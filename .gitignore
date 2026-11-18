@@ -3,3 +3,4 @@ upstream/
 *.keystore
 *.jks
 local.properties
+.secrets/
