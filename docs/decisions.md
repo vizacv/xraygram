@@ -7,3 +7,6 @@
   Почему не нативный Swift-клиент (`overtake/TelegramSwift`): у tdesktop есть рабочий upstream CI для macOS
   и тот же форк потом даёт Windows/Linux; сборка TelegramSwift под Xcode 26 сейчас сломана, CI нет.
 - **2026-11-18** — Android на паузе; материалы в `android/`.
+- **2026-11-18** — репозиторий https://github.com/vizacv/xraygram **публичный**: в публичных репо GitHub Actions
+  бесплатны без лимита, а в приватном macOS-минуты считаются ×10 (≈200 мин/мес). GPL и так требует открытый код.
+  Секреты — только GitHub Secrets.
