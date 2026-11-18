@@ -16,8 +16,10 @@
 
 | Папка | Основа | Статус |
 |---|---|---|
-| [macos/](macos/) | Telegram Desktop (`telegramdesktop/tdesktop`) | **в работе:** тестовая сборка под Apple Silicon |
-| [android/](android/) | `DrKLO/Telegram` | исследование готово, есть черновик `XrayTransport.java`; на паузе |
+| [macos/](macos/) | Telegram Desktop (`telegramdesktop/tdesktop`) | **работает** (проверено владельцем): тип прокси XRAY (VLESS), локальная сборка |
+| [ios/](ios/) | `TelegramMessenger/Telegram-iOS` | в работе: тест на iPhone друга (бесплатный Apple ID) |
+| [android/](android/) | `DrKLO/Telegram` | в работе: локальная сборка APK |
+| [testing/](testing/) | — | тест-планы и отчёты по всем платформам |
 
 ## Общее
 

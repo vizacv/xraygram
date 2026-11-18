@@ -14,6 +14,7 @@
   Коммиты и пуш делает оркестратор после проверки. Автор коммитов — `vizacv` с noreply-адресом GitHub.
 - Чужие папки не трогать. Если нужно изменить общее — написать оркестратору.
 - Секреты (api_id/api_hash, ключи подписи): в CI — GitHub Secrets; локально — `~/xraygram/.secrets/` (в .gitignore, 0600).
+- Тяжёлые сборки на Маке — по очереди: `tools/heavy-build.sh <тема> <команда>` (замок `upstream/.heavy-build.lock`).
 - Всё рабочее — внутри `~/xraygram` (сборки, кэши, тулчейны — в `upstream/`). Домашнюю папку не засорять.
 - Язык общения и документов — русский.
 
@@ -23,4 +24,6 @@
 |---|---|---|
 | Оркестратор Xraygram | `/` + `docs/` | активна |
 | Xraygram macOS (tdesktop) — `local_64b4f26b-a3e3-43c2-889b-96b5a8622be4` | `macos/` | патч + `xraygram-core` + CI приняты (коммит `863e182`); секреты `TDESKTOP_API_ID/HASH` заданы; сборка с ними запущена 2026-11-18 (run 44271794787). Дальше: локальная сборка на MacBook M5 для быстрых тестов (владелец ставит Xcode) |
-| Android | `android/` | на паузе (исследование перенесено из «Пересборка Telegram с ядром Xray») |
+| Xraygram iOS — `local_11784a51-6ae4-497c-afb6-e4e7b86f90a2` | `ios/` | старт 2026-11-18: Telegram-iOS + libXray in-process, бесплатный Apple ID |
+| Xraygram Android — `local_249734e9-91a7-4a2c-9cf6-66f7e744de7a` | `android/` | старт 2026-11-18: DrKLO/Telegram, локальная сборка |
+| Xraygram тестирование — `local_41cb505a-2a8e-4f4b-a5af-efb01e680b01` | `testing/` | старт 2026-11-18: план и проверка macOS, потом iOS/Android |
