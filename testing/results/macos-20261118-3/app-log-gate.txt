@@ -1,0 +1,36 @@
+[2026.11.18 19:27:40] Launched version: 7004004, install beta: [FALSE], debug mode: [FALSE]
+[2026.11.18 19:27:40] Executable dir: /Users/jame092/xraygram/upstream/xraygram-local/dist/, name: Xraygram-macos-20261118-3-QA.app
+[2026.11.18 19:27:40] Initial working dir: /Users/jame092/xraygram/
+[2026.11.18 19:27:40] Working dir: /Users/jame092/xraygram/upstream/xraygram-local/qa/macos-20261118-3/gate/
+[2026.11.18 19:27:40] Command line: /Users/jame092/xraygram/upstream/xraygram-local/dist/Xraygram-macos-20261118-3-QA.app/Contents/MacOS/Telegram -workdir /Users/jame092/xraygram/upstream/xraygram-local/qa/macos-20261118-3/gate/ -startintray
+[2026.11.18 19:27:40] Executable path before check: /Users/jame092/xraygram/upstream/xraygram-local/dist/Xraygram-macos-20261118-3-QA.app
+[2026.11.18 19:27:40] Logs started
+[2026.11.18 19:27:40] Connecting local socket to /tmp/f160a1924a9931a8813bf2b702ec075d-{87A94AB0-E370-4cde-98D3-ACC110C5967D}...
+[2026.11.18 19:27:40] This is the only instance of Telegram, starting server and app...
+[2026.11.18 19:27:40] Moved logging from '/Users/jame092/xraygram/upstream/xraygram-local/qa/macos-20261118-3/gate/log_start0.txt' to '/Users/jame092/xraygram/upstream/xraygram-local/qa/macos-20261118-3/gate/log.txt'!
+[2026.11.18 19:27:40] Global devicePixelRatio: 2
+[2026.11.18 19:27:40] Primary screen DPI: 72, Base: 72.
+[2026.11.18 19:27:40] Computed screen scale: 100
+[2026.11.18 19:27:40] DevicePixelRatio: 2
+[2026.11.18 19:27:40] ScreenScale: 110
+[2026.11.18 19:27:40] Media Info: Type Playback, default: BuiltInSpeakerDevice, list: { "MacBook Air Speakers" <BuiltInSpeakerDevice>, "ZoomAudioDevice" <zoom.us.zoomaudiodevice.001> }, full list refresh: true
+[2026.11.18 19:27:40] Media Info: Type Capture, default: BuiltInMicrophoneDevice, list: { "MacBook Air Microphone" <BuiltInMicrophoneDevice>, "ZoomAudioDevice" <zoom.us.zoomaudiodevice.001> }, full list refresh: true
+[2026.11.18 19:27:40] Media Info: Type Camera, default: 6C707041-05AC-0011-0003-000000000001, list: { "MacBook Air Camera" <6C707041-05AC-0011-0003-000000000001> }, full list refresh: true
+[2026.11.18 19:27:41] Font: from ':/gui/fonts/OpenSans-Italic.ttf' loaded 'Open Sans'
+[2026.11.18 19:27:41] Font: from ':/gui/fonts/OpenSans-Regular.ttf' loaded 'Open Sans'
+[2026.11.18 19:27:41] Font: from ':/gui/fonts/OpenSans-SemiBold.ttf' loaded 'Open Sans'
+[2026.11.18 19:27:41] Font: from ':/gui/fonts/OpenSans-SemiBoldItalic.ttf' loaded 'Open Sans'
+[2026.11.18 19:27:41] Font: from ':/gui/fonts/Vazirmatn-UI-NL-Regular.ttf' loaded 'Vazirmatn UI NL'
+[2026.11.18 19:27:41] Font: from ':/gui/fonts/Vazirmatn-UI-NL-SemiBold.ttf' loaded 'Vazirmatn UI NL'
+[2026.11.18 19:27:41] Xraygram: network BLOCKED (XRAY entries: no, direct allowed: no).
+[2026.11.18 19:27:41] OpenAL Logging Level: (not set)
+[2026.11.18 19:27:41] Qt version: 6.12.0 (compiled with 6.12.0)
+[2026.11.18 19:27:41] RHI: Probe backend=Metal device=Apple M5 software=no compute=yes.
+[2026.11.18 19:27:41] QRhi: backing store primed for window
+[2026.11.18 19:27:41] Title Font: .AppleSystemUIFont
+[2026.11.18 19:27:41] Touch Bar was disabled from Experimental Settings.
+[2026.11.18 19:27:42] Error: could not locate 'background.jpg' in a zip file.
+[2026.11.18 19:27:42] Renderer: [QRhi] (Window)
+[2026.11.18 19:27:42] QRhi: backing store primed for window
+[2026.11.18 19:27:42] QRhi: SurfaceRhi created
+[2026.11.18 19:27:42] Xraygram: network blocked, showing the XRAY gate (saved: 0).

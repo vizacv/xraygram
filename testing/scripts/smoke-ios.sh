@@ -53,9 +53,10 @@ log ""
 log "## B — бандл"
 check B1 "bundle id не телеграмовский ($BID)" bash -c "[[ '$BID' != ph.telegra.Telegraph* ]]"
 dn="$(plutil -extract CFBundleDisplayName raw "$APP/Info.plist" 2>/dev/null)"
-check B2 "имя на экране: $dn" test "$dn" = "Xraygram"
+bn="$(plutil -extract CFBundleName raw "$APP/Info.plist" 2>/dev/null)"
+check B2 "имя: CFBundleDisplayName=$dn, CFBundleName=$bn" test "$dn" = "Xraygram" -a "$bn" = "Xraygram"
 schemes="$(plutil -extract CFBundleURLTypes json -o - "$APP/Info.plist" 2>/dev/null | python3 -I -c 'import json,sys;print(" ".join(s for t in json.load(sys.stdin) for s in t.get("CFBundleURLSchemes",[])))' 2>/dev/null)"
-if grep -qw tg <<< "$schemes"; then warn B3 "регистрирует схемы: $schemes (tg:// может уйти в Xraygram вместо Telegram)"; else pass B3 "схемы: ${schemes:-нет}"; fi
+if grep -qwE "tg|telegram|ton|tonsite|tc" <<< "$schemes"; then fail B3 "регистрирует схемы: $schemes (tg:// может уйти в Xraygram вместо Telegram)"; else pass B3 "схемы: ${schemes:-нет}"; fi
 grep -qw vless <<< "$schemes" && pass B4 "схема vless:// зарегистрирована (FEAT-08)" || warn B4 "схема vless:// не зарегистрирована (FEAT-08)"
 
 # ---- устройство QA
@@ -121,23 +122,57 @@ if [[ -n "$P" ]]; then
 fi
 
 log ""
-log "## L — ссылка vless:// через openurl (тестовый сервер 127.0.0.1:10443)"
-if [[ -r "$TS/link-reality.txt" ]] && lsof -nP -iTCP:10443 -sTCP:LISTEN > /dev/null 2>&1; then
-	link="$(sed 's/@10\.0\.2\.2:/@127.0.0.1:/; s/#.*$/#qa-ios/' "$TS/link-reality.txt" | tr -d '\n')"
-	if xcrun simctl openurl "$UDID" "$link" > /dev/null 2>&1; then
-		sleep 6
-		xcrun simctl io "$UDID" screenshot "$OUT/ios-openurl.png" > /dev/null 2>&1
-		P="$(app_pid2)"; l="$(listens "${P:-0}")"
-		if [[ -n "$l" ]]; then
-			pass L1 "после openurl xray слушает: $l"
-		else
-			skip L1 "openurl принят, но xray не запущен (нужно подтверждение в UI) — скриншот ios-openurl.png"
-		fi
-	else
-		skip L1 "openurl vless:// не принят системой (схема не зарегистрирована)"
+log "## X — подключение через XRAY (тестовый сервер 127.0.0.1:10443, Reality)"
+# Запись без UI: сборки с поддержкой SIMCTL_CHILD_XRAYGRAM_ADD_LINK_FILE (только симулятор), иначе — openurl vless://.
+STARTED_TS=""
+if [[ -r "$TS/link-reality.txt" ]]; then
+	if ! lsof -nP -iTCP:10443 -sTCP:LISTEN > /dev/null 2>&1; then
+		nohup "$TS/xray" run -c "$TS/config.json" > /dev/null 2>&1 &
+		STARTED_TS=$!; sleep 1.5
+		log "      инфо: тестовый сервер запущен смоуком (pid $STARTED_TS)"
 	fi
+	LINKF="$(mktemp "$ROOT/upstream/qa-ios-link.XXXX")"; chmod 600 "$LINKF"
+	sed 's/@10\.0\.2\.2:/@127.0.0.1:/; s/#.*$/#qa-ios/' "$TS/link-reality.txt" | tr -d '\n' > "$LINKF"
+	ts_from=$(( $(stat -f %z "$TS/access.log" 2>/dev/null || echo 0) + 1 ))   # смещение в байтах
+	xcrun simctl terminate "$UDID" "$BID" 2>/dev/null
+	SIMCTL_CHILD_XRAYGRAM_ADD_LINK_FILE="$LINKF" xcrun simctl launch "$UDID" "$BID" > /dev/null 2>&1
+	l=""; P=""
+	for i in $(seq 1 60); do P="$(app_pid2)"; l="$(listens "${P:-0}")"; [[ -n "$l" ]] && break; sleep 0.5; done
+	rm -f "$LINKF"
+	if [[ -z "$l" ]]; then
+		skip X "сборка не умеет XRAYGRAM_ADD_LINK_FILE (xray не поднялся за 30 с) — подключение руками (README)"
+	else
+		pass X1 "запись добавлена из окружения, xray слушает: $l"
+		alog="$(ls -t "$GRP"/telegram-data/logs/app-logs/log-*.txt 2>/dev/null | head -1)"
+		[[ -n "$alog" ]] && check X2 "маркер «adding XRAY entry from environment» в логе" grep -q "adding XRAY entry from environment" "$alog"
+		sleep 5
+		xcrun simctl io "$UDID" screenshot "$OUT/ios-connected.png" > /dev/null 2>&1
+		ext="$(ext_sample "$P" 30)"
+		check X3 "30 с после подключения: процесс только на 127.0.0.1${ext:+: $(echo $ext)}" test -z "$ext"
+		acc=""
+		for i in $(seq 1 15); do   # xray пишет access.log с задержкой
+			acc="$(tail -c +"$ts_from" "$TS/access.log" 2>/dev/null | grep -oE 'accepted tcp:[^ ]+' | sed 's/accepted tcp://' | sort | uniq -c | tr -s ' ' | tr '\n' ';')"
+			grep -qE '(149\.154|91\.108|95\.161|2001:b28|2001:67c)' <<< "$acc" && break; sleep 1
+		done
+		check X4 "тестовый сервер принял соединения к DC (${acc:-нет})" bash -c "grep -qE '(149\.154|91\.108|95\.161|2001:b28|2001:67c)' <<< '$acc'"
+		if grep -qE '(^|[ ;])1\.0\.0\.0:|(^|[ ;])3\.0\.0\.0:' <<< "$acc"; then
+			fail X5 "CONNECT к 1.0.0.0/3.0.0.0 (IPv6-адрес DC ушёл как мусорный IPv4)"
+		else
+			pass X5 "нет CONNECT к 1.0.0.0/3.0.0.0$(grep -q '\[2001' <<< "$acc" && echo '; IPv6 DC идут как [2001:…]')"
+		fi
+		via="$(grep -h MTTcpConnection "$alog" 2>/dev/null | grep -oE 'via [0-9.]+:[0-9]+( using [a-z]+)?' | sort | uniq -c | tr -s ' ' | tr '\n' ';')"
+		log "      инфо: MTTcpConnection: ${via:-нет строк}"
+		# холодный старт: запись сохранилась, xray поднимается сам
+		xcrun simctl terminate "$UDID" "$BID" 2>/dev/null
+		xcrun simctl launch "$UDID" "$BID" > /dev/null 2>&1
+		l=""; for i in $(seq 1 60); do P="$(app_pid2)"; l="$(listens "${P:-0}")"; [[ -n "$l" ]] && break; sleep 0.5; done
+		check X6 "холодный старт: xray поднялся сам (${l:-не слушает})" test -n "$l"
+		ext="$(ext_sample "${P:-0}" 20)"
+		check X7 "холодный старт, 20 с: только 127.0.0.1${ext:+: $(echo $ext)}" test -z "$ext"
+	fi
+	[[ -n "$STARTED_TS" ]] && kill "$STARTED_TS" 2>/dev/null
 else
-	skip L "тестовый сервер не запущен (upstream/android-work/testserver, порт 10443)"
+	skip X "нет тестового сервера upstream/android-work/testserver"
 fi
 
 log ""

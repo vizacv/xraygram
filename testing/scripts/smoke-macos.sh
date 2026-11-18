@@ -17,7 +17,7 @@
 #      Telegram только на 127.0.0.1, падение core → перезапуск, Cmd+Q / kill -9 → ничего не остаётся
 #   Y  система до и после: прокси, туннели, автозапуск, процессы, порты
 #
-# Безопасность: приложение запускается через `open -g -n` (без фокуса) с отдельным -workdir в
+# Безопасность: GUI-шаги идут в тихой QA-копии (<app>-QA.app, macos/scripts/run-qa.sh: без Dock и окна) с -workdir в
 # upstream/xraygram-local/qa/, завершаются только процессы с этим -workdir. Чужой Xraygram не трогаем.
 # Для шага X копируется только список прокси владельца (tdata/settingss, без аккаунта), а ссылка
 # в xraygram.json подменяется на тестовый сервер: VPS владельца не используется. Пароли и ссылки не печатаются.
@@ -41,6 +41,12 @@ done
 APP="$(cd "$APP" && pwd)" || { echo "нет бандла $APP"; exit 2; }
 [[ -n "$BUILD" ]] || BUILD="$(basename "$APP" .app)"
 EXE="$APP/Contents/MacOS/Telegram"
+# GUI-шаги (G, S, X) — только в тихой QA-копии (bundle id *.qa, LSUIElement, macos/scripts/run-qa.sh), BUG-09.
+QAAPP="${APP%.app}-QA.app"
+[[ "$APP" == *-QA.app ]] && QAAPP="$APP"
+if (( ! QUICK )) && [[ ! -x "$QAAPP/Contents/MacOS/Telegram" ]]; then
+	echo "нет QA-копии $QAAPP — сделайте: macos/scripts/make-qa-app.sh $APP (или запустите с -q)"; exit 2
+fi
 CORE="$APP/Contents/MacOS/xraygram-core"
 QA="$ROOT/upstream/xraygram-local/qa/$BUILD"
 OUT="$ROOT/testing/results/$BUILD"
@@ -57,6 +63,7 @@ log() { echo "$*" | sed -E 's/(192\.168|172\.(1[6-9]|2[0-9]|3[01]))\.[0-9]+\.[0-
 pass() { log "PASS  $1  $2"; }
 fail() { log "FAIL  $1  $2"; FAILS=$((FAILS + 1)); }
 skip() { log "SKIP  $1  $2"; }
+warn() { log "WARN  $1  $2"; }
 check() { # id описание условие...
 	local id="$1" what="$2"; shift 2
 	if "$@"; then pass "$id" "$what"; else fail "$id" "$what"; fi
@@ -75,7 +82,7 @@ log "## B — бандл"
 check B1 "подпись бандла валидна" codesign --verify --deep --strict "$APP"
 id="$(plutil -extract CFBundleIdentifier raw "$APP/Contents/Info.plist" 2>/dev/null)"
 name="$(plutil -extract CFBundleName raw "$APP/Contents/Info.plist" 2>/dev/null)"
-check B2 "bundle id/имя: $id / $name" test "$id" = "io.github.xraygram.desktop" -a "$name" = "Xraygram"
+check B2 "bundle id/имя: $id / $name" bash -c "[[ '$id' == io.github.xraygram.desktop* && '$name' == Xraygram* ]]"
 check B3 "нет URL-схем tg:// в Info.plist" bash -c "! plutil -extract CFBundleURLTypes raw '$APP/Contents/Info.plist' >/dev/null 2>&1"
 ext="$(otool -L "$EXE" | tail -n +2 | awk '{print $1}' | grep -E '^/opt/homebrew|^/usr/local|/upstream/' | head -3)"
 check B4 "нет ссылок на /opt/homebrew и build-каталоги${ext:+: $ext}" test -z "$ext"
@@ -89,9 +96,9 @@ for marker in \
 	feat="${marker%%|*}"; text="${marker#*|}"
 	if grep -q -a -F "$text" "$EXE"; then pass "B7" "$feat: маркер «$text» в бинарнике"; else skip "B7" "$feat: маркера «$text» нет (сборка без фичи?)"; fi
 done
-for text in "Подключение через XRAY" "Подключиться без XRAY" "Без xray" "Удалить XRAY?"; do
+for text in "Подключение через XRAY" "Подключиться без XRAY" "Подключиться напрямую?" "Поделиться сервером" "Сохранённые серверы"; do
 	n="$(python3 -I -c "import sys;print(open(sys.argv[1],'rb').read().count(sys.argv[2].encode('utf-16-le')))" "$EXE" "$text")"
-	if (( n > 0 )); then pass "B8" "строка UI «$text» есть"; else skip "B8" "строки UI «$text» нет"; fi
+	if (( n > 0 )); then pass "B8" "строка UI «$text» есть"; else warn "B8" "строки UI «$text» нет (тексты FEAT-01…03/15)"; fi
 done
 
 # ---------------------------------------------------------------- C: core отдельно
@@ -102,7 +109,7 @@ c_check() { printf '%s' "$1" | "$CORE" check 2>&1; }
 out="$(c_check '')"; check C1 "пустая ссылка → ошибка ($out)" grep -q '^ERROR' <<< "$out"
 out="$(c_check 'garbage')"; check C2 "мусор → ошибка ($out)" grep -q '^ERROR' <<< "$out"
 out="$(c_check 'vless://abc')"; check C3 "обрезанная vless → ошибка ($out)" grep -q '^ERROR' <<< "$out"
-out="$(c_check "$FAKE")"; check C4 "Reality-ссылка → $out" grep -q '^OK vless 192.0.2.1 fake' <<< "$out"
+out="$(c_check "$FAKE")"; check C4 "Reality-ссылка → $out" grep -qE '^OK vless 192\.0\.2\.1(:443)? fake' <<< "$out"
 
 PROBE="$TMP/socks_probe.py"
 cat > "$PROBE" <<'EOF'
@@ -127,13 +134,13 @@ check C6 "слушает только 127.0.0.1 ($listen)" test "$listen" = "127
 args="$(ps -o command= -p $CP)"
 check C7 "ссылки нет в аргументах процесса" bash -c "! grep -q 'vless://' <<< '$args'"
 probe="$(python3 -I "$PROBE" 127.0.0.1 $PORT xraygram qa-pass 2>&1 | tr '\n' ' ')"
-check C8 "SOCKS: без пароля 05ff, неверный 01ff, верный 0100 ($probe)" \
-	bash -c "grep -q 'noauth 05ff' <<< '$probe' && grep -q 'badpass 01ff' <<< '$probe' && grep -q 'goodpass 0100' <<< '$probe'"
+check C8 "SOCKS: без пароля 05ff, неверный 01xx≠00, верный 0100 ($probe)" \
+	bash -c "grep -q 'noauth 05ff' <<< '$probe' && grep -qE 'badpass 01(0[1-9a-f]|[1-9a-f].)' <<< '$probe' && grep -q 'goodpass 0100' <<< '$probe'"
 check C9 "UDP ASSOCIATE отклонён (REP 7, udp:false)" grep -q 'udp 7' <<< "$probe"
 printf '%s' "$FAKE" | XRAYGRAM_SOCKS_USER=xraygram XRAYGRAM_SOCKS_PASS=x "$CORE" run -listen 127.0.0.1:$PORT > "$TMP/busy.out" 2>&1 &
 BP=$!; sleep 1.5
 if kill -0 $BP 2>/dev/null; then kill $BP; fail C10 "второй core сел на занятый порт (SO_REUSEPORT, BUG-11): новый процесс забирает соединения"; else
-	check C10 "занятый порт → ошибка bind" grep -q 'address already in use' "$TMP/busy.out"; fi
+	check C10 "занятый порт → ошибка bind (BUG-11)" grep -qiE 'address already in use|EADDRINUSE' "$TMP/busy.out"; fi
 t0=$(now); kill -TERM $CP; for i in $(seq 1 30); do kill -0 $CP 2>/dev/null || break; sleep 0.1; done
 check C11 "SIGTERM → выход за $(since $t0) с" bash -c "! kill -0 $CP 2>/dev/null"
 sh -c "printf '%s' '$FAKE' | XRAYGRAM_SOCKS_USER=xraygram XRAYGRAM_SOCKS_PASS=x '$CORE' run -listen 127.0.0.1:39102 & echo \$! > '$TMP/child.pid'; wait" > /dev/null 2>&1 &
@@ -143,18 +150,20 @@ if kill -0 "$CH" 2>/dev/null; then kill "$CH"; fail C12 "core пережил с�
 
 # ---------------------------------------------------------------- запуск приложения
 app_pid() { pgrep -f "MacOS/Telegram -workdir $1/" | head -1; }
-launch() { # workdir
-	open -g -n -a "$APP" --args -workdir "$1/"
+launch() { # workdir — тихая QA-копия, без окна на переднем плане
+	bash "$ROOT/macos/scripts/run-qa.sh" "$QAAPP" "$1" > /dev/null
 	local i p
 	for i in $(seq 1 100); do p="$(app_pid "$1")"; [[ -n "$p" ]] && { echo "$p"; return 0; }; sleep 0.1; done
 	return 1
 }
-quit_pid() { # pid → graceful quit (тот же Apple Event, что Cmd+Q), адресно по PID
+quit_pid() { # pid → штатный выход (Apple Event quit, как Cmd+Q), адресно по PID; если не принял — SIGTERM
+	local p="$1"
+	( sleep 4; kill -0 "$p" 2>/dev/null && kill -TERM "$p" ) > /dev/null 2>&1 &
 	osascript -l JavaScript -e "ObjC.import('AppKit'); var a=\$.NSRunningApplication.runningApplicationWithProcessIdentifier($1); a ? a.terminate : false" > /dev/null 2>&1
 }
 wait_gone() { local i; for i in $(seq 1 ${2:-50}); do kill -0 "$1" 2>/dev/null || return 0; sleep 0.1; done; return 1; }
 wait_log() { # файл шаблон секунд
-	local i; for i in $(seq 1 $(( ${3:-20} * 10 ))); do grep -q -F "$2" "$1" 2>/dev/null && return 0; sleep 0.1; done; return 1
+	local i; for i in $(seq 1 $(( ${3:-20} * 10 ))); do grep -q -i -F "$2" "$1" 2>/dev/null && return 0; sleep 0.1; done; return 1
 }
 ext_conns() { # pid → внешние соединения (не 127.0.0.1/::1)
 	lsof -nP -a -p "$1" -i 2>/dev/null | awk 'NR>1{print $8, $9, $10}' | awk '$2 ~ /->/' | grep -v -E -- '->(127\.0\.0\.1|\[::1\]):' || true
@@ -184,9 +193,9 @@ else
 	log "## G — FEAT-03: чистый профиль"
 	WD="$QA/gate"; rm -rf "$WD"; mkdir -p "$WD"
 	if P="$(launch "$WD")"; then
-		pass G1 "приложение запущено (pid $P, open -g, workdir qa/gate)"
+		pass G1 "QA-копия запущена в фоне (pid $P, run-qa.sh, workdir qa/gate)"
 		if wait_log "$WD/log.txt" "network blocked" 25; then
-			pass G2 "в логе: $(grep -o 'Xraygram: network blocked.*' "$WD/log.txt" | head -1)"
+			pass G2 "в логе: $(grep -o -i 'Xraygram: network blocked.*' "$WD/log.txt" | head -2 | tr '\n' ' ')"
 		else
 			fail G2 "нет строки «network blocked» в log.txt за 25 с"
 		fi
@@ -195,6 +204,10 @@ else
 		# если блокировку снял человек («Подключиться без XRAY» → подтверждение), это видно по флагу
 		da="$(jq -r '.directAllowed // false' "$WD/tdata/xraygram.json" 2>/dev/null || echo false)"
 		[[ "$da" == true ]] && log "      ВНИМАНИЕ: в профиле directAllowed=true — кто-то нажал «Подключиться без XRAY», G3 не показателен"
+		# фон: QA-копия не должна становиться активным приложением (BUG-09)
+		front="$(lsappinfo info -only pid "$(lsappinfo front)" 2>/dev/null | grep -oE '[0-9]+$')"
+		check G8 "тестовый экземпляр не на переднем плане (front pid ${front:-?})" test "${front:-0}" != "$P"
+		grep -qi "user chose to connect directly" "$WD/log.txt" && log "      ВНИМАНИЕ: в логе «user chose to connect directly» — G3 не показателен"
 		check G4 "core не запущен" test -z "$(pgrep -P "$P" xraygram-core)"
 		lst="$(lsof -nP -a -p "$P" -iTCP -sTCP:LISTEN 2>/dev/null | awk 'NR>1{print $9}' | tr '\n' ' ')"
 		check G5 "приложение ничего не слушает${lst:+: $lst}" test -z "$lst"
@@ -215,11 +228,11 @@ else
 	jq -n --arg link "$FAKE" '{version:2, entries:[{link:$link, port:39111, password:"qa-saved", summary:"vless 192.0.2.1 fake"}]}' > "$WD/tdata/xraygram.json"
 	chmod 600 "$WD/tdata/xraygram.json"
 	if P="$(launch "$WD")"; then
-		if wait_log "$WD/log.txt" "network blocked" 25; then
-			line="$(grep -o 'Xraygram: network blocked.*' "$WD/log.txt" | head -1)"
+		if wait_log "$WD/log.txt" "showing the XRAY gate" 25; then
+			line="$(grep -o 'Xraygram: network blocked, showing the XRAY gate.*' "$WD/log.txt" | head -1)"
 			check S1 "экран с сохранённой ссылкой: $line" grep -q 'saved: 1' <<< "$line"
 		else
-			fail S1 "нет строки «network blocked» за 25 с"
+			fail S1 "нет строки «showing the XRAY gate» за 25 с"
 		fi
 		sleep 3
 		check S2 "core для неактивной ссылки не запущен" test -z "$(pgrep -P "$P" xraygram-core)"
