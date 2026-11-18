@@ -9,7 +9,9 @@
   ставим задачи и принимаем результаты. Ведёт `docs/`.
 - **Системные темы** — по одной на платформу. Каждая работает только в своей папке
   и ведёт там свою базу знаний (`<система>/README.md` + заметки).
-- Реестр тем и правила: [docs/orchestration.md](docs/orchestration.md).
+- **Регламент (роли, поток, реестры): [docs/process.md](docs/process.md).**
+- Бэклог: [docs/backlog.md](docs/backlog.md) · баги: [docs/bugs.md](docs/bugs.md) · сборки: [docs/builds.md](docs/builds.md).
+- Реестр тем: [docs/orchestration.md](docs/orchestration.md).
 - Решения: [docs/decisions.md](docs/decisions.md).
 
 ## Системы
@@ -19,10 +21,11 @@
 | [macos/](macos/) | Telegram Desktop (`telegramdesktop/tdesktop`) | **работает** (проверено владельцем): тип прокси XRAY (VLESS), локальная сборка |
 | [ios/](ios/) | `TelegramMessenger/Telegram-iOS` | в работе: тест на iPhone друга (бесплатный Apple ID) |
 | [android/](android/) | `DrKLO/Telegram` | в работе: локальная сборка APK |
-| [testing/](testing/) | — | тест-планы и отчёты по всем платформам |
+| [testing/](testing/) | — | QA: тест-планы, автосмоук, отчёты |
+| [product/](product/) | — | продукт: спецификации фич, паритет платформ |
 
 ## Общее
 
 - `upstream/` — локальные клоны исходников для чтения кода (в git не коммитятся).
 - Ядро: [XTLS/libXray](https://github.com/XTLS/libXray) (`Invoke` API, см. [android/research.md](android/research.md#api-libxray-invoke)).
-- Сборки — в GitHub Actions, публикация в GitHub-репозиторий проекта.
+- Сборки — локально на Маке по очереди (`tools/heavy-build.sh`); CI — эталонные сборки по кнопке.
