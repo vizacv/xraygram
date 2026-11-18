@@ -101,18 +101,20 @@ index 00000000..73c00596
 +  }
 +}
 diff --git a/Telegram/Telegram-iOS/en.lproj/Localizable.strings b/Telegram/Telegram-iOS/en.lproj/Localizable.strings
-index 0c6e4e28..13ac949e 100644
+index 0c6e4e28..eaec8c3a 100644
 --- a/Telegram/Telegram-iOS/en.lproj/Localizable.strings
 +++ b/Telegram/Telegram-iOS/en.lproj/Localizable.strings
-@@ -402,7 +402,7 @@
+@@ -402,8 +402,8 @@
  "Date.ChatDateHeaderYear" = "%1$@ %2$@, %3$@";
  
  // Tour
 -"Tour.Title1" = "Telegram";
+-"Tour.Text1" = "The world's **fastest** messaging app.\nIt is **free** and **secure**.";
 +"Tour.Title1" = "Xraygram";
- "Tour.Text1" = "The world's **fastest** messaging app.\nIt is **free** and **secure**.";
++"Tour.Text1" = "An unofficial Telegram client that connects through your own **XRAY** server.";
  
  "Tour.Title2" = "Fast";
+ "Tour.Text2" = "**Telegram** delivers messages\nfaster than any other application.";
 diff --git a/build-system/Make/BuildConfiguration.py b/build-system/Make/BuildConfiguration.py
 index d7354475..0fe121ac 100644
 --- a/build-system/Make/BuildConfiguration.py
@@ -1716,8 +1718,119 @@ index 56178cf9..04c0cafc 100644
          "//submodules/SSignalKit/SSignalKit",
          "//submodules/Postbox:Postbox",
      	"//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
+diff --git a/submodules/TelegramCallsUI/Sources/PresentationCall.swift b/submodules/TelegramCallsUI/Sources/PresentationCall.swift
+index bca04008..8c484456 100644
+--- a/submodules/TelegramCallsUI/Sources/PresentationCall.swift
++++ b/submodules/TelegramCallsUI/Sources/PresentationCall.swift
+@@ -1,6 +1,7 @@
+ import Foundation
+ import UIKit
+ import TelegramCore
++import XraygramKit
+ import SwiftSignalKit
+ import Display
+ import AVFoundation
+@@ -13,6 +14,7 @@ import UniversalMediaPlayer
+ import AccountContext
+ import DeviceProximity
+ import PhoneNumberFormat
++import PresentationDataUtils
+ import LiquidGlassShapes
+ 
+ public final class PresentationCallImpl: PresentationCall {
+@@ -156,6 +158,9 @@ public final class PresentationCallImpl: PresentationCall {
+     private var upgradedToConferenceCompletions = Bag<(PresentationGroupCall) -> Void>()
+     
+     private var isAcceptingIncomingConference: Bool = false
++    // Xraygram (PAR-15, FEAT-04 п. 6): конференция идёт напрямую — спросить один раз за звонок.
++    private var xraygramConferenceConfirmed = false
++    private var xraygramConferenceAsking = false
+     private var waitForConferenceCallReadyDisposable: Disposable?
+     private let conferenceStatePromise = ValuePromise<PresentationCallConferenceState?>(nil)
+     public private(set) var conferenceStateValue: PresentationCallConferenceState? {
+@@ -855,7 +860,7 @@ public final class PresentationCallImpl: PresentationCall {
+         }
+         
+         if let conferenceCallData {
+-            if self.conferenceCallDisposable == nil {
++            if self.conferenceCallDisposable == nil, !self.xraygramHoldConference() {
+                 let conferenceCallSignal = self.context.engine.calls.getCurrentGroupCall(reference: conferenceCallData)
+                 self.conferenceCallDisposable = (conferenceCallSignal
+                 |> deliverOnMainQueue).startStrict(next: { [weak self] groupCall in
+@@ -1042,7 +1047,7 @@ public final class PresentationCallImpl: PresentationCall {
+                         }
+                         
+                         if let inlineConferenceSlug {
+-                            if self.conferenceCallDisposable == nil {
++                            if self.conferenceCallDisposable == nil, !self.xraygramHoldConference() {
+                                 let conferenceCallSignal = self.context.engine.calls.getCurrentGroupCall(reference: .link(slug: inlineConferenceSlug))
+                                 self.conferenceCallDisposable = (conferenceCallSignal
+                                 |> deliverOnMainQueue).startStrict(next: { [weak self] groupCall in
+@@ -1718,6 +1723,45 @@ public final class PresentationCallImpl: PresentationCall {
+         self.videoCapturer?.setIsVideoEnabled(!isPaused)
+     }
+     
++    /// Xraygram: звонок идёт через XRAY, а переход в конференцию увёл бы его напрямую — диалог «Без XRAY».
++    /// Возвращает true, если переход надо придержать (диалог показан или уже на экране).
++    private func xraygramAskBeforeConference(proceed: @escaping () -> Void, cancel: @escaping () -> Void) -> Bool {
++        guard self.proxyServer?.xrayLink != nil, !self.xraygramConferenceConfirmed else {
++            return false
++        }
++        if self.xraygramConferenceAsking {
++            return true
++        }
++        self.xraygramConferenceAsking = true
++        let (presentationData, present, _) = self.getDeviceAccessData()
++        let xs = XrayStrings(appLanguageCode: presentationData.strings.primaryComponent.languageCode)
++        present(textAlertController(sharedContext: self.context.sharedContext, title: xs.withoutXrayTitle, text: xs.withoutXrayText, actions: [
++            TextAlertAction(type: .genericAction, title: xs.cancel, action: { [weak self] in
++                self?.xraygramConferenceAsking = false
++                cancel()
++            }),
++            TextAlertAction(type: .defaultAction, title: xs.proceed, action: { [weak self] in
++                self?.xraygramConferenceAsking = false
++                self?.xraygramConferenceConfirmed = true
++                proceed()
++            })
++        ]), nil)
++        return true
++    }
++    
++    /// Xraygram: собеседник перевёл звонок в конференцию или входящий звонок — конференция: после
++    /// «Продолжить» повторить шаг с теми же данными, «Отмена» — отказаться (иначе звонок повиснет).
++    private func xraygramHoldConference() -> Bool {
++        return self.xraygramAskBeforeConference(proceed: { [weak self] in
++            guard let self, let sessionState = self.sessionState else {
++                return
++            }
++            self.updateSessionState(sessionState: sessionState, callContextState: self.callContextState, reception: self.reception, audioSessionControl: self.audioSessionControl)
++        }, cancel: { [weak self] in
++            let _ = self?.hangUp().start()
++        })
++    }
++    
+     public func upgradeToConference(invitePeers: [(id: EnginePeer.Id, isVideo: Bool)], completion: @escaping (PresentationGroupCall) -> Void) -> Disposable {
+         if self.isMovedToConference {
+             return EmptyDisposable
+@@ -1726,6 +1770,16 @@ public final class PresentationCallImpl: PresentationCall {
+             completion(conferenceCall)
+             return EmptyDisposable
+         }
++        // Xraygram (PAR-15): «добавить участника» / ссылка конференции. «Отмена» — звонок 1:1 остаётся через XRAY.
++        let xraygramDisposable = MetaDisposable()
++        if self.xraygramAskBeforeConference(proceed: { [weak self] in
++            guard let self else {
++                return
++            }
++            xraygramDisposable.set(self.upgradeToConference(invitePeers: invitePeers, completion: completion))
++        }, cancel: {}) {
++            return xraygramDisposable
++        }
+         
+         self.pendingInviteToConferencePeerIds = invitePeers
+         let index = self.upgradedToConferenceCompletions.add({ call in
 diff --git a/submodules/TelegramCallsUI/Sources/PresentationCallManager.swift b/submodules/TelegramCallsUI/Sources/PresentationCallManager.swift
-index 1d4c5dae..abbf1061 100644
+index 1d4c5dae..09cb3d6d 100644
 --- a/submodules/TelegramCallsUI/Sources/PresentationCallManager.swift
 +++ b/submodules/TelegramCallsUI/Sources/PresentationCallManager.swift
 @@ -12,6 +12,7 @@ import TelegramUIPreferences
@@ -1792,17 +1905,22 @@ index 1d4c5dae..abbf1061 100644
              if let requestJoinAsPeerId = requestJoinAsPeerId, (initialCall.isStream == nil || initialCall.isStream == false) {
                  requestJoinAsPeerId({ joinAsPeerId in
                      guard let self else {
-@@ -998,6 +1023,9 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
+@@ -998,6 +1023,14 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
              }
          }
          
 +        let begin: () -> Void = { [weak self] in
-+            self?.xraygramConfirmWithoutXray(context: context, beginUnconfirmed)
++            // Xraygram: RTMP-трансляция (isStream) идёт по MTProto, то есть через XRAY, — без диалога «Без XRAY».
++            if initialCall.isStream == true {
++                beginUnconfirmed()
++            } else {
++                self?.xraygramConfirmWithoutXray(context: context, beginUnconfirmed)
++            }
 +        }
          if let currentGroupCall = self.currentGroupCallValue {
              if endCurrentIfAny {
                  switch currentGroupCall {
-@@ -1152,7 +1180,7 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
+@@ -1152,7 +1185,7 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
              }
              self.updateCurrentGroupCall(.group(call))
          }
@@ -1811,7 +1929,7 @@ index 1d4c5dae..abbf1061 100644
              guard let self else {
                  return
              }
-@@ -1183,6 +1211,9 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
+@@ -1183,6 +1216,9 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
              }
          }
          
