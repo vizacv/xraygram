@@ -1,0 +1,26 @@
+# Смоук Xraygram Android: android-20261119-1
+# 2026-11-19 01:37:39, APK upstream/android-work/dist/Xraygram-android-20261119-1.apk (53350803 байт, Nov 19 01:30:57 2026)
+
+## A — статика
+PASS  A1  sha256 совпадает с Xraygram-android-20261119-1.apk.sha256
+PASS  A2  applicationId: io.github.xraygram (не org.telegram.messenger)
+PASS  A3  имя: Xraygram, версия 13.2.2
+PASS  A4  подпись валидна (CN=Xraygram)
+      инфо: разрешения: com.google.android.c2dm.permission.RECEIVE io.github.xraygram.permission.MAPS_RECEIVE com.google.android.providers.gsf.permission.READ_GSERVICES ACCESS_COARSE_LOCATION ACCESS_FINE_LOCATION ACCESS_MEDIA_LOCATION CALL_PHONE FOREGROUND_SERVICE FOREGROUND_SERVICE_DATA_SYNC FOREGROUND_SERVICE_REMOTE_MESSAGING FOREGROUND_SERVICE_MEDIA_PLAYBACK FOREGROUND_SERVICE_MEDIA_PROJECTION FOREGROUND_SERVICE_CAMERA FOREGROUND_SERVICE_LOCATION FOREGROUND_SERVICE_MICROPHONE FOREGROUND_SERVICE_PHONE_CALL READ_CALL_LOG USE_FULL_SCREEN_INTENT READ_PHONE_STATE READ_PHONE_NUMBERS SEND_SMS READ_CLIPBOARD BLUETOOTH_CONNECT INTERNET RECORD_AUDIO MODIFY_AUDIO_SETTINGS ACCESS_NETWORK_STATE ACCESS_WIFI_STATE WAKE_LOCK READ_EXTERNAL_STORAGE READ_MEDIA_IMAGES READ_MEDIA_VIDEO READ_MEDIA_AUDIO GET_ACCOUNTS READ_CONTACTS WRITE_CONTACTS MANAGE_ACCOUNTS READ_PROFILE WRITE_SYNC_SETTINGS READ_SYNC_SETTINGS AUTHENTICATE_ACCOUNTS VIBRATE SYSTEM_ALERT_WINDOW RECEIVE_BOOT_COMPLETED USE_FINGERPRINT USE_BIOMETRIC INSTALL_SHORTCUT com.android.launcher.permission.INSTALL_SHORTCUT com.android.launcher.permission.UNINSTALL_SHORTCUT CAMERA BLUETOOTH MANAGE_OWN_CALLS REQUEST_INSTALL_PACKAGES POST_NOTIFICATIONS REQUEST_IGNORE_BATTERY_OPTIMIZATIONS FOREGROUND_SERVICE_SPECIAL_USE com.sec.android.provider.badge.permission.READ com.sec.android.provider.badge.permission.WRITE com.htc.launcher.permission.READ_SETTINGS com.htc.launcher.permission.UPDATE_SHORTCUT com.sonyericsson.home.permission.BROADCAST_BADGE com.sonymobile.home.permission.PROVIDER_INSERT_BADGE com.anddoes.launcher.permission.UPDATE_COUNT com.majeur.launcher.permission.UPDATE_BADGE com.huawei.android.launcher.permission.CHANGE_BADGE com.huawei.android.launcher.permission.READ_SETTINGS com.huawei.android.launcher.permission.WRITE_SETTINGS READ_APP_BADGE com.oppo.launcher.permission.READ_SETTINGS com.oppo.launcher.permission.WRITE_SETTINGS me.everything.badger.permission.BADGE_COUNT_READ me.everything.badger.permission.BADGE_COUNT_WRITE com.android.vending.BILLING WRITE_EXTERNAL_STORAGE io.github.xraygram.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION 
+PASS  A5  нет VPN-сервиса (BIND_VPN_SERVICE)
+PASS  A6  intent-filter для vless:// есть (FEAT-08)
+PASS  A7  нативные библиотеки arm64 есть
+PASS  A8  libXray (gomobile) в APK
+PASS  A9  строка FEAT-03 «Подключение через XRAY» есть
+PASS  A9  строка FEAT-03 «Подключиться без XRAY» есть
+
+## E — эмулятор (android/scripts/smoke-emulator.sh reality)
+PASS  E  GATE: за 20 с наружу ничего (сокетов нет)
+PASS  E  XRAY (reality): DC Telegram через тестовый сервер за 2 с
+PASS  E  XRAY: прямых соединений нет (Google для FCM — см. INFO)
+PASS  E  COLD: через xray за 4 с
+PASS  E  COLD: прямых соединений нет (Google для FCM — см. INFO)
+PASS  E  крэшей нет
+      инфо: полный вывод — testing/results/android-20261119-1/smoke-emulator.log, скриншоты — testing/results/android-20261119-1/android-smoke-*.png
+
+# Итог: 16 PASS, 0 FAIL, 0 WARN

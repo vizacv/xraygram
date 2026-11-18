@@ -1,0 +1,3126 @@
+diff --git a/TMessagesProj/build.gradle b/TMessagesProj/build.gradle
+index 445081154..352245d67 100644
+--- a/TMessagesProj/build.gradle
++++ b/TMessagesProj/build.gradle
+@@ -42,6 +42,9 @@ configurations.all {
+ }
+ 
+ dependencies {
++    // Xraygram: libXray (gomobile bind), built by android/scripts/build-local.sh libxray; packaged by the app module
++    compileOnly files('libs/libXray.aar')
++
+     implementation 'androidx.core:core:1.16.0'
+     implementation 'androidx.palette:palette:1.0.0'
+     implementation 'androidx.exifinterface:exifinterface:1.3.6'
+@@ -152,6 +155,12 @@ android {
+ 
+         multiDexEnabled true
+ 
++        // Xraygram: api_id/api_hash come from the environment (ORG_GRADLE_PROJECT_XRAYGRAM_API_ID/_HASH), never from git
++        buildConfigField "int", "XRAYGRAM_API_ID", (project.findProperty("XRAYGRAM_API_ID") ?: "0").toString()
++        // Xraygram: FCM only when built with our own Firebase project (.secrets/google-services.json), see XrayPush
++        buildConfigField "boolean", "XRAYGRAM_FCM", (project.findProperty("XRAYGRAM_FCM") ?: "false").toString()
++        buildConfigField "String", "XRAYGRAM_API_HASH", "\"" + (project.findProperty("XRAYGRAM_API_HASH") ?: "") + "\""
++
+         externalNativeBuild {
+             cmake {
+                 version '3.22.1'
+diff --git a/TMessagesProj/config/release/AndroidManifest_standalone.xml b/TMessagesProj/config/release/AndroidManifest_standalone.xml
+index 53e0fa790..4ecb3ba4a 100644
+--- a/TMessagesProj/config/release/AndroidManifest_standalone.xml
++++ b/TMessagesProj/config/release/AndroidManifest_standalone.xml
+@@ -137,6 +137,8 @@
+ 
+         <meta-data android:name="firebase_analytics_collection_deactivated" android:value="true" />
+         <meta-data android:name="google_analytics_adid_collection_enabled" android:value="false" />
++        <!-- Xraygram: FCM cannot work in a fork (keys are bound to the official app); no Firebase traffic -->
++        <meta-data android:name="firebase_messaging_auto_init_enabled" android:value="false" />
+ 
+         <receiver
+             tools:replace="android:enabled"
+diff --git a/TMessagesProj/proguard-rules.pro b/TMessagesProj/proguard-rules.pro
+index a76770e63..f53936ca3 100644
+--- a/TMessagesProj/proguard-rules.pro
++++ b/TMessagesProj/proguard-rules.pro
+@@ -8,6 +8,10 @@
+ -keep @androidx.annotation.Keep class * { *; }
+ -keepclasseswithmembers class * { @androidx.annotation.Keep *; }
+ 
++# Xraygram: libXray (gomobile) — JNI looks these up by name
++-keep class libXray.** { *; }
++-keep class go.** { *; }
++
+ -keep class org.webrtc.* { *; }
+ -keep class org.webrtc.audio.* { *; }
+ -keep class org.webrtc.voiceengine.* { *; }
+diff --git a/TMessagesProj/src/main/AndroidManifest.xml b/TMessagesProj/src/main/AndroidManifest.xml
+index 99f64adbf..7a38ba42a 100644
+--- a/TMessagesProj/src/main/AndroidManifest.xml
++++ b/TMessagesProj/src/main/AndroidManifest.xml
+@@ -62,6 +62,9 @@
+     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+     <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
+     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
++    <!-- Xraygram (FEAT-09): fallback background connection -->
++    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
++    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+ 
+     <uses-permission android:name="com.sec.android.provider.badge.permission.READ"/>
+     <uses-permission android:name="com.sec.android.provider.badge.permission.WRITE"/>
+@@ -263,30 +266,21 @@
+                 <data android:host="t.me" android:scheme="http" />
+                 <data android:host="t.me" android:scheme="https" />
+             </intent-filter>
+-            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:priority="1">
+-                <action android:name="android.intent.action.VIEW"/>
+-                <category android:name="android.intent.category.DEFAULT" />
+-                <category android:name="android.intent.category.BROWSABLE" />
+-                <data android:scheme="tonsite" />
+-            </intent-filter>
+-            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:priority="1">
+-                <action android:name="android.intent.action.VIEW" />
+-                <category android:name="android.intent.category.BROWSABLE" />
+-                <category android:name="android.intent.category.DEFAULT" />
+-                <data android:scheme="tg" />
+-            </intent-filter>
+-            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:priority="1">
++            <!-- Xraygram (BUG-13): tonsite:// is Telegram's, not registered -->
++            <!-- Xraygram (BUG-13): tg:// is Telegram's, not registered -->
++            <!-- Xraygram: share links open the "add proxy" sheet -->
++            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round">
+                 <action android:name="android.intent.action.VIEW" />
+-                <category android:name="android.intent.category.DEFAULT" />
+                 <category android:name="android.intent.category.BROWSABLE" />
+-                <data android:scheme="ton" android:host="transfer" android:pathPrefix="/" />
+-            </intent-filter>
+-            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:priority="1">
+-                <action android:name="android.intent.action.VIEW" />
+                 <category android:name="android.intent.category.DEFAULT" />
+-                <category android:name="android.intent.category.BROWSABLE" />
+-                <data android:scheme="tc" />
++                <data android:scheme="vless" />
++                <data android:scheme="vmess" />
++                <data android:scheme="trojan" />
++                <data android:scheme="hysteria2" />
++                <data android:scheme="hy2" />
+             </intent-filter>
++            <!-- Xraygram (BUG-13): ton://transfer is Telegram's, not registered -->
++            <!-- Xraygram (BUG-13): tc:// is Telegram's, not registered -->
+             <intent-filter>
+                 <action android:name="org.telegram.messenger.CREATE_STICKER_PACK"/>
+                 <category android:name="android.intent.category.DEFAULT"/>
+@@ -329,12 +323,7 @@
+             android:stateNotNeeded="true"
+             android:theme="@style/Theme.TMessages.Transparent"
+             android:exported="true">
+-            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:priority="1">
+-                <action android:name="android.intent.action.VIEW" />
+-                <category android:name="android.intent.category.BROWSABLE" />
+-                <category android:name="android.intent.category.DEFAULT" />
+-                <data android:scheme="tgb" />
+-            </intent-filter>
++            <!-- Xraygram (BUG-13): tgb:// is Telegram's, not registered -->
+         </activity>
+         <activity
+             android:name="org.telegram.ui.ExternalActionActivity"
+@@ -494,8 +483,10 @@
+             android:name=".NotificationsService"
+             android:enabled="true"
+             android:exported="true"
+-            android:foregroundServiceType="dataSync"
+-        />
++            android:foregroundServiceType="dataSync|specialUse">
++            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
++                android:value="Keeps the connection to the user's own proxy server for message notifications when Google push is unavailable" />
++        </service>
+         <service
+             android:name=".NotificationRepeat"
+             android:exported="false"
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/AndroidUtilities.java b/TMessagesProj/src/main/java/org/telegram/messenger/AndroidUtilities.java
+index d59b29a66..55c729b67 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/AndroidUtilities.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/AndroidUtilities.java
+@@ -4733,11 +4733,12 @@ public class AndroidUtilities {
+             return;
+         }
+ 
+-        final String address = settings.getAddress();
+-        final int port = settings.getPort();
++        final boolean xray = settings.getType() == ProxySettings.Type.XRAY;
++        final String address = xray ? "XRAY · " + org.telegram.utils.proxy.XrayTransport.parse(settings.getSecret()).describe() : settings.getAddress();
++        final int port = xray ? 0 : settings.getPort();
+         final String user = settings.getUser();
+         final String password = settings.getPassword();
+-        final String secret = settings.getSecret();
++        final String secret = xray ? "" : settings.getSecret(); // Xraygram: do not show the share link
+ 
+         final BottomSheet.Builder builder = new BottomSheet.Builder(activity);
+         builder.setApplyTopPadding(false);
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/ApplicationLoader.java b/TMessagesProj/src/main/java/org/telegram/messenger/ApplicationLoader.java
+index 4d0a8f5dc..0b80f2e50 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/ApplicationLoader.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/ApplicationLoader.java
+@@ -381,7 +381,7 @@ public class ApplicationLoader extends Application {
+         if (preferences.contains("pushService")) {
+             enabled = preferences.getBoolean("pushService", true);
+         } else {
+-            enabled = MessagesController.getMainSettings(UserConfig.selectedAccount).getBoolean("keepAliveService", false);
++            enabled = org.telegram.utils.proxy.XrayPush.keepAliveDefault(MessagesController.getMainSettings(UserConfig.selectedAccount).getBoolean("keepAliveService", false));
+         }
+         if (enabled) {
+             try {
+@@ -407,10 +407,22 @@ public class ApplicationLoader extends Application {
+         }
+     }
+ 
++    /** Xraygram: (re)start push registration once the XRAY gate opens. */
++    public static void initPushServicesIfReady() {
++        if (applicationLoaderInstance != null) {
++            applicationLoaderInstance.initPushServices();
++        }
++    }
++
+     private void initPushServices() {
+         AndroidUtilities.runOnUIThread(() -> {
+-            if (getPushProvider().hasServices()) {
++            if (org.telegram.utils.proxy.XrayGate.isBlocked()) {
++                return; // Xraygram: nothing until XRAY (or "direct") is chosen; XrayGate calls initPushServicesIfReady()
++            }
++            // Xraygram: FCM only with our own Firebase project (BuildConfig.XRAYGRAM_FCM), never with Telegram's keys
++            if (org.telegram.utils.proxy.XrayPush.fcmBuilt() && getPushProvider().hasServices()) {
+                 getPushProvider().onRequestPushToken();
++                org.telegram.utils.proxy.XrayPush.onAppStarted();
+             } else {
+                 if (BuildVars.LOGS_ENABLED) {
+                     FileLog.d("No valid " + getPushProvider().getLogTitle() + " APK found.");
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java b/TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java
+index ca821813f..81453035d 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java
+@@ -22,15 +22,16 @@ public class BuildVars {
+     public static boolean LOGS_ENABLED = BuildConfig.DEBUG_VERSION;
+     public static boolean DEBUG_PRIVATE_VERSION = BuildConfig.DEBUG_PRIVATE_VERSION;
+     public static boolean USE_CLOUD_STRINGS = true;
+-    public static boolean CHECK_UPDATES = true;
++    public static boolean CHECK_UPDATES = false; // Xraygram: never offer upstream Telegram APKs
+     public static boolean NO_SCOPED_STORAGE = Build.VERSION.SDK_INT <= 29;
+     public static String BUILD_VERSION_STRING = BuildConfig.BUILD_VERSION_STRING;
+ 
+-    public static int APP_ID = 4;
+-    public static String APP_HASH = "014b35b6184100b085b0d0572f9b5103";
++    // Xraygram: own api_id/api_hash from my.telegram.org, injected at build time (see android/scripts/build-local.sh)
++    public static int APP_ID = BuildConfig.XRAYGRAM_API_ID;
++    public static String APP_HASH = BuildConfig.XRAYGRAM_API_HASH;
+ 
+     // SafetyNet key for Google Identity SDK, set it to empty to disable
+-    public static String SAFETYNET_KEY = "AIzaSyDqt8P-7F7CPCseMkOiVRgb1LY8RN1bvH8";
++    public static String SAFETYNET_KEY = ""; // Xraygram: fork
+     public static String PLAYSTORE_APP_URL = "https://play.google.com/store/apps/details?id=org.telegram.messenger";
+     public static String HUAWEI_STORE_URL = "https://appgallery.huawei.com/app/C101184875";
+     public static String GOOGLE_AUTH_CLIENT_ID = "760348033671-81kmi3pi84p11ub8hp9a1funsv0rn2p9.apps.googleusercontent.com";
+@@ -38,13 +39,13 @@ public class BuildVars {
+     public static String HUAWEI_APP_ID = "101184875";
+ 
+     // You can use this flag to disable Google Play Billing (If you're making fork and want it to be in Google Play)
+-    public static boolean IS_BILLING_UNAVAILABLE = false;
++    public static boolean IS_BILLING_UNAVAILABLE = true; // Xraygram: fork
+ 
+     // works only on official app ids, disable on your forks
+-    public static boolean SUPPORTS_PASSKEYS = true;
++    public static boolean SUPPORTS_PASSKEYS = false; // Xraygram: fork
+     // the second main tab: News, or Contacts as before them
+ 
+-    public static boolean SUPPORTS_FPNV = true;
++    public static boolean SUPPORTS_FPNV = false; // Xraygram: fork
+ 
+     static {
+         if (ApplicationLoader.applicationContext != null) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/LocaleController.java b/TMessagesProj/src/main/java/org/telegram/messenger/LocaleController.java
+index 3a5413ce1..e649504bf 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/LocaleController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/LocaleController.java
+@@ -4780,14 +4780,44 @@ public class LocaleController {
+     }
+ 
+     @Nullable
++    // Xraygram (FEAT-06): prompts where "Telegram" means this app itself (permissions on the login screen etc.)
++    private static java.util.HashSet<Integer> xraygramAppNameRes;
++    private static String xraygramAppName(int res, String value) {
++        if (xraygramAppNameRes == null) {
++            xraygramAppNameRes = new java.util.HashSet<>(java.util.Arrays.asList(
++                    R.string.AllowReadCall, R.string.AllowReadCallAndLog, R.string.AllowReadCallLog, R.string.AllowFillNumber,
++                    R.string.NotificationsPermissionAlertSubtitle, R.string.QRCodePermissionNoCameraWithHint,
++                    R.string.PermissionStorageWithHint, R.string.PermissionNoAudioWithHint, R.string.PermissionNoBluetoothWithHint,
++                    R.string.PermissionNoAudioVideoWithHint, R.string.PermissionNoCameraWithHint, R.string.PermissionNoCameraMicVideo,
++                    R.string.PermissionNoLocation, R.string.PermissionNoLocationStory));
++        }
++        if (res == R.string.ContactsPermissionAlert) {
++            return value.replace("**Telegram**", "**Xraygram**"); // the second "Telegram" is the cloud service
++        }
++        if (res != 0 && xraygramAppNameRes.contains(res)) {
++            return value.replace("Telegram", "Xraygram").replace("Телеграм", "Xraygram");
++        }
++        return value;
++    }
++
+     private String getStringV2(String key, @StringRes int stringRes, String fallback) {
+         final Context context = ApplicationLoader.applicationContext;
+         String value;
+ 
++        if (stringRes == R.string.AppName || "AppName".equals(key)
++                || stringRes == R.string.Page1Title || "Page1Title".equals(key)) {
++            return "Xraygram"; // Xraygram: cloud language packs say "Telegram"
++        }
++        if (stringRes == R.string.Page1Message || "Page1Message".equals(key)) {
++            // Xraygram (FEAT-06, PAR-16): first intro slide
++            return org.telegram.utils.proxy.XrayTransport.str("Неофициальный клиент Telegram, который подключается через ваш сервер XRAY.",
++                    "An unofficial Telegram client that connects through your own XRAY server.");
++        }
++
+         if (BuildVars.USE_CLOUD_STRINGS) {
+             value = localizationExternal.getByResNameOrResId(context, key, stringRes);
+             if (value != null) {
+-                return value;
++                return xraygramAppName(stringRes, value);
+             }
+ 
+             value = localizationExternal.getByResName(fallback);
+@@ -4799,7 +4829,7 @@ public class LocaleController {
+         checkLocalizationInternal();
+         value = localizationInternal.getByResNameOrResId(context, key, stringRes);
+         if (value != null) {
+-            return value;
++            return xraygramAppName(stringRes, value);
+         }
+ 
+         return localizationInternal.getByResName(fallback);
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsService.java b/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsService.java
+index a32cd26b4..8109be507 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsService.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsService.java
+@@ -8,6 +8,12 @@
+ 
+ package org.telegram.messenger;
+ 
++import android.app.Notification;
++import android.app.NotificationChannel;
++import android.app.NotificationManager;
++import android.content.pm.ServiceInfo;
++import android.os.Build;
++
+ import android.app.Service;
+ import android.content.Intent;
+ import android.content.SharedPreferences;
+@@ -19,6 +25,37 @@ public class NotificationsService extends Service {
+     public void onCreate() {
+         super.onCreate();
+         ApplicationLoader.postInitApplication();
++        startXraygramForeground();
++    }
++
++    /** Xraygram (FEAT-09): on the fallback path the keep-alive service is foreground with "Xraygram is connected". */
++    private void startXraygramForeground() {
++        if (Build.VERSION.SDK_INT < 26 || !org.telegram.utils.proxy.XrayPush.isFallback()) {
++            return;
++        }
++        try {
++            final String channelId = "xraygram_keepalive";
++            NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
++            if (manager.getNotificationChannel(channelId) == null) {
++                NotificationChannel channel = new NotificationChannel(channelId, "Xraygram", NotificationManager.IMPORTANCE_MIN);
++                channel.setShowBadge(false);
++                manager.createNotificationChannel(channel);
++            }
++            Notification notification = new Notification.Builder(this, channelId)
++                    .setSmallIcon(R.drawable.notification)
++                    .setContentTitle(org.telegram.utils.proxy.XrayPush.keepAliveNotificationText())
++                    .setOngoing(true)
++                    .build();
++            if (Build.VERSION.SDK_INT >= 34) {
++                startForeground(9701, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
++            } else if (Build.VERSION.SDK_INT >= 29) {
++                startForeground(9701, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
++            } else {
++                startForeground(9701, notification);
++            }
++        } catch (Throwable e) {
++            FileLog.e(e); // e.g. not allowed from background: stays a plain service, as upstream
++        }
+     }
+ 
+     @Override
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/PushListenerController.java b/TMessagesProj/src/main/java/org/telegram/messenger/PushListenerController.java
+index d63cdf50c..1be8de5c7 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/PushListenerController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/PushListenerController.java
+@@ -1824,6 +1824,7 @@ public class PushListenerController {
+                                     }
+                                     SharedConfig.pushStringStatus = "__FIREBASE_FAILED__";
+                                     PushListenerController.sendRegistrationToServer(getPushType(), null);
++                                    org.telegram.utils.proxy.XrayPush.onFcmFailed(); // Xraygram: fallback
+                                     return;
+                                 }
+                                 String token = task.getResult();
+@@ -1833,6 +1834,7 @@ public class PushListenerController {
+                             });
+                 } catch (Throwable e) {
+                     FileLog.e(e);
++                    org.telegram.utils.proxy.XrayPush.onFcmFailed(); // Xraygram: fallback
+                 }
+             });
+         }
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/SharedConfig.java b/TMessagesProj/src/main/java/org/telegram/messenger/SharedConfig.java
+index 85ab1d8a3..d82b1d4c2 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/SharedConfig.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/SharedConfig.java
+@@ -1492,6 +1492,13 @@ public class SharedConfig {
+     }
+ 
+     public static void saveProxyList() {
++        for (ProxyInfo info : proxyList) {
++            if (org.telegram.utils.proxy.XrayGate.isXray(info)) {
++                // Xraygram: with an XRAY entry around, an earlier "connect directly" choice is reset
++                org.telegram.utils.proxy.XrayGate.setDirectAllowed(false);
++                break;
++            }
++        }
+         List<ProxyInfo> infoToSerialize = new ArrayList<>(proxyList);
+         Collections.sort(infoToSerialize, (o1, o2) -> {
+             long bias1 = SharedConfig.currentProxy == o1 ? -200000 : 0;
+@@ -1537,6 +1544,25 @@ public class SharedConfig {
+     }
+ 
+     public static void deleteProxy(ProxyInfo proxyInfo) {
++        if (org.telegram.utils.proxy.XrayGate.isXray(proxyInfo)) {
++            // Xraygram: keep the link for the "connect through XRAY" screen
++            org.telegram.utils.proxy.XrayGate.rememberLink(proxyInfo.settings.getSecret());
++        }
++        final ProxyInfo nextXray = currentProxy == proxyInfo && org.telegram.utils.proxy.XrayGate.isXray(proxyInfo)
++                ? org.telegram.utils.proxy.XrayGate.nextXray(proxyInfo) : null;
++        if (nextXray != null) {
++            // Xraygram (MAC-04): deleting the active XRAY entry switches to another XRAY entry, never to direct
++            currentProxy = nextXray;
++            SharedPreferences preferences = MessagesController.getGlobalMainSettings();
++            SharedPreferences.Editor editor = preferences.edit();
++            nextXray.settings.toSharedPreferences(editor);
++            editor.apply();
++            proxyList.remove(proxyInfo);
++            saveProxyList();
++            ConnectionsManager.setProxySettings(preferences.getBoolean("proxy_enabled", false), nextXray.settings);
++            org.telegram.utils.proxy.XrayTransport.pruneAsync();
++            return;
++        }
+         if (currentProxy == proxyInfo) {
+             currentProxy = null;
+             SharedPreferences preferences = MessagesController.getGlobalMainSettings();
+@@ -1550,12 +1576,22 @@ public class SharedConfig {
+             editor.putInt("proxy_port", 1080);
+             editor.putBoolean("proxy_enabled", false);
+             editor.apply();
+-            if (enabled) {
++            proxyList.remove(proxyInfo);
++            saveProxyList();
++            // Xraygram: applied after removal, so that losing the last XRAY entry closes the gate instead of going direct
++            if (enabled || org.telegram.utils.proxy.XrayGate.isBlocked()) {
+                 ConnectionsManager.setProxySettings(false, null);
+             }
++            return;
+         }
+         proxyList.remove(proxyInfo);
+         saveProxyList();
++        if (org.telegram.utils.proxy.XrayGate.isXray(proxyInfo)) {
++            org.telegram.utils.proxy.XrayTransport.pruneAsync(); // Xraygram: the deleted link leaves the running core
++        }
++        if (org.telegram.utils.proxy.XrayGate.isBlocked()) {
++            ConnectionsManager.setProxySettings(false, null); // Xraygram: last XRAY entry gone → gate
++        }
+     }
+ 
+     public static void checkSaveToGalleryFiles() {
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPGroupNotification.java b/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPGroupNotification.java
+index bd41c9f1c..b73749f68 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPGroupNotification.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPGroupNotification.java
+@@ -360,7 +360,12 @@ public class VoIPGroupNotification {
+ 
+         final TLRPC.TL_inputGroupCallInviteMessage call = new TLRPC.TL_inputGroupCallInviteMessage();
+         call.msg_id = msg_id;
+-        VoIPHelper.joinConference(LaunchActivity.instance, account, call, video, groupCall);
++        // Xraygram (FEAT-04, PAR-15): conference without XRAY — ask; "Cancel" declines the invite
++        final Runnable join = () -> VoIPHelper.joinConference(LaunchActivity.instance, account, call, video, groupCall);
++        if (org.telegram.utils.proxy.XrayCalls.confirmWithoutXray(LaunchActivity.instance, join, () -> decline(context, account, msg_id))) {
++            return;
++        }
++        join.run();
+     }
+ 
+     public static void decline(Context context, int account, int msg_id) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPService.java b/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPService.java
+index 415aff0b5..d6bdbe084 100755
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPService.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPService.java
+@@ -1159,7 +1159,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
+ 				reqCall.protocol.udp_reflector = true;
+ 				reqCall.protocol.min_layer = CALL_MIN_LAYER;
+ 				reqCall.protocol.max_layer = Instance.getConnectionMaxLayer();
+-				Collections.addAll(reqCall.protocol.library_versions, NativeInstance.getAllVersions());
++				Collections.addAll(reqCall.protocol.library_versions, org.telegram.utils.proxy.XrayCalls.versions()); // Xraygram: only proxied versions with XRAY
+ 				VoIPService.this.g_a = g_a;
+ 				reqCall.g_a_hash = Utilities.computeSHA256(g_a, 0, g_a.length);
+ 				reqCall.random_id = Utilities.random.nextInt();
+@@ -1866,6 +1866,20 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
+ 					tgVoip[CAPTURE_DEVICE_CAMERA] = null;
+ 				}
+ 
++				// Xraygram (FEAT-04, PAR-15): the other side turned the call into a conference, which bypasses XRAY
++				if (org.telegram.utils.proxy.XrayCalls.xrayActive()) {
++					final Runnable join = () -> startConferenceGroupCall(false, 0, null, false);
++					AndroidUtilities.runOnUIThread(() -> {
++						if (!org.telegram.utils.proxy.XrayCalls.confirmWithoutXray(LaunchActivity.instance, join, this::hangUp)) {
++							if (LaunchActivity.instance == null) {
++								hangUp(); // nobody to ask: do not go direct silently
++							} else {
++								join.run();
++							}
++						}
++					});
++					return;
++				}
+ 				startConferenceGroupCall(false, 0, null, false);
+ 			} else if (phoneCall.reason instanceof TLRPC.TL_phoneCallDiscardReasonBusy) {
+ 				dispatchStateChanged(STATE_BUSY);
+@@ -2034,7 +2048,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
+ 		req.protocol.max_layer = Instance.getConnectionMaxLayer();
+ 		req.protocol.min_layer = CALL_MIN_LAYER;
+ 		req.protocol.udp_p2p = req.protocol.udp_reflector = true;
+-		Collections.addAll(req.protocol.library_versions, NativeInstance.getAllVersions());
++		Collections.addAll(req.protocol.library_versions, org.telegram.utils.proxy.XrayCalls.versions()); // Xraygram: only proxied versions with XRAY
+ 		ConnectionsManager.getInstance(currentAccount).sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
+ 			if (error != null) {
+ 				callFailed();
+@@ -3577,7 +3591,22 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
+ 			final boolean enableNs = !(sysNsAvailable && serverConfig.useSystemNs);
+ 			final String logFilePath = BuildVars.DEBUG_VERSION ? VoIPHelper.getLogFilePath("voip" + privateCall.id) : VoIPHelper.getLogFilePath("" + privateCall.id, false);
+ 			final String statsLogFilePath = VoIPHelper.getLogFilePath("" + privateCall.id, true);
+-			final Instance.Config config = new Instance.Config(initializationTimeout, receiveTimeout, voipDataSaving, privateCall.p2p_allowed, enableAec, enableNs, true, false, serverConfig.enableStunMarking, logFilePath, statsLogFilePath, privateCall.protocol.max_layer, privateCall.custom_parameters == null ? "" : privateCall.custom_parameters.data);
++			// Xraygram: with an active XRAY entry the call goes only through TCP relays via xray's SOCKS5, no P2P/UDP
++			Instance.Proxy xrayCallProxy = null;
++			final SharedConfig.ProxyInfo xrayCurrent = SharedConfig.currentProxy;
++			if (SharedConfig.isProxyEnabled() && xrayCurrent != null && xrayCurrent.settings.getType() == org.telegram.utils.proxy.ProxySettings.Type.XRAY) {
++				final int xrayPort = org.telegram.utils.proxy.XrayTransport.startAsync(xrayCurrent.settings.getSecret());
++				if (xrayPort != 0) {
++					xrayCallProxy = new Instance.Proxy("127.0.0.1", xrayPort, org.telegram.utils.proxy.XrayTransport.SOCKS_USER, org.telegram.utils.proxy.XrayTransport.getSocksPassword());
++				}
++				// "better not connect than leak": no local port, or a version that does not take the proxy
++				if (xrayCallProxy == null || !org.telegram.utils.proxy.XrayCalls.versionAllowed(privateCall.protocol.library_versions.get(0))) {
++					FileLog.e("xraygram: call cannot go through xray (port " + xrayPort + ", version " + privateCall.protocol.library_versions.get(0) + "), failing it");
++					callFailed();
++					return;
++				}
++			}
++			final Instance.Config config = new Instance.Config(initializationTimeout, receiveTimeout, voipDataSaving, privateCall.p2p_allowed && xrayCallProxy == null, enableAec, enableNs, true, false, serverConfig.enableStunMarking, logFilePath, statsLogFilePath, privateCall.protocol.max_layer, privateCall.custom_parameters == null ? "" : privateCall.custom_parameters.data);
+ 			lastLogFilePath = logFilePath;
+ 
+ 			// persistent state
+@@ -3627,7 +3656,10 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
+ 				}
+ 			}
+ 			// init
+-			tgVoip[CAPTURE_DEVICE_CAMERA] = Instance.makeInstance(privateCall.protocol.library_versions.get(0), config, persistentStateFilePath, endpoints, null, getNetworkType(), encryptionKey, remoteSink[CAPTURE_DEVICE_CAMERA], captureDevice[CAPTURE_DEVICE_CAMERA], (uids, levels, voice) -> {
++			if (BuildVars.LOGS_ENABLED) {
++				FileLog.d("xraygram: call via xray proxy: " + (xrayCallProxy != null));
++			}
++			tgVoip[CAPTURE_DEVICE_CAMERA] = Instance.makeInstance(privateCall.protocol.library_versions.get(0), config, persistentStateFilePath, endpoints, xrayCallProxy, getNetworkType(), encryptionKey, remoteSink[CAPTURE_DEVICE_CAMERA], captureDevice[CAPTURE_DEVICE_CAMERA], (uids, levels, voice) -> {
+ 				if (sharedInstance == null || privateCall == null) {
+ 					return;
+ 				}
+@@ -4517,7 +4549,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
+ 				req1.protocol.udp_p2p = req1.protocol.udp_reflector = true;
+ 				req1.protocol.min_layer = CALL_MIN_LAYER;
+ 				req1.protocol.max_layer = Instance.getConnectionMaxLayer();
+-				Collections.addAll(req1.protocol.library_versions, NativeInstance.getAllVersions());
++				Collections.addAll(req1.protocol.library_versions, org.telegram.utils.proxy.XrayCalls.versions()); // Xraygram: only proxied versions with XRAY
+ 				ConnectionsManager.getInstance(currentAccount).sendRequest(req1, (response1, error1) -> AndroidUtilities.runOnUIThread(() -> {
+ 					if (error1 == null) {
+ 						if (BuildVars.LOGS_ENABLED) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/tgnet/ConnectionsManager.java b/TMessagesProj/src/main/java/org/telegram/tgnet/ConnectionsManager.java
+index ab54ee378..0d11528b6 100644
+--- a/TMessagesProj/src/main/java/org/telegram/tgnet/ConnectionsManager.java
++++ b/TMessagesProj/src/main/java/org/telegram/tgnet/ConnectionsManager.java
+@@ -48,6 +48,8 @@ import org.telegram.messenger.UserConfig;
+ import org.telegram.messenger.Utilities;
+ import org.telegram.utils.proxy.WebProxyConnectionTester;
+ import org.telegram.utils.proxy.WebProxyTransport;
++import org.telegram.utils.proxy.XrayGate;
++import org.telegram.utils.proxy.XrayTransport;
+ import org.telegram.utils.proxy.ProxySettings;
+ import org.telegram.ui.Components.VideoPlayer;
+ import org.telegram.ui.LoginActivity;
+@@ -295,7 +297,7 @@ public class ConnectionsManager extends BaseController {
+         if (preferences.contains("pushConnection")) {
+             return preferences.getBoolean("pushConnection", true);
+         } else {
+-            return MessagesController.getMainSettings(UserConfig.selectedAccount).getBoolean("backgroundConnection", false);
++            return org.telegram.utils.proxy.XrayPush.keepAliveDefault(MessagesController.getMainSettings(UserConfig.selectedAccount).getBoolean("backgroundConnection", false));
+         }
+     }
+ 
+@@ -672,11 +674,19 @@ public class ConnectionsManager extends BaseController {
+     public void init(int version, int layer, int apiId, String deviceModel, String systemVersion, String appVersion, String langCode, String systemLangCode, String configPath, String logPath, String regId, String cFingerprint, int timezoneOffset, long userId, boolean userPremium, boolean enablePushConnection) {
+         final SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
+         final ProxySettings proxySettings = ProxySettings.fromSharedPreferences(preferences);
+-        if (preferences.getBoolean("proxy_enabled", false) && proxySettings.isValid()) {
++        if (XrayGate.isBlocked()) {
++            // Xraygram: no XRAY entry yet and no explicit "direct" choice: nothing goes to Telegram
++            native_setProxySettings(currentAccount, XrayGate.BLACKHOLE_ADDRESS, XrayGate.BLACKHOLE_PORT, XrayTransport.SOCKS_USER, "blocked", "");
++        } else if (preferences.getBoolean("proxy_enabled", false) && proxySettings.isValid()) {
+             if (proxySettings.getType() == ProxySettings.Type.WEB) {
+                 int localPort = WebProxyTransport.start(proxySettings.getAddress(), proxySettings.getSecret());
+                 native_setProxySettings(currentAccount, "127.0.0.1", localPort != 0 ? localPort : 9, "", "",
+                         proxySettings.getSecret());
++            } else if (proxySettings.getType() == ProxySettings.Type.XRAY) {
++                // Xraygram: plain SOCKS5 to the in-process Xray; the share link never reaches native code
++                int localPort = XrayTransport.startAsync(proxySettings.getSecret());
++                native_setProxySettings(currentAccount, "127.0.0.1", localPort != 0 ? localPort : 9,
++                        XrayTransport.SOCKS_USER, XrayTransport.getSocksPassword(), "");
+             } else {
+                 native_setProxySettings(currentAccount, proxySettings.getAddress(), proxySettings.getPort(),
+                         proxySettings.getUser(), proxySettings.getPassword(), proxySettings.getSecret());
+@@ -781,6 +791,18 @@ public class ConnectionsManager extends BaseController {
+             WebProxyConnectionTester.getInstance().checkProxy(settings, requestTimeDelegate, this::checkWebProxyInternal);
+             return 0;
+         }
++        if (settings.getType() == ProxySettings.Type.XRAY) {
++            // Xraygram: MTProto ping through the in-process Xray (started if needed)
++            XrayTransport.withRunning(settings.getSecret(), port -> {
++                if (port == 0) {
++                    requestTimeDelegate.run(-1);
++                } else {
++                    native_checkProxy(currentAccount, "127.0.0.1", port, XrayTransport.SOCKS_USER,
++                            XrayTransport.getSocksPassword(), "", requestTimeDelegate);
++                }
++            });
++            return 0;
++        }
+ 
+         return native_checkProxy(currentAccount, settings.getAddress(), settings.getPort(), settings.getUser(), settings.getPassword(), settings.getSecret(), requestTimeDelegate);
+     }
+@@ -898,6 +920,9 @@ public class ConnectionsManager extends BaseController {
+     }
+ 
+     public static void onRequestNewServerIpAndPort(final int second, final int currentAccount) {
++        if (XrayGate.isBlocked()) {
++            return; // Xraygram: no DoH/backup-address lookups while the XRAY gate is closed
++        }
+         Utilities.globalQueue.postRunnable(() -> {
+             boolean networkOnline = ApplicationLoader.isNetworkOnline();
+             Utilities.stageQueue.postRunnable(() -> {
+@@ -983,6 +1008,15 @@ public class ConnectionsManager extends BaseController {
+     }
+ 
+     public static void setProxySettings(boolean enabled, ProxySettings settings) {
++        if (XrayGate.isBlocked()) {
++            // Xraygram: the gate overrides whatever proxy settings are saved
++            WebProxyTransport.stop();
++            XrayTransport.stopAsync();
++            for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
++                native_setProxySettings(a, XrayGate.BLACKHOLE_ADDRESS, XrayGate.BLACKHOLE_PORT, XrayTransport.SOCKS_USER, "blocked", "");
++            }
++            return;
++        }
+         String address = "";
+         int port = 0;
+         String username = "";
+@@ -1005,8 +1039,19 @@ public class ConnectionsManager extends BaseController {
+             } else {
+                 WebProxyTransport.stop();
+             }
++            if (settings.getType() == ProxySettings.Type.XRAY) {
++                int localPort = XrayTransport.startAsync(secret);
++                address = "127.0.0.1";
++                port = localPort != 0 ? localPort : 9;
++                username = XrayTransport.SOCKS_USER;
++                password = XrayTransport.getSocksPassword();
++                secret = "";
++            } else {
++                XrayTransport.stopAsync();
++            }
+         } else {
+             WebProxyTransport.stop();
++            XrayTransport.stopAsync();
+         }
+ 
+         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/voip/VoIPHelper.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/voip/VoIPHelper.java
+index cb6f2e2a7..eecadaf3c 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/voip/VoIPHelper.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/voip/VoIPHelper.java
+@@ -130,6 +130,13 @@ public class VoIPHelper {
+ 		if (activity == null) {
+ 			return;
+ 		}
++		// Xraygram (FEAT-04): group calls / video chats do not go through XRAY — ask first.
++		// RTMP streams are watched over MTProto (i.e. through XRAY) — no dialog.
++		final ChatObject.Call xrayExistingCall = chat != null ? accountInstance.getMessagesController().getGroupCall(chat.id, false) : null;
++		final boolean xrayRtmp = xrayExistingCall != null && xrayExistingCall.call != null && xrayExistingCall.call.rtmp_stream;
++		if (!xrayRtmp && org.telegram.utils.proxy.XrayCalls.confirmWithoutXray(activity, () -> startCall(chat, peer, hash, createCall, checkJoiner, activity, fragment, accountInstance))) {
++			return;
++		}
+ 		if (ConnectionsManager.getInstance(UserConfig.selectedAccount).getConnectionState() != ConnectionsManager.ConnectionStateConnected) {
+ 			boolean isAirplaneMode = Settings.System.getInt(activity.getContentResolver(), Settings.System.AIRPLANE_MODE_ON, 0) != 0;
+ 			AlertDialog.Builder bldr = new AlertDialog.Builder(activity)
+@@ -254,6 +261,10 @@ public class VoIPHelper {
+ 		if (activity == null) {
+ 			return;
+ 		}
++		// Xraygram (FEAT-04): conferences do not go through XRAY — ask first
++		if (org.telegram.utils.proxy.XrayCalls.confirmWithoutXray(activity, () -> joinConference(activity, account, inputGroupCall, videoCall, preloadedCall, inviteUsers))) {
++			return;
++		}
+ 
+ 		if (VoIPService.getSharedInstance() != null) {
+ 			VoIPService.getSharedInstance().hangUp(() -> {
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/IntroActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/IntroActivity.java
+index 9f8f0977b..6ec013a6e 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/IntroActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/IntroActivity.java
+@@ -157,7 +157,7 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
+         logoDrawable = context.getResources().getDrawable(R.drawable.telegram_logo).mutate();
+         logoDrawable.setBounds(0, dp(8.666f), dp(115), dp(35));
+         SpannableStringBuilder ssb = new SpannableStringBuilder(LocaleController.getString(R.string.Page1Title));
+-        ssb.setSpan(new ImageSpan(logoDrawable), 0, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
++        // Xraygram: plain "Xraygram" text instead of the Telegram wordmark image
+         titles[0] = ssb;
+ 
+ 
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/LaunchActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/LaunchActivity.java
+index 1dd2ffee8..3ab37f99a 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/LaunchActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/LaunchActivity.java
+@@ -6118,6 +6118,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
+ 
+     private boolean firstAppUpdateCheck = true;
+     public void checkAppUpdate(boolean force, Browser.Progress progress) {
++        if (true) {
++            return; // Xraygram: updates of official Telegram do not apply to this fork
++        }
+         if (!ApplicationLoader.isStandaloneBuild() && !ApplicationLoader.isBetaBuild()) {
+             return;
+         }
+@@ -7209,6 +7212,10 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
+     @Override
+     protected void onResume() {
+         super.onResume();
++        AndroidUtilities.runOnUIThread(() -> {
++            org.telegram.utils.proxy.XrayGate.showIfNeeded(this); // Xraygram: XRAY gate (FEAT-03)
++            org.telegram.utils.proxy.XrayPush.showExplanationIfNeeded(this); // Xraygram: background notifications (FEAT-09)
++        });
+         WidgetMedia.onAppPaused(false);
+         isResumed = true;
+         PipCoordinator.getInstance().onActivityResume(this);
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/LoginActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/LoginActivity.java
+index dac59c13a..58be902a7 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/LoginActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/LoginActivity.java
+@@ -9123,7 +9123,11 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
+         final boolean proxyEnabled = preferences.getBoolean("proxy_enabled", false) && !TextUtils.isEmpty(proxyAddress);
+         final boolean connected = currentConnectionState == ConnectionsManager.ConnectionStateConnected || currentConnectionState == ConnectionsManager.ConnectionStateUpdating;
+         final boolean connecting = currentConnectionState == ConnectionsManager.ConnectionStateConnecting || currentConnectionState == ConnectionsManager.ConnectionStateWaitingForNetwork || currentConnectionState == ConnectionsManager.ConnectionStateConnectingToProxy;
+-        if (proxyEnabled) {
++        if (true) {
++            // Xraygram (FEAT-03, F03-14): the proxy button is always there, without waiting for a timeout
++            proxyDrawable.setConnected(proxyEnabled, connected, animated);
++            showProxyButton(true, animated);
++        } else if (proxyEnabled) {
+             proxyDrawable.setConnected(true, connected, animated);
+             showProxyButton(true, animated);
+         } else if (getMessagesController().blockedCountry && !SharedConfig.proxyList.isEmpty() || connecting) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/NotificationsSettingsActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/NotificationsSettingsActivity.java
+index f1aee7810..6d47ed6bb 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/NotificationsSettingsActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/NotificationsSettingsActivity.java
+@@ -105,6 +105,7 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
+ 
+     private int notificationsServiceRow;
+     private int notificationsServiceConnectionRow;
++    private int xrayPushStatusRow = -1; // Xraygram (FEAT-09): how notifications are delivered
+ 
+     private int notificationsSectionRow;
+     @Keep
+@@ -217,6 +218,7 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
+         otherSectionRow = rowCount++;
+         notificationsServiceRow = rowCount++;
+         notificationsServiceConnectionRow = rowCount++;
++        xrayPushStatusRow = rowCount++;
+         androidAutoAlertRow = -1;
+         repeatRow = rowCount++;
+         resetSection2Row = rowCount++;
+@@ -733,7 +735,7 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
+                 getNotificationsController().updateBadge();
+             } else if (position == notificationsServiceConnectionRow) {
+                 SharedPreferences preferences = MessagesController.getNotificationsSettings(currentAccount);
+-                enabled = preferences.getBoolean("pushConnection", getMessagesController().backgroundConnection);
++                enabled = preferences.getBoolean("pushConnection", org.telegram.utils.proxy.XrayPush.keepAliveDefault(getMessagesController().backgroundConnection));
+                 SharedPreferences.Editor editor = preferences.edit();
+                 editor.putBoolean("pushConnection", !enabled);
+                 editor.commit();
+@@ -762,7 +764,7 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
+                 }
+             } else if (position == notificationsServiceRow) {
+                 SharedPreferences preferences = MessagesController.getNotificationsSettings(currentAccount);
+-                enabled = preferences.getBoolean("pushService", getMessagesController().keepAliveService);
++                enabled = preferences.getBoolean("pushService", org.telegram.utils.proxy.XrayPush.keepAliveDefault(getMessagesController().keepAliveService));
+                 SharedPreferences.Editor editor = preferences.edit();
+                 editor.putBoolean("pushService", !enabled);
+                 editor.commit();
+@@ -779,6 +781,10 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
+                     updateVibrate = true;
+                     adapter.notifyItemChanged(position);
+                 }));
++            } else if (position == xrayPushStatusRow) {
++                if (!org.telegram.utils.proxy.XrayPush.fcmActive() && !org.telegram.utils.proxy.XrayPush.isIgnoringBatteryOptimizations()) {
++                    org.telegram.utils.proxy.XrayPush.requestIgnoreBatteryOptimizations(getParentActivity());
++                }
+             } else if (position == repeatRow) {
+                 AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+                 builder.setTitle(getString("RepeatNotifications", R.string.RepeatNotifications));
+@@ -1029,9 +1035,9 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
+                     } else if (position == androidAutoAlertRow) {
+                         checkCell.setTextAndCheck("Android Auto", preferences.getBoolean("EnableAutoNotifications", false), true);
+                     } else if (position == notificationsServiceRow) {
+-                        checkCell.setTextAndValueAndCheck(getString("NotificationsService", R.string.NotificationsService), getString("NotificationsServiceInfo", R.string.NotificationsServiceInfo), preferences.getBoolean("pushService", getMessagesController().keepAliveService), true, true);
++                        checkCell.setTextAndValueAndCheck(getString("NotificationsService", R.string.NotificationsService), getString("NotificationsServiceInfo", R.string.NotificationsServiceInfo), preferences.getBoolean("pushService", org.telegram.utils.proxy.XrayPush.keepAliveDefault(getMessagesController().keepAliveService)), true, true);
+                     } else if (position == notificationsServiceConnectionRow) {
+-                        checkCell.setTextAndValueAndCheck(getString("NotificationsServiceConnection", R.string.NotificationsServiceConnection), getString("NotificationsServiceConnectionInfo", R.string.NotificationsServiceConnectionInfo), preferences.getBoolean("pushConnection", getMessagesController().backgroundConnection), true, true);
++                        checkCell.setTextAndValueAndCheck(getString("NotificationsServiceConnection", R.string.NotificationsServiceConnection), getString("NotificationsServiceConnectionInfo", R.string.NotificationsServiceConnectionInfo), preferences.getBoolean("pushConnection", org.telegram.utils.proxy.XrayPush.keepAliveDefault(getMessagesController().backgroundConnection)), true, true);
+                     } else if (position == badgeNumberShowRow) {
+                         checkCell.setTextAndCheck(getString("BadgeNumberShow", R.string.BadgeNumberShow), getNotificationsController().showBadgeNumber, true);
+                     } else if (position == badgeNumberMutedRow) {
+@@ -1179,6 +1185,8 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
+                             textCell.setTextAndValue(getString("Vibrate", R.string.Vibrate), getString("OnlyIfSilent", R.string.OnlyIfSilent), updateVibrate, true);
+                         }
+                         updateVibrate = false;
++                    } else if (position == xrayPushStatusRow) {
++                        textCell.setText(org.telegram.utils.proxy.XrayPush.statusText(), true);
+                     } else if (position == repeatRow) {
+                         int minutes = preferences.getInt("repeat_messages", 60);
+                         String value;
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ProxyListActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ProxyListActivity.java
+index 271182cc7..28b64dd98 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ProxyListActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ProxyListActivity.java
+@@ -193,6 +193,10 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
+         }
+ 
+         public void setProxy(SharedConfig.ProxyInfo proxyInfo) {
++            if (proxyInfo.settings.getType() == ProxySettings.Type.XRAY) {
++                // Xraygram: "XRAY · <name from #fragment or server>"
++                textView.setText("XRAY · " + org.telegram.utils.proxy.XrayTransport.parse(proxyInfo.settings.getSecret()).displayName());
++            } else
+             textView.setText(proxyInfo.settings.getType() == ProxySettings.Type.WEB
+                     ? proxyInfo.settings.getAddress() + " (WEB)"
+                     : proxyInfo.settings.getAddress() + ":" + proxyInfo.settings.getPort());
+@@ -232,6 +236,14 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
+                     colorKey = Theme.key_text_RedRegular;
+                 }
+             }
++            // Xraygram (FEAT-02): if the core for this entry did not start, say why instead of "Connecting…"
++            if (currentInfo.settings.getType() == ProxySettings.Type.XRAY && !currentInfo.checking) {
++                final String xrayError = org.telegram.utils.proxy.XrayTransport.statusError(currentInfo.settings.getSecret());
++                if (xrayError != null) {
++                    valueTextView.setText("XRAY: " + xrayError);
++                    colorKey = Theme.key_text_RedRegular;
++                }
++            }
+             color = Theme.getColor(colorKey);
+             valueTextView.setTag(colorKey);
+             valueTextView.setTextColor(color);
+@@ -416,43 +428,51 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
+         listView.setAdapter(listAdapter);
+         listView.setOnItemClickListener((view, position) -> {
+             if (position == useProxyRow) {
+-                if (SharedConfig.currentProxy == null) {
+-                    if (!proxyList.isEmpty()) {
+-                        SharedConfig.currentProxy = proxyList.get(0);
+-
+-                        if (!useProxySettings) {
+-                            SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit();
+-                            SharedConfig.currentProxy.settings.toSharedPreferences(editor);
+-                            editor.commit();
++                // Xraygram (FEAT-02 п. 11, PAR-05): turning the proxy off while XRAY entries exist goes direct — confirm first
++                final Runnable toggleProxy = () -> {
++                    if (SharedConfig.currentProxy == null) {
++                        if (!proxyList.isEmpty()) {
++                            SharedConfig.currentProxy = proxyList.get(0);
++
++                            if (!useProxySettings) {
++                                SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit();
++                                SharedConfig.currentProxy.settings.toSharedPreferences(editor);
++                                editor.commit();
++                            }
++                        } else {
++                            presentFragment(new ProxySettingsActivity());
++                            return;
+                         }
+-                    } else {
+-                        presentFragment(new ProxySettingsActivity());
+-                        return;
+                     }
+-                }
+-                useProxySettings = !useProxySettings;
+-                updateRows(true);
++                    useProxySettings = !useProxySettings;
++                    updateRows(true);
+ 
+-                SharedPreferences preferences = MessagesController.getGlobalMainSettings();
++                    SharedPreferences preferences = MessagesController.getGlobalMainSettings();
+ 
+-                TextCheckCell textCheckCell = (TextCheckCell) view;
+-                textCheckCell.setChecked(useProxySettings);
++                    TextCheckCell textCheckCell = (TextCheckCell) view;
++                    textCheckCell.setChecked(useProxySettings);
+ 
+-                SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit();
+-                editor.putBoolean("proxy_enabled", useProxySettings);
+-                editor.commit();
++                    SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit();
++                    editor.putBoolean("proxy_enabled", useProxySettings);
++                    editor.commit();
+ 
+-                ConnectionsManager.setProxySettings(useProxySettings, SharedConfig.currentProxy.settings);
+-                NotificationCenter.getGlobalInstance().removeObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
+-                NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
+-                NotificationCenter.getGlobalInstance().addWeakObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
++                    ConnectionsManager.setProxySettings(useProxySettings, SharedConfig.currentProxy.settings);
++                    NotificationCenter.getGlobalInstance().removeObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
++                    NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
++                    NotificationCenter.getGlobalInstance().addWeakObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
+ 
+-                for (int a = proxyStartRow; a < proxyEndRow; a++) {
+-                    RecyclerListView.Holder holder = (RecyclerListView.Holder) listView.findViewHolderForAdapterPosition(a);
+-                    if (holder != null) {
+-                        TextDetailProxyCell cell = (TextDetailProxyCell) holder.itemView;
+-                        cell.updateStatus();
++                    for (int a = proxyStartRow; a < proxyEndRow; a++) {
++                        RecyclerListView.Holder holder = (RecyclerListView.Holder) listView.findViewHolderForAdapterPosition(a);
++                        if (holder != null) {
++                            TextDetailProxyCell cell = (TextDetailProxyCell) holder.itemView;
++                            cell.updateStatus();
++                        }
+                     }
++                };
++                if (useProxySettings && org.telegram.utils.proxy.XrayGate.hasXrayEntries()) {
++                    org.telegram.utils.proxy.XrayGate.confirmDirect(getParentActivity(), toggleProxy);
++                } else {
++                    toggleProxy.run();
+                 }
+             } else if (position == rotationRow) {
+                 SharedConfig.proxyRotationEnabled = !SharedConfig.proxyRotationEnabled;
+@@ -492,14 +512,17 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
+                 presentFragment(new ProxySettingsActivity());
+             } else if (position == deleteAllRow) {
+                 AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+-                builder.setMessage(getString(R.string.DeleteAllProxiesConfirm));
++                // Xraygram (FEAT-02): own wording when the last XRAY entry goes
++                final boolean lastXrayAll = org.telegram.utils.proxy.XrayGate.removesLastXray(proxyList);
++                builder.setMessage(lastXrayAll ? org.telegram.utils.proxy.XrayGate.lastXrayDeleteText() : getString(R.string.DeleteAllProxiesConfirm));
+                 builder.setNegativeButton(getString(R.string.Cancel), null);
+-                builder.setTitle(getString(R.string.DeleteProxyTitle));
++                builder.setTitle(lastXrayAll ? org.telegram.utils.proxy.XrayGate.lastXrayDeleteTitle() : getString(R.string.DeleteProxyTitle));
+                 builder.setPositiveButton(getString(R.string.Delete), (dialog, which) -> {
+-                    for (SharedConfig.ProxyInfo info : proxyList) {
++                    for (SharedConfig.ProxyInfo info : new ArrayList<>(proxyList)) {
+                         SharedConfig.deleteProxy(info);
+                     }
+                     useProxySettings = false;
++                    AndroidUtilities.runOnUIThread(() -> org.telegram.utils.proxy.XrayGate.showIfNeeded(getParentActivity()));
+                     NotificationCenter.getGlobalInstance().removeObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
+                     NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
+                     NotificationCenter.getGlobalInstance().addWeakObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
+@@ -545,13 +568,16 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
+                         break;
+                     case MENU_DELETE:
+                         AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+-                        builder.setMessage(getString(selectedItems.size() > 1 ? R.string.DeleteProxyMultiConfirm : R.string.DeleteProxyConfirm));
++                        final boolean lastXraySel = org.telegram.utils.proxy.XrayGate.removesLastXray(selectedItems);
++                        builder.setMessage(lastXraySel ? org.telegram.utils.proxy.XrayGate.lastXrayDeleteText()
++                                : getString(selectedItems.size() > 1 ? R.string.DeleteProxyMultiConfirm : R.string.DeleteProxyConfirm));
+                         builder.setNegativeButton(getString(R.string.Cancel), null);
+-                        builder.setTitle(getString(R.string.DeleteProxyTitle));
++                        builder.setTitle(lastXraySel ? org.telegram.utils.proxy.XrayGate.lastXrayDeleteTitle() : getString(R.string.DeleteProxyTitle));
+                         builder.setPositiveButton(getString(R.string.Delete), (dialog, which) -> {
+-                            for (SharedConfig.ProxyInfo info : selectedItems) {
++                            for (SharedConfig.ProxyInfo info : new ArrayList<>(selectedItems)) {
+                                 SharedConfig.deleteProxy(info);
+                             }
++                            AndroidUtilities.runOnUIThread(() -> org.telegram.utils.proxy.XrayGate.showIfNeeded(getParentActivity()));
+                             if (SharedConfig.currentProxy == null) {
+                                 useProxySettings = false;
+                             }
+@@ -576,11 +602,20 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
+                     case MENU_SHARE:
+                         StringBuilder links = new StringBuilder();
+                         for (SharedConfig.ProxyInfo info : selectedItems) {
++                            if (info.settings.getType() == ProxySettings.Type.XRAY) {
++                                continue; // Xraygram (FEAT-02 п. 12, FEAT-15): XRAY links are shared only one by one, with a warning
++                            }
+                             if (links.length() > 0) {
+                                 links.append("\n\n");
+                             }
+                             links.append(info.settings.getLink());
+                         }
++                        if (links.length() == 0) {
++                            if (listAdapter != null) {
++                                listAdapter.clearSelected();
++                            }
++                            break;
++                        }
+ 
+                         Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                         shareIntent.setType("text/plain");
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ProxySettingsActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ProxySettingsActivity.java
+index 84ffe29b2..78d8cd759 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ProxySettingsActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ProxySettingsActivity.java
+@@ -56,6 +56,7 @@ import org.telegram.messenger.SharedConfig;
+ import org.telegram.messenger.SvgHelper;
+ import org.telegram.messenger.Utilities;
+ import org.telegram.utils.proxy.WebProxyTransport;
++import org.telegram.utils.proxy.XrayTransport;
+ import org.telegram.utils.proxy.ProxySettings;
+ import org.telegram.tgnet.ConnectionsManager;
+ import org.telegram.ui.ActionBar.ActionBar;
+@@ -89,6 +90,15 @@ public class ProxySettingsActivity extends BaseFragment {
+     private final static int FIELD_USER = 2;
+     private final static int FIELD_PASSWORD = 3;
+     private final static int FIELD_SECRET = 4;
++    private final static int FIELD_LINK = 5; // Xraygram: share link for XRAY
++
++    // Xraygram: order of proxy types on screen, XRAY first
++    private final static ProxySettings.Type[] TYPE_ORDER = {
++            ProxySettings.Type.XRAY, ProxySettings.Type.SOCKS5, ProxySettings.Type.MTPROTO, ProxySettings.Type.WEB
++    };
++    private Runnable xrayPreviewRunnable;
++    private String xrayRejectedLink;
++    private int xrayPreviewGeneration;
+ 
+     private EditTextBoldCursor[] inputFields;
+     private SectionsScrollView scrollView;
+@@ -100,7 +110,7 @@ public class ProxySettingsActivity extends BaseFragment {
+     private TextSettingsCell shareCell;
+     private TextSettingsCell pasteCell;
+     private SimpleActionBarDoneButton doneItem;
+-    private RadioCell[] typeCell = new RadioCell[3];
++    private RadioCell[] typeCell = new RadioCell[4];
+     private ProxySettings.Type currentType;
+ 
+     private ProxySettings pasteProxySettings;
+@@ -222,6 +232,17 @@ public class ProxySettingsActivity extends BaseFragment {
+                         return;
+                     }
+ 
++                    if (currentType == ProxySettings.Type.XRAY) {
++                        final String xrayLink = inputFields[FIELD_LINK].getText().toString().trim();
++                        if (!org.telegram.utils.proxy.XrayLinkPreview.instantValid(xrayLink) || xrayLink.equals(xrayRejectedLink)) {
++                            AndroidUtilities.shakeViewSpring(inputFields[FIELD_LINK]); // FEAT-01 п. 6: no entry from a bad link
++                            return;
++                        }
++                        currentProxyInfo.settings = ProxySettings.builder()
++                            .setType(ProxySettings.Type.XRAY)
++                            .setSecret(inputFields[FIELD_LINK].getText().toString())
++                            .build();
++                    } else
+                     currentProxyInfo.settings = ProxySettings.builder()
+                         .setType(currentType)
+                         .setAddress(inputFields[FIELD_IP].getText().toString())
+@@ -288,15 +309,17 @@ public class ProxySettingsActivity extends BaseFragment {
+ 
+         final View.OnClickListener typeCellClickListener = view -> setProxyType(ProxySettings.intToType((Integer) view.getTag()), true);
+ 
+-        for (int a = 0; a < 3; a++) {
+-            ProxySettings.Type t = ProxySettings.intToType(a);
++        for (int a = 0; a < typeCell.length; a++) {
++            ProxySettings.Type t = TYPE_ORDER[a];
+ 
+             typeCell[a] = new RadioCell(context);
+             ThemeBind.selectorBackground(typeCell[a], Theme.getSelectorDrawable(true), ThemeBind.of(Theme.key_windowBackgroundWhite), ThemeBind.of(Theme.key_listSelector));
+-            typeCell[a].setTag(a);
+-            if (a == 0) {
++            typeCell[a].setTag(ProxySettings.typeToInt(t));
++            if (t == ProxySettings.Type.XRAY) {
++                typeCell[a].setText("XRAY (VLESS)", t == currentType, true);
++            } else if (t == ProxySettings.Type.SOCKS5) {
+                 typeCell[a].setText(LocaleController.getString(R.string.UseProxySocks5), t == currentType, true);
+-            } else if (a == 1) {
++            } else if (t == ProxySettings.Type.MTPROTO) {
+                 typeCell[a].setText(LocaleController.getString(R.string.UseProxyTelegram), t == currentType, true);
+             } else {
+                 typeCell[a].setText(LocaleController.getString(R.string.UseProxyWeb), t == currentType, false);
+@@ -318,8 +341,8 @@ public class ProxySettingsActivity extends BaseFragment {
+         inputFieldsContainer.setOutlineProvider(null);
+         linearLayout2.addView(inputFieldsContainer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+ 
+-        inputFields = new EditTextBoldCursor[5];
+-        for (int a = 0; a < 5; a++) {
++        inputFields = new EditTextBoldCursor[6];
++        for (int a = 0; a < 6; a++) {
+             FrameLayout container = new FrameLayout(context);
+             inputFieldsContainer.addView(container, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 64));
+ 
+@@ -412,6 +435,24 @@ public class ProxySettingsActivity extends BaseFragment {
+             } else {
+                 inputFields[a].setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+             }
++            if (a == FIELD_LINK) {
++                inputFields[a].setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_VARIATION_URI);
++                inputFields[a].addTextChangedListener(new TextWatcher() {
++                    @Override
++                    public void beforeTextChanged(CharSequence s, int start, int count, int after) {
++                    }
++
++                    @Override
++                    public void onTextChanged(CharSequence s, int start, int before, int count) {
++                    }
++
++                    @Override
++                    public void afterTextChanged(Editable s) {
++                        checkShareDone(true);
++                        updateXrayPreview();
++                    }
++                });
++            }
+             if (a == FIELD_SECRET) {
+                 inputFields[a].addTextChangedListener(new TextWatcher() {
+                     @Override
+@@ -448,7 +489,11 @@ public class ProxySettingsActivity extends BaseFragment {
+                     break;
+                 case FIELD_SECRET:
+                     inputFields[a].setHintText(LocaleController.getString(R.string.UseProxySecret));
+-                    inputFields[a].setText(currentProxyInfo.settings.getSecret());
++                    inputFields[a].setText(currentProxyInfo.settings.getType() == ProxySettings.Type.XRAY ? "" : currentProxyInfo.settings.getSecret());
++                    break;
++                case FIELD_LINK:
++                    inputFields[a].setHintText(org.telegram.utils.proxy.XrayLinkPreview.fieldTitle());
++                    inputFields[a].setText(currentProxyInfo.settings.getType() == ProxySettings.Type.XRAY ? currentProxyInfo.settings.getSecret() : "");
+                     break;
+             }
+             inputFields[a].setSelection(inputFields[a].length());
+@@ -488,6 +533,12 @@ public class ProxySettingsActivity extends BaseFragment {
+         pasteCell.setText(LocaleController.getString(R.string.PasteFromClipboard), false);
+         ThemeBind.textColor(pasteCell.getTextView(), Theme.key_windowBackgroundWhiteBlueText4);
+         pasteCell.setOnClickListener(v -> {
++            if (pasteProxySettings != null && pasteProxySettings.getType() == ProxySettings.Type.XRAY) {
++                inputFields[FIELD_LINK].setText(pasteProxySettings.getSecret());
++                inputFields[FIELD_LINK].setSelection(inputFields[FIELD_LINK].length());
++                setProxyType(ProxySettings.Type.XRAY, true, () -> AndroidUtilities.hideKeyboard(inputFieldsContainer.findFocus()));
++                return;
++            }
+             if (pasteProxySettings != null) {
+                 final ProxySettings.Type pasteType = pasteProxySettings.getType();
+ 
+@@ -570,6 +621,11 @@ public class ProxySettingsActivity extends BaseFragment {
+             String secret = inputFields[FIELD_SECRET].getText().toString();
+             String url;
+             try {
++                if (currentType == ProxySettings.Type.XRAY) {
++                    // Xraygram (FEAT-15): warning, then QR + copy/send, without the link as text
++                    XrayShareSheet.show(getParentActivity(), inputFields[FIELD_LINK].getText().toString());
++                    return;
++                }
+                 if (currentType == ProxySettings.Type.WEB) {
+                     showShareQrCode(context, ProxySettings.builder()
+                         .setType(currentType)
+@@ -628,12 +684,19 @@ public class ProxySettingsActivity extends BaseFragment {
+         checkShareDone(false);
+ 
+         currentType = null;
+-        setProxyType(currentProxyInfo.settings.getType(), false);
++        setProxyType(addingNewProxy ? ProxySettings.Type.XRAY : currentProxyInfo.settings.getType(), false);
+ 
+         pasteProxySettings = null;
+         pasteString = null;
+         updatePasteCell();
+ 
++        // Xraygram: a new proxy with a share link in the clipboard opens already filled in
++        if (addingNewProxy && pasteProxySettings != null && pasteProxySettings.getType() == ProxySettings.Type.XRAY) {
++            inputFields[FIELD_LINK].setText(pasteProxySettings.getSecret());
++            inputFields[FIELD_LINK].setSelection(inputFields[FIELD_LINK].length());
++        }
++        updateXrayPreview();
++
+         return fragmentView;
+     }
+ 
+@@ -720,6 +783,11 @@ public class ProxySettingsActivity extends BaseFragment {
+         if (shareCell == null || doneItem == null || inputFields[FIELD_IP] == null || inputFields[FIELD_PORT] == null) {
+             return;
+         }
++        if (currentType == ProxySettings.Type.XRAY) {
++            final String link = inputFields[FIELD_LINK] != null ? inputFields[FIELD_LINK].getText().toString() : "";
++            setShareDoneEnabled(org.telegram.utils.proxy.XrayLinkPreview.instantValid(link) && !link.trim().equals(xrayRejectedLink), animated);
++            return;
++        }
+         boolean enabled = currentType == ProxySettings.Type.WEB
+                 ? !TextUtils.isEmpty(WebProxyTransport.normalizeHost(inputFields[FIELD_IP].getText().toString()))
+                     && WebProxyTransport.isValidSecret(inputFields[FIELD_SECRET].getText().toString())
+@@ -732,6 +800,44 @@ public class ProxySettingsActivity extends BaseFragment {
+         setProxyType(type, animated, null);
+     }
+ 
++    /** Xraygram (FEAT-01): "Server: proto · host:port · name" or "Error: …" under the link, then the hint. */
++    private void updateXrayPreview() {
++        if (currentType != ProxySettings.Type.XRAY || inputFields == null || inputFields[FIELD_LINK] == null || bottomCells[1] == null) {
++            return;
++        }
++        final String hint = org.telegram.utils.proxy.XrayLinkPreview.hint();
++        final String link = inputFields[FIELD_LINK].getText().toString().trim();
++        final int generation = ++xrayPreviewGeneration;
++        if (xrayPreviewRunnable != null) {
++            AndroidUtilities.cancelRunOnUIThread(xrayPreviewRunnable);
++            xrayPreviewRunnable = null;
++        }
++        final String instant = org.telegram.utils.proxy.XrayLinkPreview.instant(link);
++        if (instant == null) {
++            bottomCells[1].setText(hint);
++            return;
++        }
++        bottomCells[1].setText(instant + "\n\n" + hint);
++        if (!org.telegram.utils.proxy.XrayLinkPreview.instantValid(link)) {
++            return;
++        }
++        xrayPreviewRunnable = () -> {
++            xrayPreviewRunnable = null;
++            Utilities.globalQueue.postRunnable(() -> {
++                final String verdict = org.telegram.utils.proxy.XrayLinkPreview.coreVerdict(link);
++                AndroidUtilities.runOnUIThread(() -> {
++                    if (generation != xrayPreviewGeneration || currentType != ProxySettings.Type.XRAY || verdict == null) {
++                        return;
++                    }
++                    xrayRejectedLink = link; // FEAT-01 п. 6: xray rejected it — Save stays off
++                    setShareDoneEnabled(false, true);
++                    bottomCells[1].setText(verdict + "\n\n" + hint);
++                });
++            });
++        };
++        AndroidUtilities.runOnUIThread(xrayPreviewRunnable, 300);
++    }
++
+     private void setProxyType(ProxySettings.Type type, boolean animated, Runnable onTransitionEnd) {
+         if (currentType != type) {
+             currentType = type;
+@@ -773,7 +879,18 @@ public class ProxySettingsActivity extends BaseFragment {
+ 
+                 TransitionManager.beginDelayedTransition(linearLayout2, transitionSet);
+             }
+-            if (currentType == ProxySettings.Type.SOCKS5) {
++            ((View) inputFields[FIELD_LINK].getParent()).setVisibility(View.GONE);
++            ((View) inputFields[FIELD_IP].getParent()).setVisibility(currentType == ProxySettings.Type.XRAY ? View.GONE : View.VISIBLE);
++            if (currentType == ProxySettings.Type.XRAY) {
++                bottomCells[0].setVisibility(View.GONE);
++                bottomCells[1].setVisibility(View.VISIBLE);
++                ((View) inputFields[FIELD_LINK].getParent()).setVisibility(View.VISIBLE);
++                ((View) inputFields[FIELD_SECRET].getParent()).setVisibility(View.GONE);
++                ((View) inputFields[FIELD_PASSWORD].getParent()).setVisibility(View.GONE);
++                ((View) inputFields[FIELD_USER].getParent()).setVisibility(View.GONE);
++                ((View) inputFields[FIELD_PORT].getParent()).setVisibility(View.GONE);
++                updateXrayPreview();
++            } else if (currentType == ProxySettings.Type.SOCKS5) {
+                 bottomCells[0].setVisibility(View.VISIBLE);
+                 bottomCells[1].setVisibility(View.GONE);
+                 ((View) inputFields[FIELD_SECRET].getParent()).setVisibility(View.GONE);
+@@ -798,9 +915,10 @@ public class ProxySettingsActivity extends BaseFragment {
+                 ((View) inputFields[FIELD_PORT].getParent()).setVisibility(View.GONE);
+                 inputFields[FIELD_PORT].setText("443");
+             }
+-            typeCell[0].setChecked(currentType == ProxySettings.Type.SOCKS5, animated);
+-            typeCell[1].setChecked(currentType == ProxySettings.Type.MTPROTO, animated);
+-            typeCell[2].setChecked(currentType == ProxySettings.Type.WEB, animated);
++            for (int i = 0; i < typeCell.length; i++) {
++                typeCell[i].setChecked(currentType == TYPE_ORDER[i], animated);
++            }
++            shareCell.setText(currentType == ProxySettings.Type.XRAY ? XrayShareSheet.actionTitle() : LocaleController.getString(R.string.ShareFile), false);
+             checkShareDone(animated);
+         }
+     }
+@@ -808,8 +926,12 @@ public class ProxySettingsActivity extends BaseFragment {
+     @Override
+     public void onTransitionAnimationEnd(boolean isOpen, boolean backward) {
+         if (isOpen && !backward && addingNewProxy) {
+-            inputFields[FIELD_IP].requestFocus();
+-            AndroidUtilities.showKeyboard(inputFields[FIELD_IP]);
++            final int field = currentType == ProxySettings.Type.XRAY ? FIELD_LINK : FIELD_IP;
++            if (field == FIELD_LINK && inputFields[FIELD_LINK].length() > 0) {
++                return; // filled from the clipboard: just Save
++            }
++            inputFields[field].requestFocus();
++            AndroidUtilities.showKeyboard(inputFields[field]);
+         }
+     }
+ 
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/VoIPFragment.java b/TMessagesProj/src/main/java/org/telegram/ui/VoIPFragment.java
+index 496f76966..62c4c9261 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/VoIPFragment.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/VoIPFragment.java
+@@ -1213,9 +1213,15 @@ public class VoIPFragment implements
+             addPeopleSheet = new UserSelectorBottomSheet(context, currentAccount, 0, null, UserSelectorBottomSheet.TYPE_CALL, true, new DarkBlueThemeResourcesProvider())
+                 .exceptUsers(currentUser != null ? currentUser.id : 0, callingUser != null ? callingUser.id : 0)
+                 .setOnUsersSelector((video, users) -> {
+-                    VoIPService voip = VoIPService.getSharedInstance();
+-                    if (voip != null) {
+-                        voip.convertToConferenceCall(video, users);
++                    // Xraygram (FEAT-04, PAR-15): a conference does not go through XRAY — ask; "Cancel" keeps the 1:1 call
++                    final Runnable convert = () -> {
++                        VoIPService voip = VoIPService.getSharedInstance();
++                        if (voip != null) {
++                            voip.convertToConferenceCall(video, users);
++                        }
++                    };
++                    if (!org.telegram.utils.proxy.XrayCalls.confirmWithoutXray(activity, convert)) {
++                        convert.run();
+                     }
+                 });
+             addPeopleSheet.show();
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/XrayGateActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/XrayGateActivity.java
+new file mode 100644
+index 000000000..a83ff5e9b
+--- /dev/null
++++ b/TMessagesProj/src/main/java/org/telegram/ui/XrayGateActivity.java
+@@ -0,0 +1,320 @@
++package org.telegram.ui;
++
++import android.content.ClipData;
++import android.content.ClipboardManager;
++import android.content.Context;
++import android.content.DialogInterface;
++import android.text.Editable;
++import android.text.InputType;
++import android.text.TextUtils;
++import android.text.TextWatcher;
++import android.util.TypedValue;
++import android.view.Gravity;
++import android.view.MotionEvent;
++import android.view.View;
++import android.view.ViewGroup;
++import android.view.inputmethod.EditorInfo;
++import android.widget.FrameLayout;
++import android.widget.LinearLayout;
++import android.widget.ScrollView;
++import android.widget.TextView;
++
++import org.telegram.messenger.AndroidUtilities;
++import org.telegram.messenger.LocaleController;
++import org.telegram.messenger.NotificationCenter;
++import org.telegram.messenger.R;
++import org.telegram.messenger.Utilities;
++import org.telegram.ui.ActionBar.AlertDialog;
++import org.telegram.ui.ActionBar.BaseFragment;
++import org.telegram.ui.ActionBar.Theme;
++import org.telegram.ui.ActionBar.ThemeBind;
++import org.telegram.ui.Cells.HeaderCell;
++import org.telegram.ui.Cells.RadioCell;
++import org.telegram.ui.Cells.TextInfoPrivacyCell;
++import org.telegram.ui.Components.EditTextBoldCursor;
++import org.telegram.ui.Components.LayoutHelper;
++import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
++import org.telegram.utils.proxy.XrayGate;
++import org.telegram.utils.proxy.XrayTransport;
++
++import java.util.ArrayList;
++
++import static org.telegram.utils.proxy.XrayTransport.str;
++
++/**
++ * Xraygram: "Connect through XRAY" screen. Shown on top of everything while {@link XrayGate#isBlocked()}:
++ * a share link (or one of the saved ones) → Connect; a quiet "connect directly" with confirmation below.
++ * Cannot be closed with Back or a swipe.
++ */
++public class XrayGateActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
++
++    private EditTextBoldCursor linkField;
++    private FrameLayout linkContainer;
++    private TextInfoPrivacyCell previewCell;
++    private ButtonWithCounterView connectButton;
++    private final ArrayList<RadioCell> choiceCells = new ArrayList<>();
++    private ArrayList<String> savedLinks = new ArrayList<>();
++    /** Selected saved link index; -1 = "new link". */
++    private int selected = -1;
++    private Runnable previewRunnable;
++    private String rejectedLink;
++    private int previewGeneration;
++
++    @Override
++    public boolean onFragmentCreate() {
++        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.proxySettingsChanged);
++        return super.onFragmentCreate();
++    }
++
++    @Override
++    public void onFragmentDestroy() {
++        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.proxySettingsChanged);
++        if (previewRunnable != null) {
++            AndroidUtilities.cancelRunOnUIThread(previewRunnable);
++        }
++        super.onFragmentDestroy();
++    }
++
++    @Override
++    public void didReceivedNotification(int id, int account, Object... args) {
++        if (id == NotificationCenter.proxySettingsChanged && !XrayGate.isBlocked()) {
++            finishFragment(); // e.g. an XRAY link was added through a vless:// intent
++        }
++    }
++
++    @Override
++    public boolean isSwipeBackEnabled(MotionEvent event) {
++        return false;
++    }
++
++    @Override
++    public boolean canBeginSlide() {
++        return false;
++    }
++
++    @Override
++    public boolean onBackPressed(boolean invoked) {
++        if (!super.onBackPressed(invoked)) {
++            return false;
++        }
++        if (invoked && getParentActivity() != null) {
++            getParentActivity().moveTaskToBack(true); // the gate is not closed by Back
++        }
++        return false;
++    }
++
++    @Override
++    public View createView(Context context) {
++        actionBar.setTitle("Xraygram");
++
++        fragmentView = new FrameLayout(context);
++        ThemeBind.backgroundColor(fragmentView, Theme.key_windowBackgroundWhite);
++        ScrollView scrollView = new ScrollView(context);
++        scrollView.setFillViewport(true);
++        ((FrameLayout) fragmentView).addView(scrollView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
++
++        LinearLayout layout = new LinearLayout(context);
++        layout.setOrientation(LinearLayout.VERTICAL);
++        scrollView.addView(layout, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
++
++        TextView title = new TextView(context);
++        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 22);
++        title.setTypeface(AndroidUtilities.bold());
++        ThemeBind.textColor(title, Theme.key_windowBackgroundWhiteBlackText);
++        title.setText(str("Подключение через XRAY", "Connect through XRAY"));
++        layout.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 21, 20, 21, 0));
++
++        TextView subtitle = new TextView(context);
++        subtitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
++        ThemeBind.textColor(subtitle, Theme.key_windowBackgroundWhiteGrayText);
++        layout.addView(subtitle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 21, 8, 21, 8));
++
++        // Saved servers (links of deleted XRAY entries) + "New link"
++        savedLinks = XrayGate.savedLinks();
++        subtitle.setText(savedLinks.isEmpty()
++                ? str("Xraygram подключается к Telegram только через ваш сервер XRAY. Вставьте ссылку на него: vless://, vmess://, trojan://, ss:// или hysteria2://. Пока ссылки нет, Xraygram никуда не подключается.",
++                      "Xraygram connects to Telegram only through your XRAY server. Paste its link: vless://, vmess://, trojan://, ss:// or hysteria2://. Until there is a link, Xraygram does not connect anywhere.")
++                : str("Xraygram подключается к Telegram только через ваш сервер XRAY. Выберите сохранённый сервер или вставьте новую ссылку. До этого Xraygram никуда не подключается.",
++                      "Xraygram connects to Telegram only through your XRAY server. Choose a saved server or paste a new link. Until then Xraygram does not connect anywhere."));
++        final String clip = clipboardLink(context);
++        if (!savedLinks.isEmpty()) {
++            HeaderCell header = new HeaderCell(context);
++            header.setText(str("Сохранённые серверы", "Saved servers"));
++            layout.addView(header);
++            selected = clip != null && !savedLinks.contains(clip) ? -1 : 0;
++            for (int i = 0; i <= savedLinks.size(); i++) {
++                final int index = i < savedLinks.size() ? i : -1;
++                RadioCell cell = new RadioCell(context);
++                ThemeBind.selectorBackground(cell, Theme.getSelectorDrawable(true), ThemeBind.of(Theme.key_windowBackgroundWhite), ThemeBind.of(Theme.key_listSelector));
++                String text = index >= 0
++                        ? "XRAY · " + XrayTransport.parse(savedLinks.get(index)).displayName()
++                        : str("Новая ссылка", "New link");
++                cell.setText(text, index == selected, i < savedLinks.size());
++                cell.setOnClickListener(v -> select(index));
++                choiceCells.add(cell);
++                layout.addView(cell, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 50));
++            }
++        }
++
++        linkContainer = new FrameLayout(context);
++        layout.addView(linkContainer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 64));
++        linkField = new EditTextBoldCursor(context);
++        linkField.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
++        ThemeBind.editHintColor(linkField, Theme.key_windowBackgroundWhiteHintText);
++        ThemeBind.textColor(linkField, Theme.key_windowBackgroundWhiteBlackText);
++        linkField.setBackground(null);
++        ThemeBind.cursorColor(linkField, Theme.key_windowBackgroundWhiteBlackText);
++        linkField.setCursorSize(AndroidUtilities.dp(20));
++        linkField.setCursorWidth(1.5f);
++        linkField.setSingleLine(true);
++        linkField.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.CENTER_VERTICAL);
++        ThemeBind.editHeaderHintColor(linkField, Theme.key_windowBackgroundWhiteBlueHeader);
++        linkField.setTransformHintToHeader(true);
++        ThemeBind.lineColors(linkField, Theme.key_windowBackgroundWhiteInputField, Theme.key_windowBackgroundWhiteInputFieldActivated, Theme.key_text_RedRegular);
++        linkField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_VARIATION_URI);
++        linkField.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
++        linkField.setHintText(org.telegram.utils.proxy.XrayLinkPreview.fieldTitle());
++        linkField.setPadding(0, 0, 0, 0);
++        if (clip != null) {
++            linkField.setText(clip);
++        }
++        linkField.addTextChangedListener(new TextWatcher() {
++            @Override
++            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
++            }
++
++            @Override
++            public void onTextChanged(CharSequence s, int start, int before, int count) {
++            }
++
++            @Override
++            public void afterTextChanged(Editable s) {
++                update();
++            }
++        });
++        linkContainer.addView(linkField, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.LEFT | Gravity.TOP, 21, 12, 21, 0));
++
++        previewCell = new TextInfoPrivacyCell(context);
++        layout.addView(previewCell, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
++
++        connectButton = new ButtonWithCounterView(context, null).setRound();
++        connectButton.setText(str("Подключить", "Connect"), false);
++        connectButton.setOnClickListener(v -> connect());
++        layout.addView(connectButton, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 16, 8, 16, 0));
++
++        View spacer = new View(context);
++        layout.addView(spacer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 0, 1f));
++
++        TextView direct = new TextView(context);
++        direct.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
++        direct.setGravity(Gravity.CENTER);
++        ThemeBind.textColor(direct, Theme.key_windowBackgroundWhiteGrayText3);
++        direct.setText(str("Подключиться без XRAY (напрямую)", "Connect without XRAY (direct)"));
++        direct.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(14), AndroidUtilities.dp(16), AndroidUtilities.dp(14));
++        direct.setOnClickListener(v -> confirmDirect());
++        layout.addView(direct, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 24, 0, 16));
++
++        update();
++        return fragmentView;
++    }
++
++    private void select(int index) {
++        selected = index;
++        for (int i = 0; i < choiceCells.size(); i++) {
++            final int cellIndex = i < savedLinks.size() ? i : -1;
++            choiceCells.get(i).setChecked(cellIndex == selected, true);
++        }
++        update();
++        if (selected == -1 && linkField.length() == 0) {
++            linkField.requestFocus();
++            AndroidUtilities.showKeyboard(linkField);
++        } else {
++            AndroidUtilities.hideKeyboard(linkField);
++        }
++    }
++
++    private String currentLink() {
++        if (selected >= 0 && selected < savedLinks.size()) {
++            return savedLinks.get(selected);
++        }
++        return linkField != null ? linkField.getText().toString().trim() : "";
++    }
++
++    private void update() {
++        if (linkContainer == null) {
++            return;
++        }
++        linkContainer.setVisibility(selected == -1 ? View.VISIBLE : View.GONE);
++        final String link = currentLink();
++        final boolean valid = org.telegram.utils.proxy.XrayLinkPreview.instantValid(link) && !link.equals(rejectedLink);
++        connectButton.setEnabled(valid);
++        connectButton.setAlpha(valid ? 1f : 0.5f);
++
++        final int generation = ++previewGeneration;
++        if (previewRunnable != null) {
++            AndroidUtilities.cancelRunOnUIThread(previewRunnable);
++            previewRunnable = null;
++        }
++        final String hint = org.telegram.utils.proxy.XrayLinkPreview.hint();
++        final String instant = org.telegram.utils.proxy.XrayLinkPreview.instant(link);
++        if (instant == null) {
++            previewCell.setText(hint);
++            return;
++        }
++        previewCell.setText(selected == -1 ? instant + "\n\n" + hint : instant);
++        if (!valid) {
++            return;
++        }
++        previewRunnable = () -> {
++            previewRunnable = null;
++            Utilities.globalQueue.postRunnable(() -> {
++                final String verdict = org.telegram.utils.proxy.XrayLinkPreview.coreVerdict(link);
++                AndroidUtilities.runOnUIThread(() -> {
++                    if (generation != previewGeneration || previewCell == null || verdict == null) {
++                        return;
++                    }
++                    rejectedLink = link; // FEAT-01 п. 6: xray rejected it — no entry from this link
++                    connectButton.setEnabled(false);
++                    connectButton.setAlpha(0.5f);
++                    previewCell.setText(selected == -1 ? verdict + "\n\n" + hint : verdict);
++                });
++            });
++        };
++        AndroidUtilities.runOnUIThread(previewRunnable, 300);
++    }
++
++    private void connect() {
++        final String link = currentLink();
++        if (!org.telegram.utils.proxy.XrayLinkPreview.instantValid(link) || link.equals(rejectedLink)) {
++            return;
++        }
++        AndroidUtilities.hideKeyboard(linkField);
++        XrayGate.connect(link);
++        if (!XrayGate.isBlocked()) {
++            finishFragment();
++        }
++    }
++
++    private void confirmDirect() {
++        XrayGate.confirmDirect(getParentActivity(), () -> {
++            XrayGate.allowDirect();
++            finishFragment();
++        });
++    }
++
++    private static String clipboardLink(Context context) {
++        try {
++            ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
++            ClipData clip = clipboard != null ? clipboard.getPrimaryClip() : null;
++            if (clip != null && clip.getItemCount() > 0) {
++                CharSequence text = clip.getItemAt(0).coerceToText(context);
++                String link = text != null ? text.toString().trim() : null;
++                if (!TextUtils.isEmpty(link) && XrayTransport.isSupportedLink(link) && XrayTransport.parse(link).isValid()) {
++                    return link;
++                }
++            }
++        } catch (Throwable ignore) {
++        }
++        return null;
++    }
++}
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/XrayShareSheet.java b/TMessagesProj/src/main/java/org/telegram/ui/XrayShareSheet.java
+new file mode 100644
+index 000000000..a3463907c
+--- /dev/null
++++ b/TMessagesProj/src/main/java/org/telegram/ui/XrayShareSheet.java
+@@ -0,0 +1,176 @@
++package org.telegram.ui;
++
++import android.app.Activity;
++import android.content.ClipData;
++import android.content.ClipDescription;
++import android.content.ClipboardManager;
++import android.content.Context;
++import android.content.DialogInterface;
++import android.content.Intent;
++import android.graphics.Bitmap;
++import android.graphics.Color;
++import android.os.Build;
++import android.os.PersistableBundle;
++import android.util.TypedValue;
++import android.view.Gravity;
++import android.widget.FrameLayout;
++import android.widget.ImageView;
++import android.widget.LinearLayout;
++import android.widget.TextView;
++import android.widget.Toast;
++
++import com.google.zxing.EncodeHintType;
++import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
++
++import org.telegram.messenger.AndroidUtilities;
++import org.telegram.messenger.FileLog;
++import org.telegram.ui.ActionBar.AlertDialog;
++import org.telegram.ui.ActionBar.BottomSheet;
++import org.telegram.ui.ActionBar.Theme;
++import org.telegram.ui.ActionBar.ThemeBind;
++import org.telegram.ui.Components.LayoutHelper;
++import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
++import org.telegram.utils.proxy.XrayTransport;
++
++import java.util.HashMap;
++
++import static org.telegram.utils.proxy.XrayTransport.str;
++
++/**
++ * Xraygram (FEAT-15, stage 1): "Share server" for an XRAY entry. A warning every time, then QR of the stored link
++ * (with #name) without the link as text, "Copy link" (sensitive clip on Android 13+), "Send…", "Close".
++ * The link is never logged.
++ */
++public final class XrayShareSheet {
++
++    private XrayShareSheet() {
++    }
++
++    public static String actionTitle() {
++        return str("Поделиться сервером", "Share server");
++    }
++
++    /** Warning → sheet. */
++    public static void show(Activity activity, String link) {
++        if (activity == null || !XrayTransport.isSupportedLink(link)) {
++            return;
++        }
++        final String trimmed = link.trim();
++        new AlertDialog.Builder(activity)
++                .setTitle(str("Поделиться сервером?", "Share server?"))
++                .setMessage(str("Кто получит эту ссылку, сможет пользоваться вашим сервером XRAY. Отправляйте её только тем, кому доверяете.",
++                        "Anyone who gets this link can use your XRAY server. Send it only to people you trust."))
++                .setPositiveButton(str("Показать", "Show"), (d, w) -> showSheet(activity, trimmed))
++                .setNegativeButton(str("Отмена", "Cancel"), null)
++                .show();
++    }
++
++    private static void showSheet(Activity activity, String link) {
++        final Context context = activity;
++        final BottomSheet.Builder builder = new BottomSheet.Builder(context);
++        builder.setApplyTopPadding(false);
++        builder.setApplyBottomPadding(false);
++
++        LinearLayout layout = new LinearLayout(context);
++        layout.setOrientation(LinearLayout.VERTICAL);
++        layout.setPadding(0, AndroidUtilities.dp(18), 0, AndroidUtilities.dp(12));
++
++        TextView title = new TextView(context);
++        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
++        title.setTypeface(AndroidUtilities.bold());
++        title.setGravity(Gravity.CENTER_HORIZONTAL);
++        ThemeBind.textColor(title, Theme.key_dialogTextBlack);
++        title.setText("XRAY · " + XrayTransport.parse(link).displayName());
++        layout.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 22, 0, 22, 14));
++
++        ImageView qr = new ImageView(context);
++        qr.setBackgroundColor(Color.WHITE);
++        qr.setPadding(AndroidUtilities.dp(10), AndroidUtilities.dp(10), AndroidUtilities.dp(10), AndroidUtilities.dp(10));
++        qr.setScaleType(ImageView.ScaleType.FIT_CENTER);
++        qr.setImageBitmap(createQR(link));
++        FrameLayout qrFrame = new FrameLayout(context);
++        qrFrame.addView(qr, LayoutHelper.createFrame(260, 260, Gravity.CENTER));
++        layout.addView(qrFrame, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 260));
++
++        TextView help = new TextView(context);
++        help.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
++        help.setGravity(Gravity.CENTER_HORIZONTAL);
++        ThemeBind.textColor(help, Theme.key_dialogTextGray3);
++        help.setText(str("Отсканируйте камерой телефона, затем вставьте ссылку в Xraygram",
++                "Scan with a phone camera, then paste the link into Xraygram"));
++        layout.addView(help, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 40, 12, 40, 12));
++
++        final BottomSheet[] sheet = new BottomSheet[1];
++
++        ButtonWithCounterView copy = new ButtonWithCounterView(context, null).setRound();
++        copy.setText(str("Копировать ссылку", "Copy link"), false);
++        copy.setOnClickListener(v -> copyLink(context, link));
++        layout.addView(copy, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 16, 4, 16, 4));
++
++        ButtonWithCounterView send = new ButtonWithCounterView(context, false, null).setRound();
++        send.setText(str("Отправить…", "Send…"), false);
++        send.setOnClickListener(v -> {
++            Intent shareIntent = new Intent(Intent.ACTION_SEND);
++            shareIntent.setType("text/plain");
++            shareIntent.putExtra(Intent.EXTRA_TEXT, link);
++            try {
++                activity.startActivity(Intent.createChooser(shareIntent, str("Отправить…", "Send…")));
++            } catch (Throwable e) {
++                FileLog.e("xraygram: share chooser failed");
++            }
++        });
++        layout.addView(send, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 16, 4, 16, 4));
++
++        ButtonWithCounterView close = new ButtonWithCounterView(context, false, null).setRound();
++        close.setText(str("Закрыть", "Close"), false);
++        close.setOnClickListener(v -> {
++            if (sheet[0] != null) {
++                sheet[0].dismiss();
++            }
++        });
++        layout.addView(close, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 16, 4, 16, 4));
++
++        builder.setCustomView(layout);
++        sheet[0] = builder.create();
++        sheet[0].show();
++    }
++
++    private static void copyLink(Context context, String link) {
++        try {
++            ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
++            ClipData clip = ClipData.newPlainText("XRAY", link);
++            if (Build.VERSION.SDK_INT >= 33) {
++                PersistableBundle extras = new PersistableBundle();
++                extras.putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true);
++                clip.getDescription().setExtras(extras);
++            }
++            clipboard.setPrimaryClip(clip);
++            Toast.makeText(context, str("Ссылка скопирована", "Link copied"), Toast.LENGTH_SHORT).show();
++        } catch (Throwable e) {
++            FileLog.e("xraygram: copy failed");
++        }
++    }
++
++    /** Plain QR (no Telegram logo in the middle, unlike TelegramQRCodeWriter). */
++    private static Bitmap createQR(String link) {
++        try {
++            HashMap<EncodeHintType, Object> hints = new HashMap<>();
++            hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
++            hints.put(EncodeHintType.MARGIN, 0);
++            hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
++            com.google.zxing.common.BitMatrix matrix = new com.google.zxing.qrcode.QRCodeWriter()
++                    .encode(link, com.google.zxing.BarcodeFormat.QR_CODE, 0, 0, hints);
++            final int w = matrix.getWidth(), h = matrix.getHeight(), scale = Math.max(1, 768 / Math.max(w, 1));
++            final int[] pixels = new int[w * scale * h * scale];
++            for (int y = 0; y < h * scale; y++) {
++                for (int x = 0; x < w * scale; x++) {
++                    pixels[y * w * scale + x] = matrix.get(x / scale, y / scale) ? Color.BLACK : Color.WHITE;
++                }
++            }
++            return Bitmap.createBitmap(pixels, w * scale, h * scale, Bitmap.Config.ARGB_8888);
++        } catch (Throwable e) {
++            FileLog.e("xraygram: QR failed");
++            return null;
++        }
++    }
++}
+diff --git a/TMessagesProj/src/main/java/org/telegram/utils/proxy/ProxySettings.java b/TMessagesProj/src/main/java/org/telegram/utils/proxy/ProxySettings.java
+index 1914e5c9b..cb8fe3792 100644
+--- a/TMessagesProj/src/main/java/org/telegram/utils/proxy/ProxySettings.java
++++ b/TMessagesProj/src/main/java/org/telegram/utils/proxy/ProxySettings.java
+@@ -27,7 +27,8 @@ public final class ProxySettings {
+     public enum Type {
+         SOCKS5,
+         MTPROTO,
+-        WEB
++        WEB,
++        XRAY // Xraygram: share link (vless://...) served by in-process Xray as local SOCKS5
+     }
+ 
+     private final @NonNull Type type;
+@@ -46,6 +47,11 @@ public final class ProxySettings {
+             port = 0;
+             user = "";
+             password = "";
++        } else if (type == Type.XRAY) {
++            secret = builder.secret;
++            port = builder.port;
++            user = "";
++            password = "";
+         } else if (type == Type.MTPROTO) {
+             secret = builder.secret;
+             port = builder.port;
+@@ -94,12 +100,18 @@ public final class ProxySettings {
+         if (TextUtils.isEmpty(address)) {
+             return false;
+         }
++        if (type == Type.XRAY) {
++            return XrayTransport.isSupportedLink(secret);
++        }
+         return type == Type.WEB
+                 ? isValidWebAddress(address) && isValidWebProxySecret(secret)
+                 : port > 0;
+     }
+ 
+     public String getLink() {
++        if (type == Type.XRAY) {
++            return secret;
++        }
+         StringBuilder url;
+         switch (type) {
+             case MTPROTO:
+@@ -212,6 +224,12 @@ public final class ProxySettings {
+                 editor.remove("proxy_pass");
+                 editor.remove("proxy_user");
+                 break;
++            case XRAY:
++                editor.putString("proxy_secret", secret);
++                editor.putInt("proxy_port", port);
++                editor.remove("proxy_pass");
++                editor.remove("proxy_user");
++                break;
+         }
+     }
+ 
+@@ -228,6 +246,14 @@ public final class ProxySettings {
+ 
+             Type type;
+ 
++            if (XrayTransport.isSupportedLink(uri.toString())) {
++                final ProxySettings settings = builder()
++                        .setType(Type.XRAY)
++                        .setSecret(uri.toString())
++                        .build();
++                return settings.isValid() ? settings : null;
++            }
++
+             if (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https")) {
+                 String host = uri.getHost();
+                 if (host == null) {
+@@ -362,7 +388,13 @@ public final class ProxySettings {
+         }
+ 
+         public ProxySettings build() {
+-            if (type == Type.WEB) {
++            if (type == Type.XRAY) {
++                // address/port are derived from the link: for display, equality and storage
++                secret = secret.trim();
++                final XrayTransport.LinkInfo info = XrayTransport.parse(secret);
++                address = info.host;
++                port = info.port;
++            } else if (type == Type.WEB) {
+                 address = normalizeWebAddress(address);
+                 if (hasWebProxyPath(address)) {
+                     final String decodedSecret = decodeMarkedWebProxySecret(secret);
+@@ -523,6 +555,8 @@ public final class ProxySettings {
+                 return 1;
+             case WEB:
+                 return 2;
++            case XRAY:
++                return 3;
+         }
+         return 0;
+     }
+@@ -535,6 +569,8 @@ public final class ProxySettings {
+                 return Type.MTPROTO;
+             case 2:
+                 return Type.WEB;
++            case 3:
++                return Type.XRAY;
+         }
+         return Type.SOCKS5;
+     }
+diff --git a/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayCalls.java b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayCalls.java
+new file mode 100644
+index 000000000..628b96d2b
+--- /dev/null
++++ b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayCalls.java
+@@ -0,0 +1,99 @@
++package org.telegram.utils.proxy;
++
++import android.app.Activity;
++import android.content.DialogInterface;
++import android.os.SystemClock;
++import android.widget.TextView;
++
++import org.telegram.messenger.SharedConfig;
++import org.telegram.messenger.voip.NativeInstance;
++import org.telegram.ui.ActionBar.AlertDialog;
++
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.HashSet;
++
++import static org.telegram.utils.proxy.XrayTransport.str;
++
++/**
++ * Xraygram: calls with an active XRAY entry (FEAT-04).
++ *
++ * 1:1 calls: only the call versions whose implementation goes through the tgcalls SOCKS5 patch are offered/accepted —
++ * InstanceV2Impl (7, 8, 9, 12, 13) and InstanceV2ReferenceImpl (10, 11). Excluded: InstanceV2PumpImpl 18/19 (no proxy
++ * support at all) and v1 InstanceImpl 2.7.7/5.0.0 (its TURN over TCP would ignore the SOCKS5 proxy: libwebrtc has no
++ * SOCKS adapter any more). A call that cannot go through xray fails instead of going direct.
++ *
++ * Group calls, video chats, conferences, broadcasts are not proxied: a "Without XRAY" confirmation comes first.
++ */
++public final class XrayCalls {
++
++    private static final HashSet<String> PROXY_VERSIONS = new HashSet<>(Arrays.asList(
++            "7.0.0", "8.0.0", "9.0.0", "10.0.0", "11.0.0", "12.0.0", "13.0.0"));
++
++    private static long confirmedUntil;
++
++    private XrayCalls() {
++    }
++
++    /** An XRAY entry is selected and the proxy is on. */
++    public static boolean xrayActive() {
++        final SharedConfig.ProxyInfo current = SharedConfig.currentProxy;
++        return SharedConfig.isProxyEnabled() && current != null && current.settings.getType() == ProxySettings.Type.XRAY;
++    }
++
++    /** Versions for phone.requestCall / acceptCall / confirmCall. */
++    public static String[] versions() {
++        final String[] all = NativeInstance.getAllVersions();
++        if (!xrayActive() || all == null) {
++            return all;
++        }
++        final ArrayList<String> result = new ArrayList<>();
++        for (String version : all) {
++            if (PROXY_VERSIONS.contains(version)) {
++                result.add(version);
++            }
++        }
++        return result.toArray(new String[0]);
++    }
++
++    /** May a call of this version be started now? (false = would bypass xray) */
++    public static boolean versionAllowed(String version) {
++        return !xrayActive() || PROXY_VERSIONS.contains(version);
++    }
++
++    /**
++     * Before a group call / video chat / conference / broadcast with an active XRAY entry.
++     * @return true if the dialog was shown (the caller returns; {@code proceed} runs on "Continue").
++     */
++    public static boolean confirmWithoutXray(Activity activity, Runnable proceed) {
++        return confirmWithoutXray(activity, proceed, null);
++    }
++
++    /** Same, {@code onCancel} runs on "Cancel" (e.g. decline a conference invite, hang up a migrated call). */
++    public static boolean confirmWithoutXray(Activity activity, Runnable proceed, Runnable onCancel) {
++        if (activity == null || !xrayActive() || SystemClock.elapsedRealtime() < confirmedUntil) {
++            return false;
++        }
++        AlertDialog.Builder builder = new AlertDialog.Builder(activity);
++        builder.setTitle(str("Без XRAY", "Without XRAY"));
++        builder.setMessage(str(
++                "Групповые звонки, видеочаты и конференции пока идут напрямую, без XRAY: провайдер увидит соединение с серверами Telegram, а при блокировке звонок может не соединиться.\n\nСообщения и звонки один на один по-прежнему идут через XRAY.",
++                "Group calls, video chats and conferences currently go directly, without XRAY: your provider will see a connection to Telegram servers, and where Telegram is blocked the call may not connect.\n\nMessages and one-on-one calls still go through XRAY."));
++        builder.setPositiveButton(str("Продолжить", "Continue"), (d, w) -> {
++            confirmedUntil = SystemClock.elapsedRealtime() + 10_000; // the same entry may re-enter itself (hang up → join)
++            proceed.run();
++        });
++        builder.setNegativeButton(str("Отмена", "Cancel"), (d, w) -> {
++            if (onCancel != null) {
++                onCancel.run();
++            }
++        });
++        AlertDialog dialog = builder.create();
++        if (onCancel != null) {
++            dialog.setCanceledOnTouchOutside(false);
++            dialog.setCancelable(false);
++        }
++        dialog.show();
++        return true;
++    }
++}
+diff --git a/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayGate.java b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayGate.java
+new file mode 100644
+index 000000000..a20a5518a
+--- /dev/null
++++ b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayGate.java
+@@ -0,0 +1,242 @@
++package org.telegram.utils.proxy;
++
++import android.app.Activity;
++import android.content.SharedPreferences;
++import android.text.TextUtils;
++
++import org.json.JSONArray;
++import org.telegram.messenger.ApplicationLoader;
++import org.telegram.messenger.FileLog;
++import org.telegram.messenger.MessagesController;
++import org.telegram.messenger.NotificationCenter;
++import org.telegram.messenger.SharedConfig;
++import org.telegram.tgnet.ConnectionsManager;
++import org.telegram.ui.ActionBar.BaseFragment;
++import org.telegram.ui.LaunchActivity;
++import org.telegram.ui.XrayGateActivity;
++
++import java.util.ArrayList;
++import java.util.Collection;
++import java.util.LinkedHashSet;
++
++/**
++ * Xraygram: "connect through XRAY" gate (same rules on all platforms, see macos/decisions.md, MAC-05).
++ *
++ * Blocked = no XRAY entry in the proxy list and the user has not explicitly chosen "connect directly".
++ * While blocked the client sends nothing towards Telegram: every account gets a black-hole SOCKS5
++ * (127.0.0.1:1, connection refused locally) instead of its proxy settings, and the DNS/DoH fallbacks
++ * are not started. Saved proxy settings are not touched: the block is applied on top of them.
++ */
++public final class XrayGate {
++
++    /** Black-hole proxy: nobody listens on port 1, the connect fails locally. */
++    public static final String BLACKHOLE_ADDRESS = "127.0.0.1";
++    public static final int BLACKHOLE_PORT = 1;
++
++    private static final String PREF_DIRECT_ALLOWED = "xraygram_direct_allowed";
++    private static final String PREF_SAVED_LINKS = "xraygram_saved_links";
++
++    private XrayGate() {
++    }
++
++    private static SharedPreferences prefs() {
++        return MessagesController.getGlobalMainSettings();
++    }
++
++    public static boolean isDirectAllowed() {
++        try {
++            return prefs().getBoolean(PREF_DIRECT_ALLOWED, false);
++        } catch (Throwable e) {
++            return false;
++        }
++    }
++
++    public static void setDirectAllowed(boolean value) {
++        if (isDirectAllowed() != value) {
++            prefs().edit().putBoolean(PREF_DIRECT_ALLOWED, value).commit();
++        }
++    }
++
++    public static boolean isXray(SharedConfig.ProxyInfo info) {
++        return info != null && info.settings.getType() == ProxySettings.Type.XRAY;
++    }
++
++    public static boolean hasXrayEntries() {
++        try {
++            if (ApplicationLoader.applicationContext == null) {
++                return false;
++            }
++            SharedConfig.loadProxyList();
++            for (SharedConfig.ProxyInfo info : new ArrayList<>(SharedConfig.proxyList)) {
++                if (isXray(info)) {
++                    return true;
++                }
++            }
++        } catch (Throwable e) {
++            FileLog.e(e);
++        }
++        return false;
++    }
++
++    public static boolean isBlocked() {
++        return !hasXrayEntries() && !isDirectAllowed();
++    }
++
++    /** True if deleting these entries leaves the list without XRAY entries (while it had some). */
++    public static boolean removesLastXray(Collection<SharedConfig.ProxyInfo> toDelete) {
++        boolean deletesXray = false;
++        for (SharedConfig.ProxyInfo info : toDelete) {
++            deletesXray |= isXray(info);
++        }
++        if (!deletesXray) {
++            return false;
++        }
++        for (SharedConfig.ProxyInfo info : new ArrayList<>(SharedConfig.proxyList)) {
++            if (isXray(info) && !toDelete.contains(info)) {
++                return false;
++            }
++        }
++        return true;
++    }
++
++    /** FEAT-03 "Connect directly?" confirmation (red button); {@code proceed} runs on confirm. */
++    public static void confirmDirect(Activity activity, Runnable proceed) {
++        if (activity == null) {
++            return;
++        }
++        org.telegram.ui.ActionBar.AlertDialog dialog = new org.telegram.ui.ActionBar.AlertDialog.Builder(activity)
++                .setTitle(XrayTransport.str("Подключиться напрямую?", "Connect directly?"))
++                .setMessage(XrayTransport.str(
++                        "Xraygram подключится к Telegram без XRAY: провайдер увидит это соединение, а там, где Telegram блокируют, связи не будет. Вернуться к XRAY: Настройки → Данные и память → Прокси.",
++                        "Xraygram will connect to Telegram without XRAY: your provider will see this connection, and where Telegram is blocked it will not work. To go back to XRAY: Settings → Data and Storage → Proxy."))
++                .setPositiveButton(XrayTransport.str("Подключиться напрямую", "Connect directly"), (d, w) -> proceed.run())
++                .setNegativeButton(XrayTransport.str("Отмена", "Cancel"), null)
++                .create();
++        dialog.show();
++        android.view.View button = dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE);
++        if (button instanceof android.widget.TextView) {
++            org.telegram.ui.ActionBar.ThemeBind.textColor((android.widget.TextView) button, org.telegram.ui.ActionBar.Theme.key_text_RedBold);
++        }
++    }
++
++    public static String lastXrayDeleteTitle() {
++        return XrayTransport.str("Удалить последнюю XRAY-запись?", "Delete the last XRAY entry?");
++    }
++
++    public static String lastXrayDeleteText() {
++        return XrayTransport.str(
++                "Без неё Xraygram не будет подключаться к Telegram, пока вы не добавите ссылку или явно не выберете подключение напрямую. Ссылка останется в сохранённых серверах.",
++                "Without it Xraygram will not connect to Telegram until you add a link or explicitly choose a direct connection. The link stays in saved servers.");
++    }
++
++    /** Another XRAY entry to switch to when the active one is deleted, or null. */
++    public static SharedConfig.ProxyInfo nextXray(SharedConfig.ProxyInfo deleted) {
++        for (SharedConfig.ProxyInfo info : new ArrayList<>(SharedConfig.proxyList)) {
++            if (info != deleted && isXray(info)) {
++                return info;
++            }
++        }
++        return null;
++    }
++
++    // ------------------------------------------------------------------ saved links
++
++    /** Links of deleted XRAY entries (newest first), minus links that are in the list again. */
++    public static ArrayList<String> savedLinks() {
++        LinkedHashSet<String> result = new LinkedHashSet<>(readSaved());
++        for (SharedConfig.ProxyInfo info : new ArrayList<>(SharedConfig.proxyList)) {
++            if (isXray(info)) {
++                result.remove(info.settings.getSecret().trim());
++            }
++        }
++        return new ArrayList<>(result);
++    }
++
++    /** Called when an XRAY entry is deleted: keep its link for the gate screen. */
++    public static void rememberLink(String link) {
++        if (!XrayTransport.isSupportedLink(link)) {
++            return;
++        }
++        LinkedHashSet<String> links = new LinkedHashSet<>();
++        links.add(link.trim());
++        links.addAll(readSaved());
++        writeSaved(new ArrayList<>(links));
++    }
++
++    private static ArrayList<String> readSaved() {
++        ArrayList<String> links = new ArrayList<>();
++        try {
++            String json = prefs().getString(PREF_SAVED_LINKS, null);
++            if (!TextUtils.isEmpty(json)) {
++                JSONArray array = new JSONArray(json);
++                for (int i = 0; i < array.length(); i++) {
++                    String link = array.optString(i);
++                    if (XrayTransport.isSupportedLink(link)) {
++                        links.add(link.trim());
++                    }
++                }
++            }
++        } catch (Throwable e) {
++            FileLog.e(e);
++        }
++        return links;
++    }
++
++    private static void writeSaved(ArrayList<String> links) {
++        JSONArray array = new JSONArray();
++        for (int i = 0; i < links.size() && i < 20; i++) {
++            array.put(links.get(i));
++        }
++        prefs().edit().putString(PREF_SAVED_LINKS, array.toString()).commit();
++    }
++
++    // ------------------------------------------------------------------ actions
++
++    /** "Connect": add (or reuse) the XRAY entry for this link, select it, enable the proxy. */
++    public static void connect(String link) {
++        link = link.trim();
++        final ProxySettings settings = ProxySettings.builder()
++                .setType(ProxySettings.Type.XRAY)
++                .setSecret(link)
++                .build();
++        if (!settings.isValid()) {
++            return;
++        }
++        final SharedConfig.ProxyInfo info = SharedConfig.addProxy(new SharedConfig.ProxyInfo(settings));
++        SharedConfig.currentProxy = info;
++        SharedPreferences.Editor editor = prefs().edit();
++        editor.putBoolean("proxy_enabled", true);
++        info.settings.toSharedPreferences(editor);
++        editor.putBoolean(PREF_DIRECT_ALLOWED, false);
++        editor.commit();
++        SharedConfig.saveProxyList();
++        ConnectionsManager.setProxySettings(true, info.settings);
++        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
++        XrayPush.onGateOpened(LaunchActivity.instance); // FEAT-09: FCM / background connection only now
++    }
++
++    /** "Connect without XRAY": explicit choice, then the usual proxy settings apply. */
++    public static void allowDirect() {
++        setDirectAllowed(true);
++        final boolean enabled = prefs().getBoolean("proxy_enabled", false) && SharedConfig.currentProxy != null;
++        ConnectionsManager.setProxySettings(enabled, enabled ? SharedConfig.currentProxy.settings : null);
++        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
++        XrayPush.onGateOpened(LaunchActivity.instance); // FEAT-09: FCM / background connection only now
++    }
++
++    /** Shows the gate on top of everything if blocked and it is not shown yet. */
++    public static void showIfNeeded(Activity activity) {
++        if (!(activity instanceof LaunchActivity) || !isBlocked()) {
++            return;
++        }
++        final LaunchActivity launchActivity = (LaunchActivity) activity;
++        if (launchActivity.getActionBarLayout() == null) {
++            return;
++        }
++        final BaseFragment last = launchActivity.getActionBarLayout().getLastFragment();
++        if (last instanceof XrayGateActivity) {
++            return;
++        }
++        launchActivity.presentFragment(new XrayGateActivity());
++    }
++}
+diff --git a/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayLinkPreview.java b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayLinkPreview.java
+new file mode 100644
+index 000000000..a69ba611f
+--- /dev/null
++++ b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayLinkPreview.java
+@@ -0,0 +1,91 @@
++package org.telegram.utils.proxy;
++
++import android.text.TextUtils;
++
++import java.util.Locale;
++
++import static org.telegram.utils.proxy.XrayTransport.str;
++
++/**
++ * Xraygram: the line under the link field (FEAT-01): "Server: proto · host:port · name" or "Error: <friendly text>"
++ * from the table «Понятные ошибки». Android shows the Java parse at once; the core check then confirms or replaces it.
++ */
++public final class XrayLinkPreview {
++
++    private XrayLinkPreview() {
++    }
++
++    /** Hint under the field (macOS/Android text of FEAT-01). */
++    public static String hint() {
++        return str("Ссылка на ваш сервер: vless://, vmess://, trojan://, ss:// или hysteria2://. Если она скопирована, подставится сама.",
++                "Link to your server: vless://, vmess://, trojan://, ss:// or hysteria2://. If it is copied, it is filled in automatically.");
++    }
++
++    public static String fieldTitle() {
++        return str("Ссылка", "Link");
++    }
++
++    /** Instant check in Java. null = empty field. */
++    public static String instant(String link) {
++        link = link == null ? "" : link.trim();
++        if (link.isEmpty()) {
++            return null;
++        }
++        final String lower = link.toLowerCase(Locale.US);
++        if (lower.startsWith("http://") || lower.startsWith("https://")) {
++            return error(str("Это ссылка на сайт или подписку. Нужна ссылка на один сервер: vless://, vmess://, trojan://, ss:// или hysteria2://",
++                    "This is a web or subscription link. A single-server link is needed: vless://, vmess://, trojan://, ss:// or hysteria2://"));
++        }
++        if (!XrayTransport.isSupportedLink(link)) {
++            return error(notServerLink());
++        }
++        final XrayTransport.LinkInfo info = XrayTransport.parse(link);
++        if (!info.isValid()) {
++            return error(incomplete());
++        }
++        return str("Сервер: ", "Server: ") + info.describe();
++    }
++
++    /** Passes the instant check (Save / Connect may be enabled). */
++    public static boolean instantValid(String link) {
++        return link != null && XrayTransport.isSupportedLink(link) && XrayTransport.parse(link).isValid();
++    }
++
++    /** Core check (blocking, off the UI thread): null if xray accepts the link, else "Error: …". */
++    public static String coreVerdict(String link) {
++        final String core = XrayTransport.validate(link);
++        if (core == null) {
++            return null;
++        }
++        return error(friendly(core));
++    }
++
++    /** Maps libXray's error text to the FEAT-01 table. */
++    public static String friendly(String core) {
++        final String lower = core == null ? "" : core.toLowerCase(Locale.US);
++        if (lower.contains("unsupported share format")) {
++            return notServerLink();
++        }
++        if (lower.contains("no valid outbound")) {
++            return incomplete();
++        }
++        if (lower.contains("timeout") || lower.contains("deadline")) {
++            return str("Не удалось проверить ссылку. Попробуйте ещё раз", "Could not check the link. Try again");
++        }
++        return str("Ссылка не распознана", "Link not recognized") + (TextUtils.isEmpty(core) ? "" : " (" + core + ")");
++    }
++
++    private static String notServerLink() {
++        return str("Это не ссылка на сервер. Нужна ссылка vless://, vmess://, trojan://, ss:// или hysteria2://",
++                "This is not a server link. Use vless://, vmess://, trojan://, ss:// or hysteria2://");
++    }
++
++    private static String incomplete() {
++        return str("В ссылке не хватает данных (адрес, порт, ключ или параметры). Скопируйте её целиком ещё раз",
++                "The link is incomplete (address, port, key or parameters). Copy the whole link again");
++    }
++
++    private static String error(String text) {
++        return str("Ошибка: ", "Error: ") + text;
++    }
++}
+diff --git a/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayPush.java b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayPush.java
+new file mode 100644
+index 000000000..99f105695
+--- /dev/null
++++ b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayPush.java
+@@ -0,0 +1,232 @@
++package org.telegram.utils.proxy;
++
++import android.Manifest;
++import android.app.Activity;
++import android.content.Context;
++import android.content.Intent;
++import android.content.SharedPreferences;
++import android.content.pm.PackageManager;
++import android.net.Uri;
++import android.os.Build;
++import android.os.PowerManager;
++import android.provider.Settings;
++import android.text.TextUtils;
++
++import org.telegram.messenger.AndroidUtilities;
++import org.telegram.messenger.ApplicationLoader;
++import org.telegram.messenger.BuildConfig;
++import org.telegram.messenger.FileLog;
++import org.telegram.messenger.MessagesController;
++import org.telegram.messenger.SharedConfig;
++import org.telegram.messenger.UserConfig;
++import org.telegram.tgnet.ConnectionsManager;
++import org.telegram.ui.ActionBar.AlertDialog;
++import org.telegram.ui.LaunchActivity;
++
++import static org.telegram.utils.proxy.XrayTransport.str;
++
++/**
++ * Xraygram: push notifications (FEAT-09, product/features/FEAT-09.md).
++ *
++ * Main path — FCM, only with Xraygram's own Firebase project: the build takes {@code .secrets/google-services.json}
++ * (package io.github.xraygram) and sets {@code BuildConfig.XRAYGRAM_FCM}. With the upstream Telegram file FCM is never
++ * started. Nothing touches Firebase while the XRAY gate is closed (FEAT-03). The token goes to Telegram the usual way,
++ * {@code account.registerDevice} over MTProto, i.e. through xray.
++ *
++ * Fallback — Keep-Alive Service + Background Connection: no own Firebase project, no Google Play services, no token
++ * within 60 s after the gate opened, or an FCM error. Once on, it stays on (the user can switch it off in settings).
++ */
++public final class XrayPush {
++
++    private static final String PREF_FALLBACK = "xraygram_push_fallback";
++    private static final String PREF_EXPLAINED = "xraygram_push_explained";
++    private static final long TOKEN_TIMEOUT_MS = 60_000;
++
++    private static boolean tokenWatchScheduled;
++
++    private XrayPush() {
++    }
++
++    private static SharedPreferences prefs() {
++        return MessagesController.getGlobalMainSettings();
++    }
++
++    /** Built with Xraygram's own google-services.json. */
++    public static boolean fcmBuilt() {
++        return BuildConfig.XRAYGRAM_FCM;
++    }
++
++    private static boolean hasPlayServices() {
++        try {
++            return ApplicationLoader.getPushProvider().hasServices();
++        } catch (Throwable e) {
++            return false;
++        }
++    }
++
++    /** The fallback (background connection) is the delivery path. */
++    public static boolean isFallback() {
++        try {
++            return !fcmBuilt() || !hasPlayServices() || prefs().getBoolean(PREF_FALLBACK, false);
++        } catch (Throwable e) {
++            return true;
++        }
++    }
++
++    /** FCM is (expected to be) delivering pushes. */
++    public static boolean fcmActive() {
++        return !isFallback();
++    }
++
++    /** Default for Keep-Alive Service / Background Connection when the user has not chosen. */
++    public static boolean keepAliveDefault(boolean serverValue) {
++        return isFallback() || serverValue;
++    }
++
++    // ------------------------------------------------------------------ lifecycle
++
++    /** The XRAY gate has just opened ("Connect" or explicit "direct"). UI thread. */
++    public static void onGateOpened(Activity activity) {
++        ApplicationLoader.initPushServicesIfReady();
++        requestNotificationPermission(activity);
++        if (isFallback()) {
++            applyFallback(activity);
++        } else {
++            watchToken();
++        }
++    }
++
++    /** App start with the gate already open: keep the 60 s token watch. */
++    public static void onAppStarted() {
++        if (!XrayGate.isBlocked() && fcmActive()) {
++            watchToken();
++        }
++    }
++
++    private static void watchToken() {
++        if (tokenWatchScheduled) {
++            return;
++        }
++        tokenWatchScheduled = true;
++        AndroidUtilities.runOnUIThread(() -> {
++            tokenWatchScheduled = false;
++            if (fcmActive() && TextUtils.isEmpty(SharedConfig.pushString)) {
++                FileLog.d("xraygram: no FCM token in 60 s, switching to background connection");
++                switchToFallback();
++            }
++        }, TOKEN_TIMEOUT_MS);
++    }
++
++    /** Called by PushListenerController when FCM failed to give a token. */
++    public static void onFcmFailed() {
++        AndroidUtilities.runOnUIThread(() -> {
++            if (fcmActive()) {
++                FileLog.d("xraygram: FCM failed, switching to background connection");
++                switchToFallback();
++            }
++        });
++    }
++
++    private static void switchToFallback() {
++        prefs().edit().putBoolean(PREF_FALLBACK, true).commit();
++        applyFallback(LaunchActivity.instance);
++    }
++
++    /** Turns on Keep-Alive / Background Connection (unless the user switched them off) and explains once. */
++    private static void applyFallback(Activity activity) {
++        try {
++            ApplicationLoader.startPushService();
++            for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
++                if (UserConfig.getInstance(a).isClientActivated()) {
++                    ConnectionsManager connectionsManager = ConnectionsManager.getInstance(a);
++                    connectionsManager.setPushConnectionEnabled(connectionsManager.isPushConnectionEnabled());
++                }
++            }
++        } catch (Throwable e) {
++            FileLog.e(e);
++        }
++        showExplanationIfNeeded(activity);
++    }
++
++    // ------------------------------------------------------------------ UI
++
++    public static boolean isIgnoringBatteryOptimizations() {
++        if (Build.VERSION.SDK_INT < 23) {
++            return true;
++        }
++        try {
++            PowerManager pm = (PowerManager) ApplicationLoader.applicationContext.getSystemService(Context.POWER_SERVICE);
++            return pm != null && pm.isIgnoringBatteryOptimizations(ApplicationLoader.applicationContext.getPackageName());
++        } catch (Throwable e) {
++            return false;
++        }
++    }
++
++    public static void requestIgnoreBatteryOptimizations(Activity activity) {
++        if (activity == null || Build.VERSION.SDK_INT < 23) {
++            return;
++        }
++        try {
++            Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
++            intent.setData(Uri.parse("package:" + activity.getPackageName()));
++            activity.startActivity(intent);
++        } catch (Throwable e) {
++            try {
++                activity.startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
++            } catch (Throwable ignore) {
++            }
++        }
++    }
++
++    /** Android 13+: ask for notifications right after the gate opened (not earlier). */
++    private static void requestNotificationPermission(Activity activity) {
++        if (activity == null || Build.VERSION.SDK_INT < 33) {
++            return;
++        }
++        try {
++            if (activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
++                activity.requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
++            }
++        } catch (Throwable e) {
++            FileLog.e(e);
++        }
++    }
++
++    /** One-time "Background notifications" explanation on the fallback path. */
++    public static void showExplanationIfNeeded(Activity activity) {
++        if (activity == null || activity.isFinishing() || XrayGate.isBlocked() || !isFallback()
++                || prefs().getBoolean(PREF_EXPLAINED, false) || isIgnoringBatteryOptimizations()) {
++            return;
++        }
++        prefs().edit().putBoolean(PREF_EXPLAINED, true).commit();
++        try {
++            new AlertDialog.Builder(activity)
++                    .setTitle(str("Уведомления в фоне", "Background notifications"))
++                    .setMessage(str(
++                            "На этом телефоне нет сервисов Google для уведомлений. Xraygram будет получать сообщения сам, через ваш сервер XRAY. Чтобы уведомления приходили, когда приложение закрыто, разрешите ему работать в фоне.",
++                            "This phone has no Google notification services. Xraygram will receive messages itself, through your XRAY server. To get notifications while the app is closed, allow it to run in the background."))
++                    .setPositiveButton(str("Разрешить", "Allow"), (d, w) -> requestIgnoreBatteryOptimizations(activity))
++                    .setNegativeButton(str("Не сейчас", "Not now"), null)
++                    .show();
++        } catch (Throwable e) {
++            FileLog.e(e);
++        }
++    }
++
++    /** Status line for Settings → Notifications and Sounds. */
++    public static String statusText() {
++        if (fcmActive()) {
++            return str("Уведомления: через Google (FCM)", "Notifications: via Google (FCM)");
++        }
++        if (isIgnoringBatteryOptimizations()) {
++            return str("Уведомления: фоновое соединение", "Notifications: background connection");
++        }
++        return str("Уведомления: фоновое соединение, работа в фоне ограничена",
++                "Notifications: background connection, background activity restricted");
++    }
++
++    /** Text of the persistent notification of the keep-alive service. */
++    public static String keepAliveNotificationText() {
++        return str("Xraygram на связи", "Xraygram is connected");
++    }
++}
+diff --git a/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayTransport.java b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayTransport.java
+new file mode 100644
+index 000000000..08c75ccd3
+--- /dev/null
++++ b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayTransport.java
+@@ -0,0 +1,449 @@
++package org.telegram.utils.proxy;
++
++import android.net.Uri;
++import android.text.TextUtils;
++import android.util.Base64;
++
++import org.json.JSONArray;
++import org.json.JSONObject;
++import org.telegram.messenger.FileLog;
++import org.telegram.messenger.LocaleController;
++import org.telegram.messenger.SharedConfig;
++
++import java.net.InetAddress;
++import java.net.ServerSocket;
++import java.nio.charset.StandardCharsets;
++import java.security.SecureRandom;
++import java.util.ArrayList;
++import java.util.HashMap;
++import java.util.LinkedHashSet;
++import java.util.Locale;
++import java.util.Set;
++import java.util.concurrent.ExecutorService;
++import java.util.concurrent.Executors;
++
++import libXray.LibXray;
++
++/**
++ * Xraygram: in-process Xray-core (libXray, gomobile) for proxy entries of type
++ * {@link ProxySettings.Type#XRAY}. Telegram's network code (tgnet) sees each
++ * XRAY entry as an ordinary SOCKS5 proxy on 127.0.0.1.
++ *
++ * libXray can only run one Xray instance per process, so a single instance
++ * serves all XRAY entries at once: one password-protected SOCKS5 inbound per
++ * share link, routed to that link's outbound. Every link keeps its local port
++ * for the life of the process, so restarting Xray (when a new link appears)
++ * never changes what tgnet is connected to.
++ */
++public final class XrayTransport {
++
++    public static final String SOCKS_USER = "xraygram";
++
++    private static final int API_VERSION = 3;
++    private static final Object lock = new Object();
++    private static final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
++        Thread thread = new Thread(r, "xraygram-core");
++        thread.setDaemon(true);
++        return thread;
++    });
++
++    private static final String socksPassword = randomHex(16);
++    private static final HashMap<String, Integer> ports = new HashMap<>();
++    private static final Set<String> runningLinks = new LinkedHashSet<>();
++    /** link → user-facing reason why its core is not serving (FEAT-02 "XRAY: <reason>"). */
++    private static final HashMap<String, String> linkErrors = new HashMap<>();
++    private static boolean running;
++    private static String lastError;
++
++    private XrayTransport() {
++    }
++
++    public static String getSocksPassword() {
++        return socksPassword;
++    }
++
++    public static boolean isSupportedLink(String link) {
++        if (TextUtils.isEmpty(link)) {
++            return false;
++        }
++        String lower = link.trim().toLowerCase(Locale.US);
++        return lower.startsWith("vless://")
++                || lower.startsWith("vmess://")
++                || lower.startsWith("trojan://")
++                || lower.startsWith("ss://")
++                || lower.startsWith("hysteria2://")
++                || lower.startsWith("hy2://");
++    }
++
++    /**
++     * Returns the local SOCKS5 port reserved for this link (or 0 if the link is
++     * not supported) and starts Xray in the background if it is not already
++     * serving the link. tgnet keeps retrying until the inbound is up.
++     */
++    public static int startAsync(String link) {
++        final int port = portFor(link);
++        if (port != 0) {
++            executor.execute(() -> ensureRunning(link));
++        }
++        return port;
++    }
++
++    /** Stops Xray in the background (no XRAY entry is in use). */
++    public static void stopAsync() {
++        executor.execute(() -> {
++            synchronized (lock) {
++                stopInternal();
++            }
++        });
++    }
++
++    /**
++     * Makes sure Xray serves this link, then calls back on the Xray thread with
++     * the local port, or 0 on failure. Used by proxy checks.
++     */
++    public static void withRunning(String link, PortCallback callback) {
++        executor.execute(() -> callback.run(ensureRunning(link) ? portFor(link) : 0));
++    }
++
++    public interface PortCallback {
++        void run(int port);
++    }
++
++    /** Reason for "XRAY: <reason>" in the proxy list, or null if the core is fine (or not tried yet). */
++    public static String statusError(String link) {
++        if (link == null) {
++            return null;
++        }
++        synchronized (lock) {
++            return linkErrors.get(link.trim());
++        }
++    }
++
++    /**
++     * After an XRAY entry was deleted: drop its link from the running core (FEAT-02 п. 7). Restarts xray with the
++     * remaining entries (ports stay the same), or stops it if none is left.
++     */
++    public static void pruneAsync() {
++        executor.execute(() -> {
++            synchronized (lock) {
++                if (!running) {
++                    return;
++                }
++                final ArrayList<String> known = knownLinks();
++                if (known.containsAll(runningLinks)) {
++                    return;
++                }
++                for (String link : new ArrayList<>(runningLinks)) {
++                    if (!known.contains(link)) {
++                        ports.remove(link);
++                        linkErrors.remove(link);
++                    }
++                }
++                stopInternal();
++                if (!known.isEmpty()) {
++                    ensureRunning(known.get(0));
++                }
++            }
++        });
++    }
++
++    public static String getLastError() {
++        synchronized (lock) {
++            return lastError;
++        }
++    }
++
++    public static String version() {
++        try {
++            JSONObject data = invoke("xrayVersion", null).optJSONObject("data");
++            return data != null ? data.optString("version") : "";
++        } catch (Throwable e) {
++            return "";
++        }
++    }
++
++    // ------------------------------------------------------------------ link info
++
++    /** What a share link points to; parsed in Java, never throws. */
++    public static final class LinkInfo {
++        public String protocol = "";
++        public String host = "";
++        public int port;
++        public String name = "";
++
++        public boolean isValid() {
++            return !TextUtils.isEmpty(host);
++        }
++
++        /** "name" from #fragment, else the server address. */
++        public String displayName() {
++            return !TextUtils.isEmpty(name) ? name : host;
++        }
++
++        /** "vless · host:port · name" */
++        public String describe() {
++            StringBuilder sb = new StringBuilder(protocol);
++            sb.append(" · ").append(host);
++            if (port > 0) {
++                sb.append(':').append(port);
++            }
++            if (!TextUtils.isEmpty(name)) {
++                sb.append(" · ").append(name);
++            }
++            return sb.toString();
++        }
++    }
++
++    public static LinkInfo parse(String link) {
++        LinkInfo info = new LinkInfo();
++        if (!isSupportedLink(link)) {
++            return info;
++        }
++        try {
++            String trimmed = link.trim();
++            int colon = trimmed.indexOf("://");
++            info.protocol = trimmed.substring(0, colon).toLowerCase(Locale.US);
++            if (info.protocol.equals("hy2")) {
++                info.protocol = "hysteria2";
++            }
++            if (info.protocol.equals("vmess")) {
++                String body = trimmed.substring(colon + 3);
++                int hash = body.indexOf('#');
++                if (hash >= 0) {
++                    info.name = Uri.decode(body.substring(hash + 1));
++                    body = body.substring(0, hash);
++                }
++                JSONObject json = new JSONObject(new String(Base64.decode(body, Base64.DEFAULT), StandardCharsets.UTF_8));
++                info.host = json.optString("add", "");
++                info.port = json.optInt("port", 0);
++                if (TextUtils.isEmpty(info.name)) {
++                    info.name = json.optString("ps", "");
++                }
++            } else {
++                Uri uri = Uri.parse(trimmed);
++                info.host = uri.getHost() != null ? uri.getHost() : "";
++                info.port = Math.max(uri.getPort(), 0);
++                String fragment = uri.getFragment();
++                info.name = fragment != null ? fragment.trim() : "";
++            }
++        } catch (Throwable ignore) {
++        }
++        return info;
++    }
++
++    /**
++     * Full check with Xray's own parser (blocking, call off the UI thread).
++     * Returns null if Xray accepts the link, otherwise the error text.
++     */
++    public static String validate(String link) {
++        try {
++            buildOutbound(link, "check");
++            return null;
++        } catch (Throwable e) {
++            String message = e.getMessage();
++            return !TextUtils.isEmpty(message) ? message : e.getClass().getSimpleName();
++        }
++    }
++
++    // ------------------------------------------------------------------ core
++
++    private static int portFor(String link) {
++        if (!isSupportedLink(link)) {
++            return 0;
++        }
++        link = link.trim();
++        synchronized (lock) {
++            Integer port = ports.get(link);
++            if (port == null) {
++                try {
++                    port = findFreePort();
++                } catch (Throwable e) {
++                    FileLog.e(e);
++                    linkErrors.put(link, str("нет свободного локального порта", "no free local port"));
++                    return 0;
++                }
++                ports.put(link, port);
++            }
++            return port;
++        }
++    }
++
++    /** Blocking. Restarts Xray with every known XRAY link if this one is not served yet. */
++    private static boolean ensureRunning(String link) {
++        if (!isSupportedLink(link)) {
++            return false;
++        }
++        link = link.trim();
++        synchronized (lock) {
++            if (running && runningLinks.contains(link) && isRunning()) {
++                return true;
++            }
++            LinkedHashSet<String> wanted = new LinkedHashSet<>();
++            wanted.add(link);
++            wanted.addAll(knownLinks());
++            try {
++                JSONArray inbounds = new JSONArray();
++                JSONArray outbounds = new JSONArray();
++                JSONArray rules = new JSONArray();
++                ArrayList<String> served = new ArrayList<>();
++                int index = 0;
++                for (String item : wanted) {
++                    JSONObject outbound;
++                    try {
++                        outbound = buildOutbound(item, "out-" + index);
++                    } catch (Throwable e) {
++                        if (item.equals(link)) {
++                            throw e;
++                        }
++                        FileLog.e("xraygram: skip broken link: " + e.getMessage());
++                        continue;
++                    }
++                    int port = portFor(item);
++                    inbounds.put(buildInbound("in-" + index, port));
++                    outbounds.put(outbound);
++                    rules.put(new JSONObject()
++                            .put("type", "field")
++                            .put("inboundTag", new JSONArray().put("in-" + index))
++                            .put("outboundTag", "out-" + index));
++                    served.add(item);
++                    index++;
++                }
++                JSONObject config = new JSONObject()
++                        .put("log", new JSONObject().put("loglevel", "warning"))
++                        .put("inbounds", inbounds)
++                        .put("outbounds", outbounds)
++                        .put("routing", new JSONObject()
++                                .put("domainStrategy", "AsIs")
++                                .put("rules", rules));
++
++                stopInternal();
++                JSONObject response = invoke("runXray", new JSONObject().put("xrayJson", config.toString()));
++                if (!response.optBoolean("success")) {
++                    throw new IllegalStateException(response.optString("error", "runXray failed"));
++                }
++                running = true;
++                runningLinks.addAll(served);
++                lastError = null;
++                linkErrors.clear();
++                FileLog.d("xraygram: xray " + version() + " serves " + served.size() + " link(s)");
++                return true;
++            } catch (Throwable e) {
++                lastError = e.getMessage();
++                linkErrors.put(link, str("не удалось запустить", "failed to start"));
++                FileLog.e("xraygram: start failed: " + e.getMessage());
++                return false;
++            }
++        }
++    }
++
++    /** Share links of all XRAY entries in the proxy list. */
++    private static ArrayList<String> knownLinks() {
++        ArrayList<String> links = new ArrayList<>();
++        try {
++            ArrayList<SharedConfig.ProxyInfo> list = new ArrayList<>(SharedConfig.proxyList);
++            for (SharedConfig.ProxyInfo info : list) {
++                if (info != null && info.settings.getType() == ProxySettings.Type.XRAY) {
++                    links.add(info.settings.getSecret().trim());
++                }
++            }
++            SharedConfig.ProxyInfo current = SharedConfig.currentProxy;
++            if (current != null && current.settings.getType() == ProxySettings.Type.XRAY) {
++                links.add(current.settings.getSecret().trim());
++            }
++        } catch (Throwable e) {
++            FileLog.e(e);
++        }
++        return links;
++    }
++
++    private static JSONObject buildInbound(String tag, int port) throws Exception {
++        return new JSONObject()
++                .put("tag", tag)
++                .put("listen", "127.0.0.1")
++                .put("port", port)
++                .put("protocol", "socks")
++                .put("settings", new JSONObject()
++                        .put("auth", "password")
++                        .put("accounts", new JSONArray().put(new JSONObject()
++                                .put("user", SOCKS_USER)
++                                .put("pass", socksPassword)))
++                        .put("udp", false));
++    }
++
++    private static JSONObject buildOutbound(String link, String tag) throws Exception {
++        JSONObject converted = invoke("convertShareLinksToXrayJson", new JSONObject().put("text", link.trim()));
++        if (!converted.optBoolean("success")) {
++            throw new IllegalArgumentException(converted.optString("error", "bad link"));
++        }
++        Object data = converted.opt("data");
++        JSONObject doc = data instanceof JSONObject ? (JSONObject) data : new JSONObject(String.valueOf(data));
++        JSONArray outbounds = doc.optJSONArray("outbounds");
++        if (outbounds == null || outbounds.length() == 0) {
++            throw new IllegalArgumentException("no outbound in link");
++        }
++        JSONObject outbound = outbounds.getJSONObject(0);
++        outbound.put("tag", tag);
++        return outbound;
++    }
++
++    private static boolean isRunning() {
++        try {
++            JSONObject data = invoke("getXrayState", null).optJSONObject("data");
++            return data != null && data.optBoolean("running");
++        } catch (Throwable e) {
++            return false;
++        }
++    }
++
++    private static void stopInternal() {
++        if (running) {
++            try {
++                invoke("stopXray", null);
++            } catch (Throwable e) {
++                FileLog.e(e);
++            }
++        }
++        running = false;
++        runningLinks.clear();
++    }
++
++    private static int findFreePort() throws Exception {
++        try (ServerSocket socket = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))) {
++            return socket.getLocalPort();
++        }
++    }
++
++    private static String randomHex(int bytes) {
++        byte[] data = new byte[bytes];
++        new SecureRandom().nextBytes(data);
++        StringBuilder sb = new StringBuilder(bytes * 2);
++        for (byte b : data) {
++            sb.append(String.format(Locale.US, "%02x", b & 0xff));
++        }
++        return sb.toString();
++    }
++
++    private static JSONObject invoke(String method, JSONObject payload) throws Exception {
++        JSONObject request = new JSONObject()
++                .put("apiVersion", API_VERSION)
++                .put("method", method);
++        if (payload != null) {
++            request.put("payload", payload);
++        }
++        return new JSONObject(LibXray.invoke(request.toString()));
++    }
++
++    // ------------------------------------------------------------------ strings
++
++    /** UI strings: Russian for ru locales, English otherwise (no strings.xml changes). */
++    public static String str(String ru, String en) {
++        String lang;
++        try {
++            LocaleController.LocaleInfo info = LocaleController.getInstance().getCurrentLocaleInfo();
++            lang = info != null ? info.getLangCode() : Locale.getDefault().getLanguage();
++        } catch (Throwable e) {
++            lang = Locale.getDefault().getLanguage();
++        }
++        return lang != null && lang.toLowerCase(Locale.US).startsWith("ru") ? ru : en;
++    }
++}
+diff --git a/TMessagesProj/src/main/res/values/strings.xml b/TMessagesProj/src/main/res/values/strings.xml
+index e4f8cf67b..449927b40 100644
+--- a/TMessagesProj/src/main/res/values/strings.xml
++++ b/TMessagesProj/src/main/res/values/strings.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="AppName">Telegram</string>
++    <string name="AppName">Xraygram</string>
+     <string name="AppNameBeta">Telegram Beta</string>
+     <string name="LanguageName">English</string>
+     <string name="English">English</string>
+@@ -4213,7 +4213,7 @@
+     <string name="ViewMessageStatistic">Message Statistic</string>
+     <string name="ViewMessage">Open Message</string>
+     <!--Intro view-->
+-    <string name="Page1Title">Telegram</string>
++    <string name="Page1Title">Xraygram</string>
+     <string name="Page2Title">Fast</string>
+     <string name="Page3Title">Free</string>
+     <string name="Page4Title">Secure</string>
+diff --git a/TMessagesProj_AppStandalone/build.gradle b/TMessagesProj_AppStandalone/build.gradle
+index 155126924..e3767fa43 100644
+--- a/TMessagesProj_AppStandalone/build.gradle
++++ b/TMessagesProj_AppStandalone/build.gradle
+@@ -21,6 +21,7 @@ dependencies {
+     implementation 'androidx.core:core:1.16.0'
+     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+     implementation files('../TMessagesProj/libs/libgsaverification-client.aar')
++    implementation files('../TMessagesProj/libs/libXray.aar') // Xraygram
+ }
+ 
+ android {
+@@ -57,10 +58,18 @@ android {
+         }
+ 
+         release {
+-            storeFile file("../TMessagesProj/config/release.keystore")
+-            storePassword RELEASE_STORE_PASSWORD
+-            keyAlias RELEASE_KEY_ALIAS
+-            keyPassword RELEASE_KEY_PASSWORD
++            // Xraygram: own keystore from .secrets/ (passed via ORG_GRADLE_PROJECT_XRAYGRAM_KEYSTORE*), upstream one as fallback
++            if (project.findProperty("XRAYGRAM_KEYSTORE")) {
++                storeFile file(project.findProperty("XRAYGRAM_KEYSTORE"))
++                storePassword project.findProperty("XRAYGRAM_KEYSTORE_PASSWORD")
++                keyAlias project.findProperty("XRAYGRAM_KEY_ALIAS")
++                keyPassword project.findProperty("XRAYGRAM_KEYSTORE_PASSWORD")
++            } else {
++                storeFile file("../TMessagesProj/config/release.keystore")
++                storePassword RELEASE_STORE_PASSWORD
++                keyAlias RELEASE_KEY_ALIAS
++                keyPassword RELEASE_KEY_PASSWORD
++            }
+         }
+     }
+ 
+@@ -86,7 +95,6 @@ android {
+             debuggable false
+             jniDebuggable false
+             signingConfig signingConfigs.release
+-            applicationIdSuffix ".web"
+             minifyEnabled true
+             shrinkResources true
+             multiDexEnabled true
+@@ -107,7 +115,8 @@ android {
+     productFlavors {
+         afat {
+             ndk {
+-                abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
++                // Xraygram: XRAYGRAM_ABIS=arm64-v8a by default (libXray.aar is built for the same set)
++                abiFilters(*((project.findProperty("XRAYGRAM_ABIS") ?: "armeabi-v7a,arm64-v8a,x86,x86_64").toString().split(",")))
+             }
+             ext {
+                 abiVersionCode = 9
+diff --git a/TMessagesProj_AppStandalone/google-services.json b/TMessagesProj_AppStandalone/google-services.json
+index 640e841b2..61af7f86b 100644
+--- a/TMessagesProj_AppStandalone/google-services.json
++++ b/TMessagesProj_AppStandalone/google-services.json
+@@ -68,7 +68,7 @@
+       "client_info": {
+         "mobilesdk_app_id": "1:760348033671:android:7396e651423888c3f66e22",
+         "android_client_info": {
+-          "package_name": "org.telegram.messenger.web"
++          "package_name": "io.github.xraygram"
+         }
+       },
+       "oauth_client": [

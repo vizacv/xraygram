@@ -1,0 +1,33 @@
+# Смоук Xraygram iOS (симулятор): ios-20261119-1
+# 2026-11-19 01:40:29, бандл upstream/xraygram-ios/dist/Xraygram-ios-20261119-1-sim.app, io.github.vizacv.xraygram 13.2
+
+## B — бандл
+PASS  B1  bundle id не телеграмовский (io.github.vizacv.xraygram)
+PASS  B2  имя: CFBundleDisplayName=Xraygram, CFBundleName=Xraygram
+PASS  B3  схемы: xraygram
+WARN  B4  схема vless:// не зарегистрирована (FEAT-08)
+      инфо: устройство Xraygram QA CB41D887-5D96-4D2B-85FF-EA2073B9F50F загружено
+PASS  I1  установка .app
+
+## G — FEAT-03: первый запуск
+PASS  G1  приложение запущено (pid 62140)
+      скриншот: testing/results/ios-20261119-1/ios-gate.png
+PASS  G2  120 с (F03-01): ни одного внешнего соединения/UDP
+PASS  G3  xray не слушает (записей нет)
+PASS  G4  в логе приложения «[Xraygram] network blocked»
+PASS  G5  все MTTcpConnection через «чёрную дыру» 127.0.0.1:1 ( 207 via 127.0.0.1:1;)
+
+## X — подключение через XRAY (тестовый сервер 127.0.0.1:10443, Reality)
+PASS  X1  запись добавлена из окружения, xray слушает: 127.0.0.1:57633 
+PASS  X2  маркер «adding XRAY entry from environment» в логе
+PASS  X3  30 с после подключения: процесс только на 127.0.0.1
+PASS  X4  тестовый сервер принял соединения к DC ( 1 149.154.167.50:443; 2 149.154.167.91:443; 6 149.154.175.50:443; 3 95.161.76.100:443; 1 [2001:67c:4e8:f002::a]:443; 2 [2001:b28:f23d:f001::a]:443;)
+PASS  X5  нет CONNECT к 1.0.0.0/3.0.0.0; IPv6 DC идут как [2001:…]
+      инфо: MTTcpConnection:  207 via 127.0.0.1:1; 15 via 127.0.0.1:57633 using xg;
+PASS  X6  холодный старт: xray поднялся сам (127.0.0.1:57717 )
+PASS  X7  холодный старт, 20 с: только 127.0.0.1
+
+## E — завершение
+PASS  E1  процесс приложения завершён
+
+# Итог: 17 PASS, 0 FAIL, 1 WARN, 0 SKIP

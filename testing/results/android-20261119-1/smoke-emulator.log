@@ -1,0 +1,13 @@
+[1;34m==>[0m запускаю эмулятор xraygram (лог: /Users/jame092/xraygram/upstream/android-work/logs/emulator.log)
+[1;34m==>[0m эмулятор загрузился
+[1;34m==>[0m ставлю Xraygram-android-20261119-1.apk
+Success
+[1;32mPASS[0m GATE: за 20 с наружу ничего (сокетов нет)
+Warning: Activity not started, intent has been delivered to currently running top-most instance.
+[1;32mPASS[0m XRAY (reality): DC Telegram через тестовый сервер за 2 с
+[1;32mPASS[0m XRAY: прямых соединений нет (Google для FCM — см. INFO)
+[1;32mPASS[0m COLD: через xray за 4 с
+INFO  Google (допустимо после снятия блокировки, BUG-15): ESTAB [::ffff:172.217.116.4]:443 
+[1;32mPASS[0m COLD: прямых соединений нет (Google для FCM — см. INFO)
+[1;32mPASS[0m крэшей нет
+[1;34m==>[0m итог: всё PASS
