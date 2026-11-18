@@ -108,6 +108,16 @@ if [[ -n "$P" ]]; then
 	check G2 "${GATE_SECS:-120} с (F03-01): ни одного внешнего соединения/UDP${ext:+: $(echo $ext)}" test -z "$ext"
 	l="$(listens "$P")"
 	check G3 "xray не слушает (записей нет)${l:+: $l}" test -z "$l"
+	# логи приложения (подсказка iOS-темы): маркер экрана и куда шли MTTcpConnection
+	GRP="$(xcrun simctl get_app_container "$UDID" "$BID" groups 2>/dev/null | awk '{print $2}' | head -1)"
+	alog="$(ls -t "$GRP"/telegram-data/logs/app-logs/log-*.txt 2>/dev/null | head -1)"
+	if [[ -n "$alog" ]]; then
+		check G4 "в логе приложения «[Xraygram] network blocked»" grep -q "\[Xraygram\] .*network blocked" "$alog"
+		via="$(grep -h "MTTcpConnection" "$alog" | grep -oE "via [0-9.]+:[0-9]+" | sort | uniq -c | tr -s ' ' | tr '\n' ';')"
+		check G5 "все MTTcpConnection через «чёрную дыру» 127.0.0.1:1 (${via:-нет строк})" bash -c "[[ -n '$via' ]] && ! grep -q -v 'via 127.0.0.1:1$' <<< \"\$(grep -h MTTcpConnection '$alog' | grep -oE 'via [0-9.]+:[0-9]+')\""
+	else
+		skip G4 "лог приложения не найден"
+	fi
 fi
 
 log ""
