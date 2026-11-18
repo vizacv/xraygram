@@ -42,8 +42,15 @@ while ! mkdir "$LOCK" 2>/dev/null; do
 	waited=$((waited + 5))
 done
 
-echo "$WHO $$ $(date '+%F %T') $*" > "$LOCK/owner"
-trap 'rm -rf "$LOCK"' EXIT INT TERM HUP
 (( waited > 0 )) && echo "heavy-build: [$WHO] дождался очереди через ${waited} с" >&2
 
-"$@"
+# Команду запускаем дочерним процессом и пишем в замок ЕЁ pid: если этот скрипт
+# убьют (SIGKILL, закрыли терминал), замок остаётся занятым, пока жива сама сборка.
+"$@" &
+child=$!
+echo "$WHO $child $(date '+%F %T') $*" > "$LOCK/owner"
+trap 'kill -TERM "$child" 2>/dev/null; wait "$child" 2>/dev/null; rm -rf "$LOCK"; exit 143' INT TERM HUP
+wait "$child"
+rc=$?
+rm -rf "$LOCK"
+exit $rc
