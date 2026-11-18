@@ -1,0 +1,1095 @@
+diff --git a/Telegram/CMakeLists.txt b/Telegram/CMakeLists.txt
+index 1601b50..d348049 100644
+--- a/Telegram/CMakeLists.txt
++++ b/Telegram/CMakeLists.txt
+@@ -596,6 +596,10 @@ PRIVATE
+     core/core_settings.h
+     core/core_settings_proxy.cpp
+     core/core_settings_proxy.h
++    xraygram/xraygram_box.cpp
++    xraygram/xraygram_box.h
++    xraygram/xraygram_core.cpp
++    xraygram/xraygram_core.h
+     core/crash_report_window.cpp
+     core/crash_report_window.h
+     core/crash_reports.cpp
+@@ -2855,9 +2859,9 @@ if (build_macstore)
+     )
+ else()
+     if (CMAKE_GENERATOR STREQUAL Xcode)
+-        set(bundle_identifier "com.tdesktop.Telegram$<$<CONFIG:Debug>:Debug>")
++        set(bundle_identifier "io.github.xraygram.desktop$<$<CONFIG:Debug>:Debug>")
+     else()
+-        set(bundle_identifier "com.tdesktop.Telegram")
++        set(bundle_identifier "io.github.xraygram.desktop")
+     endif()
+     set(bundle_entitlements "Telegram.entitlements")
+     set(output_name "Telegram")
+diff --git a/Telegram/SourceFiles/boxes/connection_box.cpp b/Telegram/SourceFiles/boxes/connection_box.cpp
+index 43f8a2a..3306d61 100644
+--- a/Telegram/SourceFiles/boxes/connection_box.cpp
++++ b/Telegram/SourceFiles/boxes/connection_box.cpp
+@@ -55,6 +55,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ #include "ui/ui_utility.h"
+ #include "boxes/abstract_box.h" // Ui::show().
+ #include "window/window_session_controller.h"
++#include "xraygram/xraygram_box.h"
++#include "xraygram/xraygram_core.h"
+ #include "styles/style_boxes.h"
+ #include "styles/style_chat_helpers.h"
+ #include "styles/style_connection_box.h"
+@@ -113,6 +115,9 @@ struct TopButtonMenuState {
+ 
+ [[nodiscard]] bool ProxyDataIsShareable(const ProxyData &proxy) {
+ 	using Type = ProxyData::Type;
++	if (Xraygram::IsXrayProxy(proxy)) {
++		return false;
++	}
+ 	return (proxy.type == Type::Socks5)
+ 		|| (proxy.type == Type::Mtproto)
+ 		|| (proxy.type == Type::Web);
+@@ -420,9 +425,32 @@ void ShareProxy(
+ 	return proxy.valid() ? proxy : ProxyData();
+ }
+ 
++void ShowXrayBox(
++		not_null<ProxiesBoxController*> controller,
++		std::shared_ptr<Ui::Show> show,
++		const QString &prefill) {
++	Xraygram::ShowLinkBox(show, {
++		.applied = [=](const ProxyData &proxy) {
++			controller->addOrApplyItem(proxy);
++		},
++		.removed = [=](const ProxyData &proxy) {
++			controller->removeItem(proxy);
++		},
++	}, prefill);
++}
++
++[[nodiscard]] QString XrayLinkFromClipboard() {
++	const auto text = QGuiApplication::clipboard()->text().trimmed();
++	return Xraygram::LooksLikeShareLink(text) ? text : QString();
++}
++
+ void AddProxyFromClipboard(
+ 		not_null<ProxiesBoxController*> controller,
+ 		std::shared_ptr<Ui::Show> show) {
++	if (const auto link = XrayLinkFromClipboard(); !link.isEmpty()) {
++		ShowXrayBox(controller, show, link);
++		return;
++	}
+ 	const auto proxyString = u"proxy"_q;
+ 	const auto socksString = u"socks"_q;
+ 	const auto webproxyString = u"webproxy"_q;
+@@ -1312,6 +1340,13 @@ void ProxiesBox::setupTopButton() {
+ 			st::popupMenuWithIcons);
+ 		const auto raw = state->menu.get();
+ 		const auto addAction = Ui::Menu::CreateAddActionCallback(raw);
++		addAction({
++			.text = u"Xray: ссылка vless://"_q,
++			.handler = [=] {
++				ShowXrayBox(_controller, uiShow(), XrayLinkFromClipboard());
++			},
++			.icon = &st::menuIconNetwork,
++		});
+ 		addAction({
+ 			.text = tr::lng_proxy_add_from_clipboard(tr::now),
+ 			.handler = [=] { AddProxyFromClipboard(_controller, uiShow()); },
+@@ -1527,6 +1562,10 @@ int ProxiesBox::rowHeight() const {
+ }
+ 
+ void ProxiesBox::addNewProxy() {
++	if (const auto link = XrayLinkFromClipboard(); !link.isEmpty()) {
++		ShowXrayBox(_controller, uiShow(), link);
++		return;
++	}
+ 	getDelegate()->show(_controller->addNewItemBox());
+ }
+ 
+@@ -2848,6 +2887,47 @@ void ProxiesBoxController::addNewItem(const ProxyData &proxy) {
+ 	applyItem(_list.back().id);
+ }
+ 
++void ProxiesBoxController::addOrApplyItem(const ProxyData &proxy) {
++	const auto j = findByProxy(proxy);
++	if (j == end(_list)) {
++		addNewItem(proxy);
++		removeStaleXrayItems(proxy);
++		return;
++	} else if (j->deleted) {
++		restoreItem(j->id);
++	}
++	if (_settings.isEnabled() && (_settings.selected() == proxy)) {
++		_account->mtp().restart();
++		refreshChecker(*j);
++		updateView(*j);
++	} else {
++		applyItem(j->id);
++	}
++	removeStaleXrayItems(proxy);
++}
++
++void ProxiesBoxController::removeStaleXrayItems(const ProxyData &current) {
++	auto stale = std::vector<int>();
++	for (const auto &item : _list) {
++		if (!item.deleted
++			&& Xraygram::IsXrayProxy(item.data)
++			&& item.data != current
++			&& _settings.indexInList(item.data) >= 0) {
++			stale.push_back(item.id);
++		}
++	}
++	for (const auto id : stale) {
++		deleteItem(id);
++	}
++}
++
++void ProxiesBoxController::removeItem(const ProxyData &proxy) {
++	const auto j = findByProxy(proxy);
++	if (j != end(_list) && !j->deleted) {
++		deleteItem(j->id);
++	}
++}
++
+ bool ProxiesBoxController::setProxySettings(ProxyData::Settings value) {
+ 	if (_settings.settings() == value) {
+ 		return true;
+@@ -2917,6 +2997,9 @@ void ProxiesBoxController::updateView(const Item &item) {
+ 	const auto selected = (_settings.selected() == item.data);
+ 	const auto deleted = item.deleted;
+ 	const auto type = [&] {
++		if (Xraygram::IsXrayProxy(item.data)) {
++			return u"XRAY"_q;
++		}
+ 		switch (item.data.type) {
+ 		case Type::Http: return u"HTTP"_q;
+ 		case Type::Socks5: return u"SOCKS5"_q;
+diff --git a/Telegram/SourceFiles/boxes/connection_box.h b/Telegram/SourceFiles/boxes/connection_box.h
+index 8458bd5..3840fbb 100644
+--- a/Telegram/SourceFiles/boxes/connection_box.h
++++ b/Telegram/SourceFiles/boxes/connection_box.h
+@@ -99,6 +99,8 @@ public:
+ 
+ 	[[nodiscard]] bool contains(const ProxyData &proxy) const;
+ 	void addNewItem(const ProxyData &proxy);
++	void addOrApplyItem(const ProxyData &proxy);
++	void removeItem(const ProxyData &proxy);
+ 
+ 	rpl::producer<ItemView> views() const;
+ 
+@@ -126,6 +128,7 @@ private:
+ 	void share(const ProxyData &proxy, bool qr = false);
+ 	void saveDelayed();
+ 	void refreshChecker(Item &item);
++	void removeStaleXrayItems(const ProxyData &current);
+ 
+ 	void replaceItemWith(
+ 		std::vector<Item>::iterator which,
+diff --git a/Telegram/SourceFiles/core/application.cpp b/Telegram/SourceFiles/core/application.cpp
+index 94b64dc..9f52d3e 100644
+--- a/Telegram/SourceFiles/core/application.cpp
++++ b/Telegram/SourceFiles/core/application.cpp
+@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #include "core/application.h"
+ 
++#include "xraygram/xraygram_core.h"
++
+ #include "data/data_abstract_structure.h"
+ #include "data/data_channel.h"
+ #include "data/data_forum.h"
+@@ -288,6 +290,7 @@ Application::~Application() {
+ 
+ 	_private->proxyRotation = nullptr;
+ 	_domain->finish();
++	Xraygram::Shutdown();
+ 	MTP::WebProxy::Transport::Shutdown();
+ 
+ 	Local::finish();
+@@ -324,6 +327,7 @@ void Application::run() {
+ 
+ 	ValidateScale();
+ 
++	Xraygram::Start();
+ 	refreshGlobalProxy(); // Depends on app settings being read.
+ 
+ 	if (const auto old = Local::oldSettingsVersion(); old < AppVersion) {
+@@ -2066,6 +2070,9 @@ void Application::refreshGlobalProxy() {
+ 	} else {
+ 		MTP::WebProxy::Transport::Deactivate();
+ 	}
++	if (Xraygram::IsXrayProxy(proxy)) {
++		Xraygram::EnsureRunning();
++	}
+ 	Sandbox::Instance().refreshGlobalProxy();
+ }
+ 
+diff --git a/Telegram/SourceFiles/core/launcher.cpp b/Telegram/SourceFiles/core/launcher.cpp
+index 3e436f7..402453b 100644
+--- a/Telegram/SourceFiles/core/launcher.cpp
++++ b/Telegram/SourceFiles/core/launcher.cpp
+@@ -343,7 +343,7 @@ void Launcher::init() {
+ 	prepareSettings();
+ 	initQtMessageLogging();
+ 
+-	QApplication::setApplicationName(u"TelegramDesktop"_q);
++	QApplication::setApplicationName(u"Xraygram"_q);
+ 
+ #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+ 	// fallback session management is useless for tdesktop since it doesn't have
+diff --git a/Telegram/SourceFiles/core/version.h b/Telegram/SourceFiles/core/version.h
+index a1a1aaf..0c5da0b 100644
+--- a/Telegram/SourceFiles/core/version.h
++++ b/Telegram/SourceFiles/core/version.h
+@@ -20,7 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ // used in Updater.cpp and Setup.iss for Windows
+ constexpr auto AppId = "{53F49750-6209-4FBF-9CA8-7A333C87D1ED}"_cs;
+ constexpr auto AppNameOld = "Telegram Win (Unofficial)"_cs;
+-constexpr auto AppName = "Telegram Desktop"_cs;
++constexpr auto AppName = "Xraygram"_cs;
+ constexpr auto AppFile = "Telegram"_cs;
+ constexpr auto AppVersion = 7004004;
+ constexpr auto AppVersionStr = "7.4.4";
+diff --git a/Telegram/SourceFiles/xraygram/xraygram_box.cpp b/Telegram/SourceFiles/xraygram/xraygram_box.cpp
+new file mode 100644
+index 0000000..5dc6c8d
+--- /dev/null
++++ b/Telegram/SourceFiles/xraygram/xraygram_box.cpp
+@@ -0,0 +1,92 @@
++/*
++This file is part of Xraygram, a fork of Telegram Desktop.
++
++For license and copyright information please follow this link:
++https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
++*/
++#include "xraygram/xraygram_box.h"
++
++#include "xraygram/xraygram_core.h"
++#include "boxes/abstract_box.h"
++#include "lang/lang_keys.h"
++#include "ui/layers/generic_box.h"
++#include "ui/layers/show.h"
++#include "ui/vertical_list.h"
++#include "ui/widgets/fields/input_field.h"
++#include "ui/widgets/labels.h"
++#include "styles/style_boxes.h"
++#include "styles/style_layers.h"
++
++namespace Xraygram {
++
++void ShowLinkBox(
++		std::shared_ptr<Ui::Show> show,
++		LinkBoxCallbacks callbacks,
++		const QString &prefill) {
++	show->showBox(Box([=](not_null<Ui::GenericBox*> box) {
++		box->setTitle(u"Xray (VLESS / Reality)"_q);
++		box->setWidth(st::boxWideWidth);
++
++		box->addRow(object_ptr<Ui::FlatLabel>(
++			box,
++			u"Вставьте ссылку vless:// (также vmess://, trojan://, "
++			"ss://, hysteria2://). Xraygram запустит встроенный xray "
++			"и подключится через него как через локальный SOCKS5."_q,
++			st::boxLabel));
++		Ui::AddSkip(box->verticalLayout());
++
++		const auto initial = prefill.isEmpty() ? CurrentLink() : prefill;
++		const auto field = box->addRow(object_ptr<Ui::InputField>(
++			box,
++			st::newGroupDescription,
++			Ui::InputField::Mode::MultiLine,
++			rpl::single(u"vless://…"_q),
++			initial));
++		Ui::AddSkip(box->verticalLayout());
++
++		const auto status = box->addRow(object_ptr<Ui::FlatLabel>(
++			box,
++			StatusText(),
++			st::boxDividerLabel));
++
++		box->setFocusCallback([=] {
++			field->setFocusFast();
++		});
++
++		const auto save = [=] {
++			const auto result = SetLink(field->getLastText());
++			if (result.proxy && callbacks.applied) {
++				callbacks.applied(result.proxy);
++			}
++			if (!result.error.isEmpty()) {
++				if (!result.proxy) {
++					field->showError();
++				}
++				status->setText(u"Ошибка: "_q + result.error);
++				return;
++			}
++			show->showToast(u"Xray запущен: "_q + result.summary);
++			box->closeBox();
++		};
++		field->submits(
++		) | rpl::on_next([=] {
++			save();
++		}, field->lifetime());
++
++		box->addButton(rpl::single(u"Сохранить и подключить"_q), save);
++		box->addButton(tr::lng_cancel(), [=] {
++			box->closeBox();
++		});
++		if (Configured()) {
++			box->addLeftButton(rpl::single(u"Удалить"_q), [=] {
++				const auto was = RemoveLink();
++				if (callbacks.removed) {
++					callbacks.removed(was);
++				}
++				box->closeBox();
++			}, st::attentionBoxButton);
++		}
++	}));
++}
++
++} // namespace Xraygram
+diff --git a/Telegram/SourceFiles/xraygram/xraygram_box.h b/Telegram/SourceFiles/xraygram/xraygram_box.h
+new file mode 100644
+index 0000000..6aaab91
+--- /dev/null
++++ b/Telegram/SourceFiles/xraygram/xraygram_box.h
+@@ -0,0 +1,27 @@
++/*
++This file is part of Xraygram, a fork of Telegram Desktop.
++
++For license and copyright information please follow this link:
++https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
++*/
++#pragma once
++
++#include "mtproto/mtproto_proxy_data.h"
++
++namespace Ui {
++class Show;
++} // namespace Ui
++
++namespace Xraygram {
++
++struct LinkBoxCallbacks {
++	Fn<void(MTP::ProxyData)> applied;
++	Fn<void(MTP::ProxyData)> removed;
++};
++
++void ShowLinkBox(
++	std::shared_ptr<Ui::Show> show,
++	LinkBoxCallbacks callbacks,
++	const QString &prefill = QString());
++
++} // namespace Xraygram
+diff --git a/Telegram/SourceFiles/xraygram/xraygram_core.cpp b/Telegram/SourceFiles/xraygram/xraygram_core.cpp
+new file mode 100644
+index 0000000..12add1e
+--- /dev/null
++++ b/Telegram/SourceFiles/xraygram/xraygram_core.cpp
+@@ -0,0 +1,597 @@
++/*
++This file is part of Xraygram, a fork of Telegram Desktop.
++
++For license and copyright information please follow this link:
++https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
++*/
++#include "xraygram/xraygram_core.h"
++
++#include "core/application.h"
++#include "core/core_settings.h"
++#include "settings.h"
++
++#include <QtCore/QCoreApplication>
++#include <QtCore/QElapsedTimer>
++#include <QtCore/QJsonDocument>
++#include <QtCore/QJsonObject>
++#include <QtCore/QProcess>
++#include <QtCore/QProcessEnvironment>
++#include <QtCore/QRandomGenerator>
++#include <QtCore/QTimer>
++#include <QtNetwork/QHostAddress>
++#include <QtNetwork/QTcpServer>
++
++namespace Xraygram {
++namespace {
++
++constexpr auto kHost = "127.0.0.1";
++constexpr auto kStartTimeout = 5000;
++constexpr auto kCheckTimeout = 5000;
++constexpr auto kStopTimeout = 2000;
++constexpr auto kRestartDelay = crl::time(3000);
++constexpr auto kMaxRestartDelay = crl::time(120000);
++constexpr auto kStableRunTime = crl::time(60000);
++constexpr auto kMaxTailSize = 4096;
++
++struct Config {
++	QString link;
++	int port = 0;
++	QString password;
++};
++
++[[nodiscard]] QString ConfigPath() {
++	return cWorkingDir() + u"tdata/xraygram.json"_q;
++}
++
++[[nodiscard]] QString HelperPath() {
++	const auto custom = qEnvironmentVariable("XRAYGRAM_CORE");
++	return custom.isEmpty()
++		? (QCoreApplication::applicationDirPath() + u"/xraygram-core"_q)
++		: custom;
++}
++
++[[nodiscard]] Config ReadConfig() {
++	auto file = QFile(ConfigPath());
++	if (!file.open(QIODevice::ReadOnly)) {
++		return {};
++	}
++	const auto object = QJsonDocument::fromJson(file.readAll()).object();
++	return {
++		.link = object.value(u"link"_q).toString().trimmed(),
++		.port = object.value(u"port"_q).toInt(),
++		.password = object.value(u"password"_q).toString(),
++	};
++}
++
++bool WriteConfig(const Config &config) {
++	QDir().mkpath(cWorkingDir() + u"tdata"_q);
++	const auto path = ConfigPath();
++	if (config.link.isEmpty()) {
++		return !QFile::exists(path) || QFile::remove(path);
++	}
++	auto file = QFile(path);
++	if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
++		LOG(("Xraygram Error: could not write %1").arg(path));
++		return false;
++	}
++	file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
++	auto object = QJsonObject();
++	object.insert(u"link"_q, config.link);
++	object.insert(u"port"_q, config.port);
++	object.insert(u"password"_q, config.password);
++	file.write(QJsonDocument(object).toJson(QJsonDocument::Indented));
++	return true;
++}
++
++[[nodiscard]] bool PortFree(int port) {
++	if (port <= 0 || port > 65535) {
++		return false;
++	}
++	auto server = QTcpServer();
++	const auto result = server.listen(QHostAddress::LocalHost, quint16(port));
++	server.close();
++	return result;
++}
++
++[[nodiscard]] int PickFreePort() {
++	auto server = QTcpServer();
++	if (!server.listen(QHostAddress::LocalHost, 0)) {
++		return 0;
++	}
++	const auto result = int(server.serverPort());
++	server.close();
++	return result;
++}
++
++[[nodiscard]] QString RandomPassword() {
++	auto result = QString();
++	auto *generator = QRandomGenerator::system();
++	for (auto i = 0; i != 4; ++i) {
++		result += QString::number(generator->generate64(), 16);
++	}
++	return result;
++}
++
++[[nodiscard]] MTP::ProxyData ProxyFor(const Config &config) {
++	if (config.link.isEmpty() || config.port <= 0) {
++		return {};
++	}
++	auto result = MTP::ProxyData();
++	result.type = MTP::ProxyData::Type::Socks5;
++	result.host = QString::fromLatin1(kHost);
++	result.port = uint32(config.port);
++	result.user = QString::fromLatin1(kSocksUser);
++	result.password = config.password;
++	return result;
++}
++
++[[nodiscard]] QString FirstLine(const QByteArray &data) {
++	const auto text = QString::fromUtf8(data).trimmed();
++	const auto index = text.indexOf('\n');
++	return (index < 0) ? text : text.mid(0, index).trimmed();
++}
++
++[[nodiscard]] QString StripPrefix(QString text, const QString &prefix) {
++	return text.startsWith(prefix) ? text.mid(prefix.size()).trimmed() : text;
++}
++
++class Manager final {
++public:
++	Manager();
++
++	void start();
++	void shutdown();
++	void ensureRunning();
++
++	[[nodiscard]] bool configured() const;
++	[[nodiscard]] bool running() const;
++	[[nodiscard]] QString link() const;
++	[[nodiscard]] MTP::ProxyData proxy() const;
++	[[nodiscard]] QString statusText() const;
++
++	[[nodiscard]] ApplyResult setLink(const QString &link);
++	MTP::ProxyData removeLink();
++
++private:
++	[[nodiscard]] QString check(const QString &link, QString *summary);
++	bool launch();
++	bool tryLaunch();
++	void stop();
++	bool ensurePort();
++	void restart();
++	void readLogs();
++	void processFinished(int exitCode);
++	void noteFailure();
++	void scheduleRestart();
++	[[nodiscard]] crl::time backoff() const;
++
++	std::unique_ptr<QObject> _guard;
++	Config _config;
++	std::unique_ptr<QProcess> _process;
++	QByteArray _tail;
++	QString _summary;
++	QString _lastError;
++	bool _ready = false;
++	bool _restartScheduled = false;
++	int _failures = 0;
++	crl::time _startedAt = 0;
++	crl::time _nextAttemptAt = 0;
++
++};
++
++Manager::Manager() : _guard(std::make_unique<QObject>()) {
++}
++
++void Manager::start() {
++	_config = ReadConfig();
++	if (!configured()) {
++		return;
++	}
++	ensurePort();
++	launch();
++}
++
++void Manager::shutdown() {
++	stop();
++	_guard = nullptr;
++}
++
++void Manager::ensureRunning() {
++	if (configured()
++		&& !running()
++		&& !_restartScheduled
++		&& crl::now() >= _nextAttemptAt) {
++		launch();
++	}
++}
++
++void Manager::restart() {
++	if (!configured() || running()) {
++		return;
++	}
++	const auto selectedChanged = ensurePort();
++	if (!launch()) {
++		scheduleRestart();
++	}
++	if (selectedChanged) {
++		auto &settings = Core::App().settings().proxy();
++		Core::App().setCurrentProxy(proxy(), settings.settings());
++	}
++}
++
++crl::time Manager::backoff() const {
++	auto result = kRestartDelay;
++	for (auto i = 1; i < _failures && result < kMaxRestartDelay; ++i) {
++		result *= 2;
++	}
++	return std::min(result, kMaxRestartDelay);
++}
++
++void Manager::noteFailure() {
++	++_failures;
++	_nextAttemptAt = crl::now() + backoff();
++}
++
++bool Manager::configured() const {
++	return !_config.link.isEmpty() && _config.port > 0;
++}
++
++bool Manager::running() const {
++	return _process
++		&& _ready
++		&& (_process->state() == QProcess::Running);
++}
++
++QString Manager::link() const {
++	return _config.link;
++}
++
++MTP::ProxyData Manager::proxy() const {
++	return ProxyFor(_config);
++}
++
++QString Manager::statusText() const {
++	if (!configured()) {
++		return u"Xray не настроен."_q;
++	} else if (running()) {
++		return u"Xray работает: %1:%2 → %3"_q
++			.arg(QString::fromLatin1(kHost))
++			.arg(_config.port)
++			.arg(_summary);
++	} else if (!_lastError.isEmpty()) {
++		return u"Xray не запущен: %1"_q.arg(_lastError);
++	}
++	return u"Xray не запущен."_q;
++}
++
++QString Manager::check(const QString &link, QString *summary) {
++	auto process = QProcess();
++	process.setProgram(HelperPath());
++	process.setArguments({ u"check"_q });
++	process.start();
++	if (!process.waitForStarted(kCheckTimeout)) {
++		return u"не удалось запустить %1: %2"_q
++			.arg(HelperPath(), process.errorString());
++	}
++	process.write(link.toUtf8());
++	process.closeWriteChannel();
++	if (!process.waitForFinished(kCheckTimeout)) {
++		process.kill();
++		process.waitForFinished(kStopTimeout);
++		return u"xraygram-core check: таймаут"_q;
++	}
++	const auto out = FirstLine(process.readAllStandardOutput());
++	if (process.exitStatus() == QProcess::NormalExit
++		&& process.exitCode() == 0
++		&& out.startsWith(u"OK"_q)) {
++		if (summary) {
++			*summary = StripPrefix(out, u"OK"_q);
++		}
++		return QString();
++	}
++	const auto error = FirstLine(process.readAllStandardError());
++	return error.isEmpty()
++		? u"ссылка не распознана"_q
++		: StripPrefix(error, u"ERROR"_q);
++}
++
++bool Manager::ensurePort() {
++	if (PortFree(_config.port)) {
++		return false;
++	}
++	const auto was = ProxyFor(_config);
++	_config.port = PickFreePort();
++	WriteConfig(_config);
++	const auto now = ProxyFor(_config);
++	LOG(("Xraygram: port busy, moving SOCKS5 inbound to %1"
++		).arg(_config.port));
++
++	auto &settings = Core::App().settings().proxy();
++	const auto selectedChanged = (settings.selected() == was);
++	if (selectedChanged) {
++		settings.setSelected(now);
++	}
++	if (!settings.replaceInList(was, now) && selectedChanged) {
++		settings.addToList(now);
++	}
++	Core::App().saveSettingsDelayed();
++	return selectedChanged;
++}
++
++bool Manager::launch() {
++	if (tryLaunch()) {
++		_startedAt = crl::now();
++		return true;
++	}
++	noteFailure();
++	return false;
++}
++
++bool Manager::tryLaunch() {
++	stop();
++	_lastError = QString();
++	if (!configured()) {
++		return false;
++	}
++	const auto path = HelperPath();
++	if (!QFile::exists(path)) {
++		_lastError = u"не найден %1"_q.arg(path);
++		LOG(("Xraygram Error: %1").arg(_lastError));
++		return false;
++	}
++
++	_process = std::make_unique<QProcess>();
++	const auto raw = _process.get();
++	auto environment = QProcessEnvironment::systemEnvironment();
++	environment.insert(
++		u"XRAYGRAM_SOCKS_USER"_q,
++		QString::fromLatin1(kSocksUser));
++	environment.insert(u"XRAYGRAM_SOCKS_PASS"_q, _config.password);
++	raw->setProcessEnvironment(environment);
++	raw->setProgram(path);
++	raw->setArguments({
++		u"run"_q,
++		u"-listen"_q,
++		u"%1:%2"_q.arg(QString::fromLatin1(kHost)).arg(_config.port),
++	});
++	_ready = false;
++	_tail = QByteArray();
++	raw->start();
++	if (!raw->waitForStarted(kStartTimeout)) {
++		_lastError = raw->errorString();
++		LOG(("Xraygram Error: start failed: %1").arg(_lastError));
++		_process = nullptr;
++		return false;
++	}
++	raw->write(_config.link.toUtf8());
++	raw->closeWriteChannel();
++
++	auto timer = QElapsedTimer();
++	timer.start();
++	auto out = QByteArray();
++	while (!out.contains("READY")) {
++		const auto left = kStartTimeout - timer.elapsed();
++		if (left <= 0 || !raw->waitForReadyRead(int(left))) {
++			break;
++		}
++		out += raw->readAllStandardOutput();
++	}
++	if (!out.contains("READY")) {
++		const auto error = FirstLine(raw->readAllStandardError());
++		_lastError = error.isEmpty()
++			? u"xraygram-core не ответил"_q
++			: StripPrefix(error, u"ERROR"_q);
++		LOG(("Xraygram Error: %1").arg(_lastError));
++		stop();
++		return false;
++	}
++	const auto ready = QString::fromUtf8(out);
++	const auto index = ready.indexOf(u"READY"_q);
++	_summary = FirstLine(ready.mid(index + 5).toUtf8());
++	_ready = true;
++	LOG(("Xraygram: xray started on %1:%2 (%3)"
++		).arg(QString::fromLatin1(kHost)
++		).arg(_config.port
++		).arg(_summary));
++
++	QObject::connect(
++		raw,
++		&QProcess::readyReadStandardOutput,
++		_guard.get(),
++		[=] { readLogs(); });
++	QObject::connect(
++		raw,
++		&QProcess::readyReadStandardError,
++		_guard.get(),
++		[=] { readLogs(); });
++	QObject::connect(
++		raw,
++		&QProcess::finished,
++		_guard.get(),
++		[=](int exitCode, QProcess::ExitStatus) {
++			processFinished(exitCode);
++		});
++	if (raw->state() != QProcess::Running) {
++		_startedAt = crl::now();
++		processFinished(raw->exitCode());
++		return true;
++	}
++	return true;
++}
++
++void Manager::readLogs() {
++	if (!_process) {
++		return;
++	}
++	const auto data = _process->readAllStandardOutput()
++		+ _process->readAllStandardError();
++	if (data.isEmpty()) {
++		return;
++	}
++	_tail = (_tail + data).right(kMaxTailSize);
++	for (const auto &line : data.split('\n')) {
++		const auto trimmed = line.trimmed();
++		if (!trimmed.isEmpty()) {
++			DEBUG_LOG(("Xray: %1").arg(QString::fromUtf8(trimmed)));
++		}
++	}
++}
++
++void Manager::processFinished(int exitCode) {
++	readLogs();
++	const auto tail = QString::fromUtf8(_tail).trimmed();
++	_lastError = u"xray завершился (код %1)"_q.arg(exitCode);
++	LOG(("Xraygram Error: %1, log tail: %2").arg(_lastError, tail));
++	_ready = false;
++	if (_process) {
++		_process->disconnect(_guard.get());
++		_process.release()->deleteLater();
++	}
++	if (crl::now() - _startedAt >= kStableRunTime) {
++		_failures = 0;
++	}
++	noteFailure();
++	scheduleRestart();
++}
++
++void Manager::scheduleRestart() {
++	if (!configured() || _restartScheduled || !_guard) {
++		return;
++	}
++	_restartScheduled = true;
++	QTimer::singleShot(int(backoff()), _guard.get(), [=] {
++		_restartScheduled = false;
++		restart();
++	});
++}
++
++void Manager::stop() {
++	_ready = false;
++	auto process = base::take(_process);
++	if (!process) {
++		return;
++	}
++	process->disconnect(_guard.get());
++	if (process->state() != QProcess::NotRunning) {
++		process->terminate();
++		if (!process->waitForFinished(kStopTimeout)) {
++			process->kill();
++			process->waitForFinished(kStopTimeout);
++		}
++	}
++}
++
++ApplyResult Manager::setLink(const QString &link) {
++	const auto trimmed = link.trimmed();
++	if (trimmed.isEmpty()) {
++		return { .error = u"пустая ссылка"_q };
++	}
++	auto summary = QString();
++	if (const auto error = check(trimmed, &summary); !error.isEmpty()) {
++		return { .error = error };
++	}
++	stop();
++	_failures = 0;
++	_nextAttemptAt = 0;
++	_config.link = trimmed;
++	if (_config.password.isEmpty()) {
++		_config.password = RandomPassword();
++	}
++	if (!PortFree(_config.port)) {
++		_config.port = PickFreePort();
++	}
++	if (_config.port <= 0) {
++		return { .error = u"нет свободного локального порта"_q };
++	}
++	if (!WriteConfig(_config)) {
++		return { .error = u"не удалось сохранить %1"_q.arg(ConfigPath()) };
++	}
++	if (!launch() || !running()) {
++		return { .proxy = proxy(), .error = _lastError };
++	}
++	return { .proxy = proxy(), .summary = _summary };
++}
++
++MTP::ProxyData Manager::removeLink() {
++	const auto result = proxy();
++	stop();
++	_config.link = QString();
++	WriteConfig(_config);
++	_summary = QString();
++	_lastError = QString();
++	return result;
++}
++
++[[nodiscard]] Manager &Instance() {
++	static auto result = Manager();
++	return result;
++}
++
++} // namespace
++
++void Start() {
++	Instance().start();
++}
++
++void Shutdown() {
++	Instance().shutdown();
++}
++
++void EnsureRunning() {
++	Instance().ensureRunning();
++}
++
++bool IsXrayProxy(const MTP::ProxyData &proxy) {
++	return (proxy.type == MTP::ProxyData::Type::Socks5)
++		&& (proxy.host == QString::fromLatin1(kHost))
++		&& (proxy.user == QString::fromLatin1(kSocksUser));
++}
++
++bool Configured() {
++	return Instance().configured();
++}
++
++bool Running() {
++	return Instance().running();
++}
++
++QString CurrentLink() {
++	return Instance().link();
++}
++
++MTP::ProxyData CurrentProxy() {
++	return Instance().proxy();
++}
++
++QString StatusText() {
++	return Instance().statusText();
++}
++
++ApplyResult SetLink(const QString &link) {
++	return Instance().setLink(link);
++}
++
++MTP::ProxyData RemoveLink() {
++	return Instance().removeLink();
++}
++
++bool LooksLikeShareLink(const QString &text) {
++	const auto schemes = std::array{
++		u"vless://"_q,
++		u"vmess://"_q,
++		u"trojan://"_q,
++		u"ss://"_q,
++		u"socks://"_q,
++		u"hysteria2://"_q,
++		u"hy2://"_q,
++	};
++	const auto trimmed = text.trimmed();
++	for (const auto &scheme : schemes) {
++		if (trimmed.startsWith(scheme, Qt::CaseInsensitive)) {
++			return true;
++		}
++	}
++	return false;
++}
++
++} // namespace Xraygram
+diff --git a/Telegram/SourceFiles/xraygram/xraygram_core.h b/Telegram/SourceFiles/xraygram/xraygram_core.h
+new file mode 100644
+index 0000000..4952c4e
+--- /dev/null
++++ b/Telegram/SourceFiles/xraygram/xraygram_core.h
+@@ -0,0 +1,55 @@
++/*
++This file is part of Xraygram, a fork of Telegram Desktop.
++
++Xraygram runs a bundled xray helper (xraygram-core) as a child process with
++a local SOCKS5 inbound on 127.0.0.1 and points the regular Telegram Desktop
++SOCKS5 proxy at it. The network code of Telegram Desktop is not changed.
++
++For license and copyright information please follow this link:
++https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
++*/
++#pragma once
++
++#include "mtproto/mtproto_proxy_data.h"
++
++namespace Xraygram {
++
++// Login for the local SOCKS5 inbound, marks "our" proxy entry in the list.
++inline constexpr auto kSocksUser = "xraygram";
++
++struct ApplyResult {
++	MTP::ProxyData proxy;
++	QString error;
++	QString summary; // "vless example.com name"
++};
++
++// Called from Core::Application::run() after settings are read.
++// Starts xray if a link was saved before.
++void Start();
++
++// Called from Core::Application::~Application().
++void Shutdown();
++
++// Called when the proxy settings are applied: (re)starts xray if the
++// selected proxy is ours and the helper is not running.
++void EnsureRunning();
++
++[[nodiscard]] bool IsXrayProxy(const MTP::ProxyData &proxy);
++
++[[nodiscard]] bool Configured();
++[[nodiscard]] bool Running();
++[[nodiscard]] QString CurrentLink();
++[[nodiscard]] MTP::ProxyData CurrentProxy();
++[[nodiscard]] QString StatusText();
++
++// Synchronous (up to a few seconds): validates the link with the helper,
++// saves it, restarts xray and returns the SOCKS5 entry to select.
++[[nodiscard]] ApplyResult SetLink(const QString &link);
++
++// Stops xray and forgets the link. Returns the entry that was used.
++MTP::ProxyData RemoveLink();
++
++// True for vless://, vmess://, trojan://, ss://, hysteria2:// and the like.
++[[nodiscard]] bool LooksLikeShareLink(const QString &text);
++
++} // namespace Xraygram
+diff --git a/Telegram/Telegram.plist b/Telegram/Telegram.plist
+index d156eda..a5f0a29 100644
+--- a/Telegram/Telegram.plist
++++ b/Telegram/Telegram.plist
+@@ -5,7 +5,7 @@
+ 	<key>CFBundleExecutable</key>
+ 	<string>@output_name@</string>
+ 	<key>CFBundleGetInfoString</key>
+-	<string>Telegram Desktop messaging app</string>
++	<string>Xraygram (Telegram Desktop fork with xray)</string>
+ 	<key>CFBundleIconFile</key>
+ 	<string>Icon.icns</string>
+ 	<key>CFBundleIconName</key>
+@@ -15,7 +15,9 @@
+ 	<key>CFBundleInfoDictionaryVersion</key>
+ 	<string>6.0</string>
+ 	<key>CFBundleName</key>
+-	<string>@output_name@</string>
++	<string>Xraygram</string>
++	<key>CFBundleDisplayName</key>
++	<string>Xraygram</string>
+ 	<key>CFBundlePackageType</key>
+ 	<string>APPL</string>
+ 	<key>CFBundleShortVersionString</key>
+@@ -26,23 +28,6 @@
+ 	<array>
+ 		<string>MacOSX</string>
+ 	</array>
+-	<key>CFBundleURLTypes</key>
+-	<array>
+-		<dict>
+-			<key>CFBundleTypeRole</key>
+-			<string>Viewer</string>
+-			<key>CFBundleURLIconFile</key>
+-			<string>Icon.icns</string>
+-			<key>CFBundleURLName</key>
+-			<string>@bundle_identifier_plist@</string>
+-			<key>CFBundleURLSchemes</key>
+-			<array>
+-				<string>tg</string>
+-				<string>tonsite</string>
+-				<string>ton</string>
+-			</array>
+-		</dict>
+-	</array>
+ 	<key>CFBundleDocumentTypes</key>
+ 	<array>
+ 		<dict>

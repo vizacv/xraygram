@@ -1,0 +1,340 @@
+# Xraygram macOS (arm64): Telegram Desktop v7.4.4 + встроенный xray.
+#
+# Пути ниже считаются от корня репозитория Xraygram (папка macos/).
+#
+# Основа — upstream .github/workflows/mac_packaged.yml (tdesktop v7.4.4):
+# Qt, ffmpeg и прочие библиотеки берутся из Homebrew, из исходников
+# собираются только tg_owt (WebRTC), tde2e, rnnoise и Rust-библиотеки.
+# Это в разы быстрее полной сборки через Telegram/build/prepare/prepare.py.
+#
+# Секреты (Settings → Secrets and variables → Actions):
+#   TDESKTOP_API_ID, TDESKTOP_API_HASH — свои ключи с my.telegram.org.
+#   Если их нет, собирается с тестовыми ключами upstream (TDESKTOP_API_TEST),
+#   вход в аккаунт с ними, скорее всего, не заработает.
+
+name: Xraygram macOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: "CMake build type"
+        type: choice
+        options: [Release, Debug]
+        default: Release
+
+concurrency:
+  group: xraygram-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TDESKTOP_REF: "v7.4.4"
+  PATCHES_DIR: "macos/patches"
+  CORE_DIR: "macos/core"
+
+jobs:
+
+  core:
+    name: xraygram-core (Go, darwin/arm64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Clone Xraygram.
+        uses: actions/checkout@v7
+
+      - name: Set up Go.
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: ${{ env.CORE_DIR }}/go.mod
+          cache-dependency-path: ${{ env.CORE_DIR }}/go.mod
+
+      - name: Resolve modules.
+        working-directory: ${{ env.CORE_DIR }}
+        run: |
+          go mod tidy
+          go vet ./...
+
+      - name: Smoke test on Linux.
+        working-directory: ${{ env.CORE_DIR }}
+        run: |
+          go build -ldflags="-checklinkname=0" -o /tmp/xraygram-core-linux .
+          /tmp/xraygram-core-linux version
+          # Фиктивная ссылка: проверяем только парсер и старт inbound,
+          # до реального сервера не достучимся, и это нормально.
+          LINK='vless://11111111-2222-3333-4444-555555555555@example.com:443?type=tcp&security=reality&pbk=Z8B1tqCSaYbXzKlVzRZ1b8T2iGBd0FvM3kq2s6N2Hn0&fp=chrome&sni=www.microsoft.com&sid=6ba85179e30d4fc2&flow=xtls-rprx-vision#ci-test'
+          printf '%s' "$LINK" | /tmp/xraygram-core-linux check
+          export XRAYGRAM_SOCKS_USER=xraygram XRAYGRAM_SOCKS_PASS=ci
+          printf '%s' "$LINK" | /tmp/xraygram-core-linux run -listen 127.0.0.1:20808 > /tmp/run.log 2>&1 &
+          PID=$!
+          for i in $(seq 1 20); do grep -q READY /tmp/run.log && break; sleep 0.5; done
+          cat /tmp/run.log
+          grep -q READY /tmp/run.log
+          kill $PID
+          wait $PID || true
+
+      - name: Build for macOS arm64.
+        working-directory: ${{ env.CORE_DIR }}
+        env:
+          CGO_ENABLED: "0"
+          GOOS: darwin
+          GOARCH: arm64
+        run: |
+          go build -trimpath -ldflags="-checklinkname=0 -s -w -buildid=" -o xraygram-core .
+          file xraygram-core
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: xraygram-core-darwin-arm64
+          path: ${{ env.CORE_DIR }}/xraygram-core
+          retention-days: 3
+
+  macos:
+    name: Xraygram.app (tdesktop ${{ github.event.inputs.build_type || 'Release' }})
+    needs: core
+    runs-on: macos-latest
+    timeout-minutes: 345
+
+    env:
+      GIT: "https://github.com"
+      CMAKE_GENERATOR: "Ninja"
+      CMAKE_BUILD_TYPE: ${{ github.event.inputs.build_type || 'Release' }}
+      CMAKE_BUILD_PARALLEL_LEVEL: ""
+      CMAKE_PREFIX_PATH: "/opt/homebrew/opt/ffmpeg@6:/opt/homebrew/opt/openal-soft"
+      # Коммиты из upstream mac_packaged.yml на теге v7.4.4.
+      TDE2E: "51743dfd01dff6179e2d8f7095729caa4e2222e9"
+      TLOTTIE: "92df98dc209bc39b1e567ec74a8c86a0af5239de"
+      WALLET_ENGINE: "e59e0d89d7ee90c388bf36e3334c5b276f396697"
+      RUST_PATCHES: "23d349a3ff09dbc1fa8127ce39ba9223de0edf21"
+      RUST_TOOLCHAIN: "1.96.1"
+
+    steps:
+      - name: Clone Xraygram.
+        uses: actions/checkout@v7
+        with:
+          path: xraygram
+
+      - name: Clone Telegram Desktop.
+        uses: actions/checkout@v7
+        with:
+          repository: telegramdesktop/tdesktop
+          ref: ${{ env.TDESKTOP_REF }}
+          submodules: recursive
+          path: tdesktop
+
+      - name: Apply Xraygram patches.
+        run: |
+          cd tdesktop
+          for patch in ../xraygram/$PATCHES_DIR/*.patch; do
+            echo "Applying $patch"
+            git apply --whitespace=nowarn "$patch"
+          done
+          git status --short
+
+      - name: First set up.
+        run: |
+          libs="ada-url ffmpeg@6 jpeg-xl libavif libheif minizip openal-soft openh264 openssl opus qtbase qtimageformats qtshadertools qtsvg xz"
+          brew update
+          brew upgrade || true
+          brew install autoconf automake boost cmake libtool ninja pkg-config python $libs
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          sudo sed -i '' '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/ -g//' /opt/homebrew/share/cmake/Modules/Compiler/GNU.cmake
+
+          xcodebuild -version > CACHE_KEY.txt
+          brew list --versions $libs >> CACHE_KEY.txt
+          echo "$GITHUB_WORKSPACE" >> CACHE_KEY.txt
+          echo "CACHE_KEY=`md5 -q CACHE_KEY.txt`" >> $GITHUB_ENV
+
+          echo "MACOSX_DEPLOYMENT_TARGET=$(grep 'set(QT_SUPPORTED_MIN_MACOS_VERSION' /opt/homebrew/Cellar/qtbase/*/lib/cmake/Qt6/Qt6ConfigExtras.cmake | sed -E 's/^.*"(.*)"\)$/\1/')" >> $GITHUB_ENV
+          echo "LibrariesPath=`pwd`" >> $GITHUB_ENV
+
+          echo "RNNOISE=`curl -sSL --header 'Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}' https://api.github.com/repos/xiph/rnnoise/git/refs/heads/master | jq -r .object.sha`" >> $GITHUB_ENV
+          echo "WEBRTC=`curl -sSL --header 'Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}' https://api.github.com/repos/desktop-app/tg_owt/git/refs/heads/master | jq -r .object.sha`" >> $GITHUB_ENV
+
+      - name: Rust libraries cache.
+        id: cache-tdesktop-rust
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.LibrariesPath }}/local/tdesktop_rust
+          key: ${{ runner.OS }}-tdesktop-rust-${{ env.TLOTTIE }}-${{ env.WALLET_ENGINE }}-${{ env.RUST_PATCHES }}-${{ env.RUST_TOOLCHAIN }}-${{ env.CACHE_KEY }}
+      - name: Rust libraries.
+        if: steps.cache-tdesktop-rust.outputs.cache-hit != 'true'
+        run: |
+          cd "$LibrariesPath"
+          export RUSTUP_HOME="$LibrariesPath/rustup"
+          export CARGO_HOME="$LibrariesPath/cargo"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup-init.sh
+          sh rustup-init.sh -y --no-modify-path --profile minimal --default-toolchain "$RUST_TOOLCHAIN"
+          export RUSTUP_TOOLCHAIN="$RUST_TOOLCHAIN"
+          export PATH="$CARGO_HOME/bin:$PATH"
+
+          git init rust-patches
+          cd rust-patches
+          git remote add origin "$GIT/desktop-app/patches.git"
+          git fetch --depth=1 origin "$RUST_PATCHES"
+          git reset --hard FETCH_HEAD
+          cd "$LibrariesPath"
+
+          git init tlottie
+          cd tlottie
+          git remote add origin "$GIT/dkaraush/tlottie.git"
+          git fetch --depth=1 origin "$TLOTTIE"
+          git reset --hard FETCH_HEAD
+          cd "$LibrariesPath"
+
+          export GIT_LFS_SKIP_SMUDGE=1
+          git init wallet-engine
+          cd wallet-engine
+          git remote add origin "$GIT/i582/wallet-engine.git"
+          git fetch --depth=1 origin "$WALLET_ENGINE"
+          git reset --hard FETCH_HEAD
+          git apply ../rust-patches/wallet-engine.patch
+          cd "$LibrariesPath"
+
+          cargo new --lib --vcs none tdesktop_rust
+          cd tdesktop_rust
+          printf 'pub use ::tlottie;\npub use ::wallet_engine;\n' > src/lib.rs
+          cargo add --path ../tlottie --features c-api
+          cargo add --path ../wallet-engine
+          cargo rustc --lib --release \
+            --crate-type staticlib --crate-type cdylib \
+            --config "profile.release.opt-level='z'" \
+            --config "profile.release.lto='thin'" \
+            --config "profile.release.codegen-units=1" \
+            --config "profile.release.panic='unwind'" \
+            --config "profile.release.package.tlottie.opt-level=3" \
+            -- --print native-static-libs
+          install -d "$LibrariesPath/local/tdesktop_rust/lib" "$LibrariesPath/local/tdesktop_rust/include/tlottie" "$LibrariesPath/local/tdesktop_rust/include/wallet_engine"
+          install -m 644 target/release/libtdesktop_rust.a "$LibrariesPath/local/tdesktop_rust/lib/libtdesktop_rust.a"
+          install -m 644 ../tlottie/include/tlottie.h "$LibrariesPath/local/tdesktop_rust/include/tlottie/tlottie.h"
+          cargo run --manifest-path ../wallet-engine/bindgen/cpp/bindgen/Cargo.toml --locked -- \
+            --library --out-dir "$LibrariesPath/local/tdesktop_rust/include/wallet_engine" \
+            target/release/libtdesktop_rust.dylib
+
+      - name: RNNoise cache.
+        id: cache-rnnoise
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.LibrariesPath }}/local/rnnoise
+          key: ${{ runner.OS }}-rnnoise-${{ env.RNNOISE }}-${{ env.CACHE_KEY }}
+      - name: RNNoise.
+        if: steps.cache-rnnoise.outputs.cache-hit != 'true'
+        run: |
+          cd $LibrariesPath
+          git clone --depth=1 $GIT/xiph/rnnoise.git
+          cd rnnoise
+          ./autogen.sh
+          ./configure --prefix=$LibrariesPath/local/rnnoise --disable-examples --disable-doc
+          make -j$(sysctl -n hw.logicalcpu)
+          make install
+
+      - name: WebRTC cache.
+        id: cache-webrtc
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.LibrariesPath }}/local/tg_owt
+          key: ${{ runner.OS }}-webrtc-${{ env.WEBRTC }}-${{ env.CACHE_KEY }}
+      - name: WebRTC.
+        if: steps.cache-webrtc.outputs.cache-hit != 'true'
+        run: |
+          cd $LibrariesPath
+          git clone --depth=1 --recursive --shallow-submodules $GIT/desktop-app/tg_owt.git
+          cd tg_owt
+          cmake -Bbuild . -DCMAKE_INSTALL_PREFIX=$LibrariesPath/local/tg_owt
+          cmake --build build
+          cmake --install build
+
+      - name: TDE2E cache.
+        id: cache-tde2e
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.LibrariesPath }}/local/tde2e
+          key: ${{ runner.OS }}-tde2e-${{ env.TDE2E }}-${{ env.CACHE_KEY }}
+      - name: TDE2E.
+        if: steps.cache-tde2e.outputs.cache-hit != 'true'
+        run: |
+          cd $LibrariesPath
+          git init tde2e
+          cd tde2e
+          git remote add origin $GIT/tdlib/td.git
+          git fetch --depth=1 origin $TDE2E
+          git reset --hard FETCH_HEAD
+          cmake -Bbuild . -DCMAKE_INSTALL_PREFIX=$LibrariesPath/local/tde2e -DTD_E2E_ONLY=ON
+          cmake --build build
+          cmake --install build
+
+      - name: Telegram Desktop build.
+        env:
+          API_ID: ${{ secrets.TDESKTOP_API_ID }}
+          API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
+        run: |
+          cd tdesktop
+          export CMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH$(find $LibrariesPath/local -mindepth 1 -maxdepth 1 -type d -exec printf ':%s' {} +)"
+
+          if [ -n "$API_ID" ] && [ -n "$API_HASH" ]; then
+            API_ARGS="-DTDESKTOP_API_ID=$API_ID -DTDESKTOP_API_HASH=$API_HASH"
+          else
+            echo "::warning::Secrets TDESKTOP_API_ID/TDESKTOP_API_HASH are not set, building with TDESKTOP_API_TEST (login will most likely fail)."
+            API_ARGS="-DTDESKTOP_API_TEST=ON"
+          fi
+
+          cmake -Bbuild . $API_ARGS \
+            -DDESKTOP_APP_DISABLE_AUTOUPDATE=ON \
+            -DDESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+          cmake --build build
+          macdeployqt build/Telegram.app
+
+      - name: Download xraygram-core.
+        uses: actions/download-artifact@v7
+        with:
+          name: xraygram-core-darwin-arm64
+          path: core-bin
+
+      - name: Assemble Xraygram.app.
+        run: |
+          mkdir -p dist
+          rm -rf dist/Xraygram.app
+          mv tdesktop/build/Telegram.app dist/Xraygram.app
+          APP=dist/Xraygram.app
+          install -m 755 core-bin/xraygram-core "$APP/Contents/MacOS/xraygram-core"
+
+          "$APP/Contents/MacOS/xraygram-core" version
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$APP/Contents/Info.plist"
+
+          # Не должно остаться ссылок на /opt/homebrew (macdeployqt всё скопировал).
+          leftovers=0
+          while IFS= read -r -d '' bin; do
+            if file "$bin" | grep -q 'Mach-O'; then
+              if otool -L "$bin" | tail -n +2 | grep -q '/opt/homebrew'; then
+                echo "::warning::$bin still links to /opt/homebrew"
+                otool -L "$bin" | grep '/opt/homebrew'
+                leftovers=1
+              fi
+            fi
+          done < <(find "$APP" -type f -print0)
+          echo "homebrew leftovers: $leftovers"
+
+          # Ad-hoc подпись: без неё arm64-бинарники не запускаются.
+          codesign --force --sign - "$APP/Contents/MacOS/xraygram-core"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+      - name: Make DMG.
+        run: |
+          mkdir -p dmg
+          ditto dist/Xraygram.app dmg/Xraygram.app
+          ln -s /Applications dmg/Applications
+          SHORT_SHA=$(git -C xraygram rev-parse --short HEAD)
+          DMG="Xraygram-${TDESKTOP_REF}-${SHORT_SHA}-macos-arm64.dmg"
+          hdiutil create -volname Xraygram -srcfolder dmg -ov -format UDZO "$DMG"
+          shasum -a 256 "$DMG" | tee "$DMG.sha256"
+          echo "DMG=$DMG" >> $GITHUB_ENV
+
+      - uses: actions/upload-artifact@v7
+        name: Upload DMG.
+        with:
+          name: Xraygram-macos-arm64
+          path: |
+            ${{ env.DMG }}
+            ${{ env.DMG }}.sha256
+          retention-days: 14
