@@ -102,11 +102,14 @@
 
 `macos/patches/0001-xraygram-xray-socks.patch` (против `v7.4.4`, проверен `git apply --check` на чистом теге):
 
-- `Telegram/SourceFiles/xraygram/xraygram_core.{h,cpp}` — менеджер дочернего процесса `xraygram-core`.
-- `Telegram/SourceFiles/xraygram/xraygram_box.{h,cpp}` — окно ввода ссылки.
-- `boxes/connection_box.{h,cpp}` — пункт меню «Xray: ссылка vless://», перехват `vless://` из буфера в «Add proxy» и
-  «Add from clipboard», подпись `XRAY` в списке, запрет шаринга нашей записи, `addOrApplyItem/removeItem` у контроллера.
-- `core/application.cpp` — `Xraygram::Start()` в `run()`, `EnsureRunning()` в `refreshGlobalProxy()`, `Shutdown()` в деструкторе.
+- `Telegram/SourceFiles/xraygram/xraygram_core.{h,cpp}` — менеджер XRAY-записей: `Instance` на каждую запись
+  (процесс `xraygram-core`, порт, пароль, перезапуск с backoff), `Manager` (хранение `tdata/xraygram.json` v2,
+  `SaveLink`, асинхронный `CheckLink`, `TitleFor`/`LinkFor` для UI).
+- `boxes/connection_box.{cpp,style}` — тип «XRAY (VLESS)» в `ProxyBox` (поле «Ссылка» + строка статуса), перехват
+  `vless://` из буфера в «Add proxy»/«Add from clipboard», подпись `XRAY · имя` в списке, запрет шаринга XRAY-записей.
+- `window/main_window.cpp`, `window_saved_windows.cpp`, `window_restore_shell.cpp`, `platform/mac/window_title_mac.mm`,
+  `boxes/about_box.cpp` — «Telegram» → «Xraygram» в заголовках.
+- `core/application.cpp` — `Xraygram::Start()` в `run()`, `EnsureRunning(proxy)` в `refreshGlobalProxy()`, `Shutdown()` в деструкторе.
 - Ребрендинг: `AppName = "Xraygram"`, `setApplicationName("Xraygram")`, bundle id `io.github.xraygram.desktop`,
   `CFBundleName/DisplayName = Xraygram`, убраны URL-схемы `tg/ton/tonsite`. Исполняемый файл внутри остаётся `Telegram`
   (меньше правок в CMake), бандл переименовывается в `Xraygram.app` в CI.
@@ -139,3 +142,26 @@
   найденные runtime-проблемы исправлены). Первая настоящая проверка — CI.
 - Поведение `macdeployqt` с brew-библиотеками на текущем `macos-latest`, запуск DMG на macOS 26.7.
 - Реальное подключение через VLESS+Reality (нужна ссылка владельца).
+
+## Локальная сборка на MacBook Air M5 (2026-11-18)
+
+Скрипты: `macos/scripts/build-local.sh`, `update-patch.sh`, `common.sh`. Повторяют CI-вариант `mac_packaged`.
+
+- **Компиляция патча**: с первого раза без ошибок и без предупреждений в наших файлах (57 предупреждений — все
+  upstream: `Q_OS_MAC deprecated`, `ld: ... built for newer macOS (26.0) than being linked (14.4)` от brew-библиотек и
+  Swift-модуля `lib_translate`). `MACOSX_DEPLOYMENT_TARGET` = 14.4 (из `Qt6ConfigExtras.cmake` brew qtbase 6.12.0).
+- **CommandLineTools достаточно**: Swift 6.4 (`lib_translate`, `enable_language(Swift)`), SDK 27.0, `actool`/`metal`
+  сборка не вызывает. Полный Xcode не понадобился.
+- **packaged-режим**: `cmake_helpers/validate_special_target.cmake` включает `DESKTOP_APP_USE_PACKAGED`, если рядом с
+  исходниками нет `../Libraries`. Наши либы лежат в `upstream/xraygram-local/libs`, скрипт ещё и задаёт флаг явно.
+- **Подводные камни**: rnnoise `autogen.sh` качает модель через `wget` (добавлен в brew-пакеты); `go mod tidy` один раз
+  упал на `proxy.golang.org` (`stream error ... INTERNAL_ERROR`), со второй попытки прошёл — при постоянных сбоях
+  `GOPROXY=direct`.
+- **Ключи API** — compile definition всей цели `Telegram`, поэтому смена ключей = пересборка почти всего (~15 мин).
+- **Время**: tdesktop с нуля 18 мин, инкрементально ~5 с, macdeployqt 5 мин (бинарник ~800 МБ, бандл 421 МБ).
+- **Дымовой тест** (`-workdir upstream/xraygram-local/appdata`): приложение стартует (Qt 6.12.0); с фиктивной ссылкой в
+  `tdata/xraygram.json` в логе `Xraygram: xray started on 127.0.0.1:20877 (vless example.com smoke)`, порт слушает
+  `xraygram-core`; после `kill -9` Телеги помощник сам вышел. `xraygram-core run` без логина/пароля SOCKS отказывает
+  (`No authentication method was acceptable`).
+- **Следы вне проекта**: tdesktop при старте создаёт пустой `~/Library/Application Support/Xraygram` даже с `-workdir`;
+  Go писал телеметрию в `~/Library/Application Support/go` — теперь `GOTELEMETRY=off`, `GOTELEMETRYDIR` внутри проекта.

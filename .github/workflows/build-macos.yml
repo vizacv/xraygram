@@ -46,7 +46,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: ${{ env.CORE_DIR }}/go.mod
-          cache-dependency-path: ${{ env.CORE_DIR }}/go.mod
+          cache-dependency-path: ${{ env.CORE_DIR }}/go.sum
 
       - name: Resolve modules.
         working-directory: ${{ env.CORE_DIR }}
