@@ -1,0 +1,26 @@
+# Смоук Xraygram iOS (симулятор): ios-20261118-1
+# 2026-11-18 18:09:11, бандл upstream/xraygram-ios/dist/Xraygram-ios-20261118-1-sim.app, io.github.vizacv.xraygram 13.2
+
+## B — бандл
+PASS  B1  bundle id не телеграмовский (io.github.vizacv.xraygram)
+PASS  B2  имя на экране: Xraygram
+WARN  B3  регистрирует схемы: telegram tg tonsite ton tc (tg:// может уйти в Xraygram вместо Telegram)
+WARN  B4  схема vless:// не зарегистрирована (FEAT-08)
+      инфо: создано устройство Xraygram QA (CB41D887-5D96-4D2B-85FF-EA2073B9F50F, com.apple.CoreSimulator.SimRuntime.iOS-27-2)
+      инфо: устройство Xraygram QA CB41D887-5D96-4D2B-85FF-EA2073B9F50F загружено
+PASS  I1  установка .app
+
+## G — FEAT-03: первый запуск
+PASS  G1  приложение запущено (pid 95049)
+      скриншот: testing/results/ios-20261118-1/ios-gate.png
+PASS  G2  20 с: ни одного внешнего соединения/UDP
+PASS  G3  xray не слушает (записей нет)
+
+## L — ссылка vless:// через openurl (тестовый сервер 127.0.0.1:10443)
+SKIP  L1  openurl vless:// не принят системой (схема не зарегистрирована)
+
+## E — завершение
+PASS  E1  процесс приложения завершён
+# устройство Xraygram QA оставлено включённым (CB41D887-5D96-4D2B-85FF-EA2073B9F50F)
+
+# Итог: 7 PASS, 0 FAIL, 2 WARN, 1 SKIP

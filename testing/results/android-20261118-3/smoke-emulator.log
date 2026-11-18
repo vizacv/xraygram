@@ -1,0 +1,13 @@
+[1;34m==>[0m запускаю эмулятор xraygram (лог: /Users/jame092/xraygram/upstream/android-work/logs/emulator.log)
+[1;34m==>[0m эмулятор загрузился
+/Users/jame092/xraygram/android/scripts/build-local.sh: line 298: syntax error near unexpected token `('
+[1;34m==>[0m ставлю Xraygram-android-20261118-3.apk
+Success
+[1;32mPASS[0m GATE: за 20 с наружу ничего (сокетов нет)
+Warning: Activity not started, intent has been delivered to currently running top-most instance.
+[1;32mPASS[0m XRAY (reality): DC Telegram через тестовый сервер за 2 с
+[1;32mPASS[0m XRAY: прямых соединений нет
+[1;32mPASS[0m COLD: через xray за 5 с
+[1;32mPASS[0m COLD: прямых соединений нет
+[1;32mPASS[0m крэшей нет
+[1;34m==>[0m итог: всё PASS

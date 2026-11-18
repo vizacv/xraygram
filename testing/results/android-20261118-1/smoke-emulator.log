@@ -1,0 +1,16 @@
+[1;34m==>[0m запускаю эмулятор xraygram (лог: /Users/jame092/xraygram/upstream/android-work/logs/emulator.log)
+[1;34m==>[0m эмулятор загрузился
+[1;34m==>[0m ставлю Xraygram-13.2.2-arm64-v8a.apk
+Success
+[1;31mFAIL[0m GATE: соединения наружу без XRAY:
+ESTAB 149.154.167.51:443
+ESTAB [::ffff:172.217.118.4]:443
+Warning: Activity not started, intent has been delivered to currently running top-most instance.
+[1;32mPASS[0m XRAY (reality): DC Telegram через тестовый сервер за 3 с
+[1;31mFAIL[0m XRAY: прямые соединения:
+ESTAB [::ffff:172.217.118.4]:443
+[1;32mPASS[0m COLD: через xray за 3 с
+[1;31mFAIL[0m COLD: прямые соединения:
+ESTAB [::ffff:172.217.118.4]:443
+[1;32mPASS[0m крэшей нет
+[1;34m==>[0m итог: FAIL: 3
