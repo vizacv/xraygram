@@ -27,3 +27,9 @@
 | Xraygram iOS — `local_11784a51-6ae4-497c-afb6-e4e7b86f90a2` | `ios/` | старт 2026-11-18: Telegram-iOS + libXray in-process, бесплатный Apple ID |
 | Xraygram Android — `local_249734e9-91a7-4a2c-9cf6-66f7e744de7a` | `android/` | старт 2026-11-18: DrKLO/Telegram, локальная сборка |
 | Xraygram тестирование — `local_41cb505a-2a8e-4f4b-a5af-efb01e680b01` | `testing/` | старт 2026-11-18: план и проверка macOS, потом iOS/Android |
+
+## Ждёт владельца
+
+- **Звонок 1:1 через xray (macOS)** — живой тест со вторым человеком; сценарий в `testing/macos-manual.md` (разд. 2)
+  и в отчёте Mac-темы: запуск с `-debug`, `testing/scripts/net-watch.sh`, grep `Call Info` / `last_call_log.txt`.
+- **iPhone друга** — Apple ID в Xcode, iPhone по кабелю, Developer Mode (см. `ios/README.md`).
