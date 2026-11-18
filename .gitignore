@@ -1,0 +1,5 @@
+upstream/
+.DS_Store
+*.keystore
+*.jks
+local.properties
