@@ -1,0 +1,2525 @@
+diff --git a/Telegram/BUILD b/Telegram/BUILD
+index 1ac8279b..54237782 100644
+--- a/Telegram/BUILD
++++ b/Telegram/BUILD
+@@ -430,20 +430,7 @@ plist_fragment(
+             <string>{telegram_bundle_id}</string>
+             <key>CFBundleURLSchemes</key>
+             <array>
+-                <string>telegram</string>
+-            </array>
+-        </dict>
+-        <dict>
+-            <key>CFBundleTypeRole</key>
+-            <string>Viewer</string>
+-            <key>CFBundleURLName</key>
+-            <string>{telegram_bundle_id}.compatibility</string>
+-            <key>CFBundleURLSchemes</key>
+-            <array>
+-                <string>tg</string>
+-                <string>tonsite</string>
+-                <string>ton</string>
+-                <string>tc</string>
++                <string>xraygram</string>
+             </array>
+         </dict>
+     </array>
+@@ -452,6 +439,9 @@ plist_fragment(
+     )
+ )
+ 
++# Xraygram (BUG-13): схемы Telegram (telegram, tg, ton, tonsite, tc) не регистрируем — ссылки Telegram
++# не перехватываем, рядом может стоять официальный клиент. Своя схема — xraygram (app_specific_url_scheme).
++
+ official_apple_pay_merchants = [
+     "merchant.ph.telegra.Telegraph",
+     "merchant.sberbank.ph.telegra.Telegraph",
+@@ -641,7 +631,7 @@ plist_fragment(
+     template =
+     """
+     <key>CFBundleDisplayName</key>
+-    <string>Telegram</string>
++    <string>Xraygram</string>
+     """
+ )
+ 
+@@ -1696,11 +1686,11 @@ plist_fragment(
+     <key>CFBundleDevelopmentRegion</key>
+     <string>en</string>
+     <key>CFBundleDisplayName</key>
+-    <string>Telegram</string>
++    <string>Xraygram</string>
+     <key>CFBundleIdentifier</key>
+     <string>{telegram_bundle_id}</string>
+     <key>CFBundleName</key>
+-    <string>Telegram</string>
++    <string>Xraygram</string>
+     <key>CFBundlePackageType</key>
+     <string>APPL</string>
+     <key>CFBundleSignature</key>
+@@ -1922,7 +1912,9 @@ ios_application(
+         ":RequiredDeviceCapabilitiesPlist",
+         ":UrlTypesInfoPlist",
+     ],
+-    app_icons = [ ":{}_icon".format(name) for name in composer_icon_folders ],
++    # Xraygram: своя иконка (branding/ios/AppIcon-1024.png, FEAT-07) вместо Telegram.icon.
++    # PNG кладёт ios/scripts/build.sh prepare; в патче только Contents.json.
++    app_icons = glob(["Telegram-iOS/XraygramAppIcon.xcassets/**"], exclude = ["Telegram-iOS/XraygramAppIcon.xcassets/**/.*"]),
+     alternate_icons = [
+         ":{}".format(name) for name in alternate_icon_folders
+     ],
+diff --git a/Telegram/Telegram-iOS/XraygramAppIcon.xcassets/AppIcon.appiconset/Contents.json b/Telegram/Telegram-iOS/XraygramAppIcon.xcassets/AppIcon.appiconset/Contents.json
+new file mode 100644
+index 00000000..f22e10cd
+--- /dev/null
++++ b/Telegram/Telegram-iOS/XraygramAppIcon.xcassets/AppIcon.appiconset/Contents.json
+@@ -0,0 +1,14 @@
++{
++  "images" : [
++    {
++      "filename" : "AppIcon-1024.png",
++      "idiom" : "universal",
++      "platform" : "ios",
++      "size" : "1024x1024"
++    }
++  ],
++  "info" : {
++    "author" : "xcode",
++    "version" : 1
++  }
++}
+diff --git a/Telegram/Telegram-iOS/XraygramAppIcon.xcassets/Contents.json b/Telegram/Telegram-iOS/XraygramAppIcon.xcassets/Contents.json
+new file mode 100644
+index 00000000..73c00596
+--- /dev/null
++++ b/Telegram/Telegram-iOS/XraygramAppIcon.xcassets/Contents.json
+@@ -0,0 +1,6 @@
++{
++  "info" : {
++    "author" : "xcode",
++    "version" : 1
++  }
++}
+diff --git a/Telegram/Telegram-iOS/en.lproj/Localizable.strings b/Telegram/Telegram-iOS/en.lproj/Localizable.strings
+index 0c6e4e28..13ac949e 100644
+--- a/Telegram/Telegram-iOS/en.lproj/Localizable.strings
++++ b/Telegram/Telegram-iOS/en.lproj/Localizable.strings
+@@ -402,7 +402,7 @@
+ "Date.ChatDateHeaderYear" = "%1$@ %2$@, %3$@";
+ 
+ // Tour
+-"Tour.Title1" = "Telegram";
++"Tour.Title1" = "Xraygram";
+ "Tour.Text1" = "The world's **fastest** messaging app.\nIt is **free** and **secure**.";
+ 
+ "Tour.Title2" = "Fast";
+diff --git a/build-system/Make/BuildConfiguration.py b/build-system/Make/BuildConfiguration.py
+index d7354475..0fe121ac 100644
+--- a/build-system/Make/BuildConfiguration.py
++++ b/build-system/Make/BuildConfiguration.py
+@@ -210,8 +210,10 @@ def resolve_aps_environment_from_directory(source_path, team_id, bundle_id):
+                 profile_base_name = profile_name[len(team_id + '.' + bundle_id):]
+                 if profile_base_name == '':
+                     if 'aps-environment' not in profile_dict['Entitlements']:
+-                        print('Provisioning profile at {} does not include an aps-environment entitlement'.format(file_path))
+-                        sys.exit(1)
++                        # Xraygram: профиль бесплатного Apple ID (Personal Team) не даёт Push.
++                        # Собираем без aps-environment: push-уведомлений не будет.
++                        print('Provisioning profile at {} does not include an aps-environment entitlement, building without push notifications'.format(file_path))
++                        return ''
+                     return profile_dict['Entitlements']['aps-environment']
+     return None
+ 
+diff --git a/build-system/Make/Make.py b/build-system/Make/Make.py
+index 08b05aef..55979a36 100644
+--- a/build-system/Make/Make.py
++++ b/build-system/Make/Make.py
+@@ -48,6 +48,7 @@ class BazelCommandLine:
+         self.show_actions = False
+         self.enable_sandbox = False
+         self.disable_provisioning_profiles = False
++        self.disable_extensions = False
+         self.profile_swift = False
+         self.embed_watch_app = False
+         self.watch_api_id = None
+@@ -143,6 +144,10 @@ class BazelCommandLine:
+     def set_disable_provisioning_profiles(self):
+         self.disable_provisioning_profiles = True
+ 
++    # Xraygram: сборка без расширений (бесплатный Apple ID: меньше App ID, нет push).
++    def set_disable_extensions(self):
++        self.disable_extensions = True
++
+     def set_profile_swift(self, value):
+         self.profile_swift = value
+ 
+@@ -303,6 +308,8 @@ class BazelCommandLine:
+ 
+         if self.disable_provisioning_profiles:
+             combined_arguments += ['--//Telegram:disableProvisioningProfiles']
++        if self.disable_extensions:
++            combined_arguments += ['--//Telegram:disableExtensions']
+ 
+         combined_arguments += self.common_args
+         combined_arguments += self.common_build_args
+@@ -653,6 +660,10 @@ def build(bazel, arguments):
+     bazel_command_line.set_show_actions(arguments.showActions)
+     bazel_command_line.set_enable_sandbox(arguments.sandbox)
+     bazel_command_line.set_profile_swift(arguments.profileSwift)
++    if arguments.disableExtensions:
++        bazel_command_line.set_disable_extensions()
++    if arguments.disableProvisioningProfiles:
++        bazel_command_line.set_disable_provisioning_profiles()
+ 
+     bazel_command_line.set_split_swiftmodules(arguments.enableParallelSwiftmoduleGeneration)
+ 
+@@ -1088,6 +1099,18 @@ if __name__ == '__main__':
+         default=False,
+         help='Enable sandbox.',
+     )
++    buildParser.add_argument(
++        '--disableExtensions',
++        action='store_true',
++        default=False,
++        help='Xraygram: build the app without extensions (free Apple ID signing).',
++    )
++    buildParser.add_argument(
++        '--disableProvisioningProfiles',
++        action='store_true',
++        default=False,
++        help='Xraygram: do not embed provisioning profiles (simulator builds).',
++    )
+     buildParser.add_argument(
+         '--outputBuildArtifactsPath',
+         required=False,
+diff --git a/submodules/AuthorizationUI/BUILD b/submodules/AuthorizationUI/BUILD
+index 4757af3b..fd403ecd 100644
+--- a/submodules/AuthorizationUI/BUILD
++++ b/submodules/AuthorizationUI/BUILD
+@@ -12,6 +12,7 @@ swift_library(
+     deps = [
+         "//submodules/AsyncDisplayKit:AsyncDisplayKit",
+         "//submodules/TelegramCore:TelegramCore",
++        "//submodules/XraygramKit:XraygramKit",
+         "//submodules/Display:Display",
+         "//submodules/SSignalKit/SSignalKit",
+         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
+diff --git a/submodules/AuthorizationUI/Sources/AuthorizationSequencePhoneEntryController.swift b/submodules/AuthorizationUI/Sources/AuthorizationSequencePhoneEntryController.swift
+index 9f9d8866..515314cc 100644
+--- a/submodules/AuthorizationUI/Sources/AuthorizationSequencePhoneEntryController.swift
++++ b/submodules/AuthorizationUI/Sources/AuthorizationSequencePhoneEntryController.swift
+@@ -7,6 +7,7 @@ import TelegramCore
+ import TelegramPresentationData
+ import PresentationDataUtils
+ import ProgressNavigationButtonNode
++import XraygramKit
+ import AccountContext
+ import CountrySelectionUI
+ import PhoneNumberFormat
+@@ -97,6 +98,20 @@ public final class AuthorizationSequencePhoneEntryController: ViewController, MF
+         if let countriesConfiguration {
+             AuthorizationSequenceCountrySelectionController.setupCountryCodes(countries: countriesConfiguration.countries, codesByPrefix: countriesConfiguration.countriesByPrefix)
+         }
++        
++        // Xraygram: до входа Телега без прокси недоступна, а штатно экран прокси появляется
++        // только после таймаута. Даём постоянную кнопку (XRAY-ссылку вставляют там).
++        if account != nil {
++            self.navigationItem.rightBarButtonItem = UIBarButtonItem(title: XrayStrings(appLanguageCode: self.presentationData.strings.primaryComponent.languageCode).proxyButton, style: .plain, target: self, action: #selector(self.xraygramProxyPressed))
++        }
++    }
++    
++    @objc private func xraygramProxyPressed() {
++        guard let account = self.account else {
++            return
++        }
++        self.view.endEditing(true)
++        self.present(self.sharedContext.makeProxySettingsController(sharedContext: self.sharedContext, account: account), in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
+     }
+     
+     required init(coder aDecoder: NSCoder) {
+@@ -121,6 +136,10 @@ public final class AuthorizationSequencePhoneEntryController: ViewController, MF
+             self.navigationItem.rightBarButtonItem = item
+         } else {
+             self.navigationItem.rightBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Next, style: .done, target: self, action: #selector(self.nextPressed))
++            // Xraygram: на узких экранах справа «Далее», «Прокси» уходит налево.
++            if self.account != nil && self.otherAccountPhoneNumbers.1.isEmpty {
++                self.navigationItem.leftBarButtonItem = UIBarButtonItem(title: XrayStrings(appLanguageCode: self.presentationData.strings.primaryComponent.languageCode).proxyButton, style: .plain, target: self, action: #selector(self.xraygramProxyPressed))
++            }
+         }
+     }
+     
+diff --git a/submodules/MtProtoKit/Sources/MTContext.m b/submodules/MtProtoKit/Sources/MTContext.m
+index 91d362c6..ed5ae106 100644
+--- a/submodules/MtProtoKit/Sources/MTContext.m
++++ b/submodules/MtProtoKit/Sources/MTContext.m
+@@ -1498,6 +1498,12 @@ - (void)invalidateTransportSchemeForDatacenterId:(NSInteger)datacenterId transpo
+ }
+ 
+ - (void)_beginBackupAddressDiscoveryWithDelay:(double)delay {
++    // Xraygram: поиск запасных адресов (DoH к Google/Cloudflare, затем прямые MTProto-соединения к
++    // найденным IP — MTBackupAddressSignals снимает прокси) при заданном прокси не запускаем: с XRAY
++    // это прямая утечка мимо xray, при блокировке («чёрная дыра») — запросы до выбора сервера.
++    if (_apiEnvironment.socksProxySettings != nil) {
++        return;
++    }
+     if (_backupAddressListDisposable == nil && _discoverBackupAddressListSignal != nil) {
+         __weak MTContext *weakSelf = self;
+         _backupAddressListDisposable = [[[_discoverBackupAddressListSignal delay:delay onQueue:[MTQueue mainQueue]] onDispose:^{
+diff --git a/submodules/MtProtoKit/Sources/MTTcpConnection.m b/submodules/MtProtoKit/Sources/MTTcpConnection.m
+index 6b9bc4d2..b91006a8 100644
+--- a/submodules/MtProtoKit/Sources/MTTcpConnection.m
++++ b/submodules/MtProtoKit/Sources/MTTcpConnection.m
+@@ -1499,9 +1499,23 @@ - (void)requestSocksConnection {
+     req.Reserved = 0;
+     req.AddrType = 1;
+     
++    // Xraygram: upstream всегда слал IPv4 (ATYP 1), и для IPv6-адресов датацентров (2001:b28:…) уходил
++    // неинициализированный мусор (1.0.0.0, 3.0.0.0 и т. п.). Теперь IPv6 — ATYP 4.
+     struct in_addr ip4;
+-    inet_aton(_scheme.address.ip.UTF8String, &ip4);
+-    req.DestAddr.IPv4 = ip4;
++    struct in6_addr ip6;
++    memset(&ip4, 0, sizeof(ip4));
++    if (inet_aton(_scheme.address.ip.UTF8String, &ip4) != 0) {
++        req.DestAddr.IPv4 = ip4;
++    } else if (inet_pton(AF_INET6, _scheme.address.ip.UTF8String, &ip6) == 1) {
++        req.AddrType = 4;
++        req.DestAddr.IPv6 = ip6;
++    } else {
++        if (MTLogEnabled()) {
++            MTLog(@"***** %s: invalid socks destination address", __PRETTY_FUNCTION__);
++        }
++        [self closeAndNotifyWithError:true];
++        return;
++    }
+     req.DestPort = _scheme.address.port;
+     
+     NSMutableData *reqData = [[NSMutableData alloc] init];
+diff --git a/submodules/QrCodeUI/Sources/QrCodeScreen.swift b/submodules/QrCodeUI/Sources/QrCodeScreen.swift
+index 292c57eb..8042aa73 100644
+--- a/submodules/QrCodeUI/Sources/QrCodeScreen.swift
++++ b/submodules/QrCodeUI/Sources/QrCodeScreen.swift
+@@ -561,6 +561,9 @@ public final class QrCodeScreen: ViewControllerComponentContainer {
+                     // only builds that one, and parseWebProxySettingsLink accepts it alongside
+                     // tg://webproxy. The public frontend has no /webproxy route yet.
+                     link = webProxySettingsLink(server) ?? ""
++                case let .xray(xrayLink):
++                    // Xraygram: в UI XRAY-записи не шарятся; здесь — сама ссылка, без tg://.
++                    link = xrayLink
+                 }
+                 return link
+             }
+diff --git a/submodules/SettingsUI/BUILD b/submodules/SettingsUI/BUILD
+index 40742e6e..511003ee 100644
+--- a/submodules/SettingsUI/BUILD
++++ b/submodules/SettingsUI/BUILD
+@@ -16,6 +16,7 @@ swift_library(
+         "//submodules/AsyncDisplayKit:AsyncDisplayKit",
+         "//submodules/Display:Display",
+         "//submodules/TelegramCore:TelegramCore",
++        "//submodules/XraygramKit:XraygramKit",
+         "//submodules/MtProtoKit:MtProtoKit",
+         "//submodules/TelegramPresentationData:TelegramPresentationData",
+         "//submodules/AccountContext:AccountContext",
+diff --git a/submodules/SettingsUI/Sources/Data and Storage/DataAndStorageSettingsController.swift b/submodules/SettingsUI/Sources/Data and Storage/DataAndStorageSettingsController.swift
+index ffd40f69..5610d97a 100644
+--- a/submodules/SettingsUI/Sources/Data and Storage/DataAndStorageSettingsController.swift	
++++ b/submodules/SettingsUI/Sources/Data and Storage/DataAndStorageSettingsController.swift	
+@@ -655,6 +655,8 @@ private func dataAndStorageControllerEntries(context: AccountContext, state: Dat
+                 proxyValue = presentationData.strings.SocksProxySetup_ProxyTelegram
+             case .web:
+                 proxyValue = presentationData.strings.SocksProxySetup_ProxyWeb
++            case .xray:
++                proxyValue = activeServer.xrayDisplayTitle ?? "XRAY"
+         }
+     } else {
+         proxyValue = presentationData.strings.GroupInfo_SharedMediaNone
+diff --git a/submodules/SettingsUI/Sources/Data and Storage/ProxyListSettingsController.swift b/submodules/SettingsUI/Sources/Data and Storage/ProxyListSettingsController.swift
+index e42e4d60..0cf1f8cb 100644
+--- a/submodules/SettingsUI/Sources/Data and Storage/ProxyListSettingsController.swift	
++++ b/submodules/SettingsUI/Sources/Data and Storage/ProxyListSettingsController.swift	
+@@ -10,6 +10,8 @@ import PresentationDataUtils
+ import AccountContext
+ import ShareController
+ import UrlEscaping
++import XraygramKit
++import AlertUI
+ 
+ private final class ProxySettingsControllerArguments {
+     let toggleEnabled: (Bool) -> Void
+@@ -73,7 +75,8 @@ public enum ProxySettingsEntryTag: ItemListItemTag, Equatable {
+ }
+ 
+ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
+-    case enabled(PresentationTheme, String, Bool, Bool)
++    // Xraygram: последний Bool — выключение подтверждается (есть XRAY-записи, PAR-05).
++    case enabled(PresentationTheme, String, Bool, Bool, Bool)
+     case serversHeader(PresentationTheme, String)
+     case addServer(PresentationTheme, String, Bool)
+     case server(Int, PresentationTheme, PresentationStrings, ProxyServerSettings, Bool, DisplayProxyServerStatus, ProxySettingsServerItemEditing, Bool)
+@@ -115,8 +118,8 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
+     
+     static func ==(lhs: ProxySettingsControllerEntry, rhs: ProxySettingsControllerEntry) -> Bool {
+         switch lhs {
+-            case let .enabled(lhsTheme, lhsText, lhsValue, lhsCreatesNew):
+-                if case let .enabled(rhsTheme, rhsText, rhsValue, rhsCreatesNew) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue, lhsCreatesNew == rhsCreatesNew {
++            case let .enabled(lhsTheme, lhsText, lhsValue, lhsCreatesNew, lhsConfirms):
++                if case let .enabled(rhsTheme, rhsText, rhsValue, rhsCreatesNew, rhsConfirms) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue, lhsCreatesNew == rhsCreatesNew, lhsConfirms == rhsConfirms {
+                     return true
+                 } else {
+                     return false
+@@ -214,8 +217,9 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
+     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
+         let arguments = arguments as! ProxySettingsControllerArguments
+         switch self {
+-            case let .enabled(_, text, value, createsNew):
+-                return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, value: value, enableInteractiveChanges: !createsNew, enabled: true, sectionId: self.section, style: .blocks, updated: { value in
++            case let .enabled(_, text, value, createsNew, confirmsDirect):
++                // Xraygram: при XRAY-записях выключатель сам не переключается — сначала алерт «Подключиться напрямую?».
++                return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, value: value, enableInteractiveChanges: !createsNew && !confirmsDirect, enabled: true, sectionId: self.section, style: .blocks, updated: { value in
+                     if createsNew {
+                         arguments.addNewServer()
+                     } else {
+@@ -255,7 +259,7 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
+ private func proxySettingsControllerEntries(theme: PresentationTheme, strings: PresentationStrings, state: ProxySettingsControllerState, proxySettings: ProxySettings, statuses: [ProxyServerSettings: ProxyServerStatus], connectionStatus: ConnectionStatus) -> [ProxySettingsControllerEntry] {
+     var entries: [ProxySettingsControllerEntry] = []
+ 
+-    entries.append(.enabled(theme, strings.ChatSettings_ConnectionType_UseProxy, proxySettings.enabled, proxySettings.servers.isEmpty))
++    entries.append(.enabled(theme, strings.ChatSettings_ConnectionType_UseProxy, proxySettings.enabled, proxySettings.servers.isEmpty, proxySettings.enabled && proxySettings.xraygramHasXrayEntries))
+     entries.append(.serversHeader(theme, strings.SocksProxySetup_SavedProxies))
+     entries.append(.addServer(theme, strings.SocksProxySetup_AddProxy, state.editing))
+     var index = 0
+@@ -296,6 +300,8 @@ private func proxySettingsControllerEntries(theme: PresentationTheme, strings: P
+                     // Unreachable - the branch above catches every WEB server - but naming it
+                     // MTProto here would be wrong if that ordering ever changed.
+                     text = strings.SocksProxySetup_ProxyWeb
++                case .xray:
++                    text = server.xrayLink.flatMap { XrayProxyManager.shared.lastError(for: $0) }.map { XrayStrings(appLanguageCode: strings.primaryComponent.languageCode).entryStatus($0) } ?? "XRAY (VLESS)"
+             }
+             switch status {
+                 case .notAvailable:
+@@ -317,7 +323,9 @@ private func proxySettingsControllerEntries(theme: PresentationTheme, strings: P
+         entries.append(.shareProxyList(theme, strings.SocksProxySetup_ShareProxyList))
+     }
+     
+-    if let activeServer = proxySettings.activeServer, case .socks5 = activeServer.connection {
++    // Xraygram: XRAY — тоже локальный SOCKS5, звонки через него возможны.
++    // Xraygram: для XRAY звонки через прокси всегда, галка нужна только обычному SOCKS5.
++    if let activeServer = proxySettings.activeServer, activeServer.canBeUsedForCalls, activeServer.xrayLink == nil {
+         entries.append(.useForCalls(theme, strings.SocksProxySetup_UseForCalls, proxySettings.useForCalls))
+         entries.append(.useForCallsInfo(theme, strings.SocksProxySetup_UseForCallsHelp))
+     }
+@@ -368,13 +376,37 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
+     }
+     
+     var shareProxyListImpl: (() -> Void)?
++    var presentControllerImpl: ((ViewController) -> Void)?
++    let proxySettings = Promise<ProxySettings>()
+     
+     let arguments = ProxySettingsControllerArguments(toggleEnabled: { value in
+-        let _ = updateProxySettingsInteractively(accountManager: accountManager, { current in
+-            var current = current
+-            current.enabled = value
+-            return current
+-        }).start()
++        let apply = {
++            let _ = updateProxySettingsInteractively(accountManager: accountManager, { current in
++                var current = current
++                current.enabled = value
++                return current
++            }).start()
++        }
++        if value {
++            apply()
++            return
++        }
++        // Xraygram (PAR-05, FEAT-02 п. 11): выключение прокси при XRAY-записях = «напрямую» — спросить.
++        let _ = (proxySettings.get()
++        |> take(1)
++        |> deliverOnMainQueue).start(next: { settings in
++            guard settings.xraygramHasXrayEntries else {
++                apply()
++                return
++            }
++            let xs = xraygramStrings(sharedContext.currentPresentationData.with { $0 })
++            presentControllerImpl?(textAlertController(sharedContext: sharedContext, title: xs.directTitle, text: xs.directText, actions: [
++                TextAlertAction(type: .genericAction, title: xs.cancel, action: {}),
++                TextAlertAction(type: .destructiveAction, title: xs.connectDirect, action: {
++                    apply()
++                })
++            ]))
++        })
+     }, addNewServer: {
+         pushControllerImpl?(proxyServerSettingsController(sharedContext: sharedContext, presentationData: presentationData, updatedPresentationData: updatedPresentationData, accountManager: accountManager, network: network, currentSettings: nil))
+     }, activateServer: { server in
+@@ -391,17 +423,41 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
+     }, editServer: { server in
+         pushControllerImpl?(proxyServerSettingsController(sharedContext: sharedContext, presentationData: presentationData, updatedPresentationData: updatedPresentationData, accountManager: accountManager, network: network, currentSettings: server))
+     }, removeServer: { server in
+-        let _ = updateProxySettingsInteractively(accountManager: accountManager, { current in
+-            var current = current
+-            if let index = current.servers.firstIndex(of: server) {
+-                current.servers.remove(at: index)
+-                if current.activeServer == server {
+-                    current.activeServer = nil
+-                    current.enabled = false
++        let remove = {
++            let _ = updateProxySettingsInteractively(accountManager: accountManager, { current in
++                var current = current
++                if let index = current.servers.firstIndex(of: server) {
++                    current.servers.remove(at: index)
++                    if current.activeServer == server {
++                        current.activeServer = nil
++                        current.enabled = false
++                    }
+                 }
++                return current
++            }).start()
++        }
++        // Xraygram: удаление последней XRAY-записи блокирует сеть до новой ссылки — спросить.
++        guard server.xrayLink != nil else {
++            remove()
++            return
++        }
++        let _ = (proxySettings.get()
++        |> take(1)
++        |> deliverOnMainQueue).start(next: { settings in
++            let otherXrayEntries = settings.servers.filter { $0 != server && $0.xrayLink != nil }
++            if !otherXrayEntries.isEmpty || settings.xraygramDirectAllowed {
++                remove()
++                return
+             }
+-            return current
+-        }).start()
++            // Тексты — FEAT-02 («подтверждение удаления последней»).
++            let xs = xraygramStrings(sharedContext.currentPresentationData.with { $0 })
++            presentControllerImpl?(textAlertController(sharedContext: sharedContext, title: xs.deleteLastTitle, text: xs.deleteLastText, actions: [
++                TextAlertAction(type: .genericAction, title: xs.cancel, action: {}),
++                TextAlertAction(type: .destructiveAction, title: xs.delete, action: {
++                    remove()
++                })
++            ]))
++        })
+     }, setServerWithRevealedOptions: { server, fromServer in
+         updateState { state in
+             var state = state
+@@ -420,7 +476,6 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
+        shareProxyListImpl?()
+     })
+     
+-    let proxySettings = Promise<ProxySettings>()
+     proxySettings.set(accountManager.sharedData(keys: [SharedDataKeys.proxySettings])
+     |> map { sharedData -> ProxySettings in
+         if let value = sharedData.entries[SharedDataKeys.proxySettings]?.get(ProxySettings.self) {
+@@ -480,6 +535,9 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
+     pushControllerImpl = { [weak controller] c in
+         (controller?.navigationController as? NavigationController)?.pushViewController(c)
+     }
++    presentControllerImpl = { [weak controller] c in
++        controller?.present(c, in: .window(.root))
++    }
+     dismissImpl = { [weak controller] in
+         controller?.dismiss()
+     }
+@@ -563,6 +621,9 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
+                             continue
+                         }
+                         string = link
++                    case .xray:
++                        // Xraygram: XRAY-ссылки (с секретом) списком не шарим.
++                        continue
+                     }
+                     
+                     if !result.isEmpty {
+diff --git a/submodules/SettingsUI/Sources/Data and Storage/ProxyServerSettingsController.swift b/submodules/SettingsUI/Sources/Data and Storage/ProxyServerSettingsController.swift
+index 61ce937b..c1d03761 100644
+--- a/submodules/SettingsUI/Sources/Data and Storage/ProxyServerSettingsController.swift	
++++ b/submodules/SettingsUI/Sources/Data and Storage/ProxyServerSettingsController.swift	
+@@ -11,22 +11,31 @@ import AccountContext
+ import UrlEscaping
+ import UrlHandling
+ import QrCodeUI
++import XraygramKit
++import AlertUI
+ 
+ private final class ProxyServerSettingsControllerArguments {
+     let updateState: ((ProxyServerSettingsControllerState) -> ProxyServerSettingsControllerState) -> Void
+     let share: () -> Void
+     let usePasteboardSettings: () -> Void
++    let pasteXrayLink: (String) -> Void
++    let dismissInput: () -> Void
++    let shareXray: () -> Void
+     
+-    init(updateState: @escaping ((ProxyServerSettingsControllerState) -> ProxyServerSettingsControllerState) -> Void, share: @escaping () -> Void, usePasteboardSettings: @escaping () -> Void) {
++    init(updateState: @escaping ((ProxyServerSettingsControllerState) -> ProxyServerSettingsControllerState) -> Void, share: @escaping () -> Void, usePasteboardSettings: @escaping () -> Void, pasteXrayLink: @escaping (String) -> Void, dismissInput: @escaping () -> Void, shareXray: @escaping () -> Void) {
+         self.updateState = updateState
+         self.share = share
+         self.usePasteboardSettings = usePasteboardSettings
++        self.pasteXrayLink = pasteXrayLink
++        self.dismissInput = dismissInput
++        self.shareXray = shareXray
+     }
+ }
+ 
+ private enum ProxySettingsSection: Int32 {
+     case pasteboard
+     case mode
++    case xray
+     case connection
+     case credentials
+     case share
+@@ -36,10 +45,17 @@ private enum ProxySettingsEntry: ItemListNodeEntry {
+     case usePasteboardSettings(PresentationTheme, String)
+     case usePasteboardInfo(PresentationTheme, String)
+     
++    case modeXray(PresentationTheme, String, Bool)
+     case modeSocks5(PresentationTheme, String, Bool)
+     case modeMtp(PresentationTheme, String, Bool)
+     case modeWeb(PresentationTheme, String, Bool)
+     
++    // Xraygram: одно поле для share-ссылки и строка превью/ошибки.
++    case xrayHeader(String)
++    case xrayPaste(String)
++    case xrayLink(String, String)
++    case xrayInfo(String)
++    
+     case connectionHeader(PresentationTheme, String)
+     case connectionServer(PresentationTheme, PresentationStrings, String, String)
+     case connectionPort(PresentationTheme, PresentationStrings, String, String)
+@@ -50,18 +66,22 @@ private enum ProxySettingsEntry: ItemListNodeEntry {
+     case credentialsSecret(PresentationTheme, PresentationStrings, String, String)
+     
+     case share(PresentationTheme, String, Bool)
++    // Xraygram: «Поделиться сервером» у сохранённой XRAY-записи (FEAT-15).
++    case xrayShare(String)
+     
+     var section: ItemListSectionId {
+         switch self {
+             case .usePasteboardSettings, .usePasteboardInfo:
+                 return ProxySettingsSection.pasteboard.rawValue
+-            case .modeSocks5, .modeMtp, .modeWeb:
++            case .modeXray, .modeSocks5, .modeMtp, .modeWeb:
+                 return ProxySettingsSection.mode.rawValue
++            case .xrayHeader, .xrayPaste, .xrayLink, .xrayInfo:
++                return ProxySettingsSection.xray.rawValue
+             case .connectionHeader, .connectionServer, .connectionPort:
+                 return ProxySettingsSection.connection.rawValue
+             case .credentialsHeader, .credentialsUsername, .credentialsPassword, .credentialsSecret:
+                 return ProxySettingsSection.credentials.rawValue
+-            case .share:
++            case .share, .xrayShare:
+                 return ProxySettingsSection.share.rawValue
+         }
+     }
+@@ -72,28 +92,40 @@ private enum ProxySettingsEntry: ItemListNodeEntry {
+                 return 0
+             case .usePasteboardInfo:
+                 return 1
+-            case .modeSocks5:
++            case .modeXray:
+                 return 2
+-            case .modeMtp:
++            case .modeSocks5:
+                 return 3
+-            case .modeWeb:
++            case .modeMtp:
+                 return 4
+-            case .connectionHeader:
++            case .modeWeb:
+                 return 5
+-            case .connectionServer:
++            case .xrayHeader:
+                 return 6
+-            case .connectionPort:
++            case .xrayPaste:
+                 return 7
+-            case .credentialsHeader:
++            case .xrayLink:
+                 return 8
+-            case .credentialsUsername:
++            case .xrayInfo:
+                 return 9
+-            case .credentialsPassword:
++            case .connectionHeader:
+                 return 10
+-            case .credentialsSecret:
++            case .connectionServer:
+                 return 11
+-            case .share:
++            case .connectionPort:
++                return 12
++            case .credentialsHeader:
+                 return 13
++            case .credentialsUsername:
++                return 14
++            case .credentialsPassword:
++                return 15
++            case .credentialsSecret:
++                return 16
++            case .share:
++                return 17
++            case .xrayShare:
++                return 18
+         }
+     }
+     
+@@ -110,6 +142,35 @@ private enum ProxySettingsEntry: ItemListNodeEntry {
+                 })
+             case let .usePasteboardInfo(_, text):
+                 return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
++            case let .modeXray(_, text, value):
++                return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: text, style: .left, checked: value, zeroSeparatorInsets: false, sectionId: self.section, action: {
++                    arguments.updateState { state in
++                        return state.withMode(.xray)
++                    }
++                })
++            case let .xrayHeader(text):
++                return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
++            case let .xrayPaste(title):
++                // Системная кнопка «Вставить» (UIPasteControl): вставка без запроса разрешения (BUG-14).
++                return XraygramPasteItem(presentationData: presentationData, fallbackTitle: title, sectionId: self.section, pasted: { text in
++                    arguments.pasteXrayLink(text)
++                })
++            case let .xrayLink(placeholder, text):
++                return ItemListMultilineInputItem(presentationData: presentationData, systemStyle: .glass, text: text, placeholder: placeholder, maxLength: nil, sectionId: self.section, style: .blocks, capitalization: false, autocorrection: false, returnKeyType: .done, minimalHeight: nil, textUpdated: { value in
++                    arguments.updateState { current in
++                        var state = current
++                        state.link = value
++                        return state
++                    }
++                }, shouldUpdateText: { value in
++                    // Перевод строки в ссылке не нужен.
++                    return !value.contains("\n")
++                }, action: {
++                    // Return = убрать клавиатуру (видно превью сервера).
++                    arguments.dismissInput()
++                })
++            case let .xrayInfo(text):
++                return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
+             case let .modeSocks5(_, text, value):
+                 return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: text, style: .left, checked: value, zeroSeparatorInsets: false, sectionId: self.section, action: {
+                     arguments.updateState { state in
+@@ -176,11 +237,21 @@ private enum ProxySettingsEntry: ItemListNodeEntry {
+                 return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: text, kind: enabled ? .generic : .disabled, alignment: .natural, sectionId: self.section, style: .blocks, action: {
+                     arguments.share()
+                 })
++            case let .xrayShare(text):
++                return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: text, kind: .generic, alignment: .natural, sectionId: self.section, style: .blocks, action: {
++                    arguments.shareXray()
++                })
+         }
+     }
+ }
+ 
++/// Xraygram: тексты XRAY-экранов на языке приложения (PAR-02).
++func xraygramStrings(_ presentationData: PresentationData) -> XrayStrings {
++    return XrayStrings(appLanguageCode: presentationData.strings.primaryComponent.languageCode)
++}
++
+ enum ProxyServerSettingsControllerMode {
++    case xray
+     case socks5
+     case mtp
+     case web
+@@ -196,6 +267,8 @@ func proxyServerSettingsControllerMode(for connection: ProxyServerConnection) ->
+             return .mtp
+         case .web:
+             return .web
++        case .xray:
++            return .xray
+     }
+ }
+ 
+@@ -206,6 +279,8 @@ struct ProxyServerSettingsControllerState: Equatable {
+     var username: String
+     var password: String
+     var secret: String
++    /// Xraygram: share-ссылка для режима `.xray`.
++    var link: String = ""
+     
+     /// Switching away from `.web` must drop the base path from the shared server field.
+     /// Only a WEB address is `host/base-path`; SOCKS5 and MTProxy take a bare host, and
+@@ -221,7 +296,18 @@ struct ProxyServerSettingsControllerState: Equatable {
+         return state
+     }
+ 
++    /// Xraygram: результат разбора ссылки ядром (кэшируется в XraygramKit).
++    var xrayCheck: Result<XrayLinkInfo, XrayError> {
++        return XrayLink.check(self.link)
++    }
++
+     var isComplete: Bool {
++        if case .xray = self.mode {
++            if case .success = self.xrayCheck {
++                return true
++            }
++            return false
++        }
+         if self.host.isEmpty {
+             return false
+         }
+@@ -230,11 +316,11 @@ struct ProxyServerSettingsControllerState: Equatable {
+                 if self.port.isEmpty || Int(self.port) == nil {
+                     return false
+                 }
+-            case .web:
++            case .web, .xray:
+                 break
+         }
+         switch self.mode {
+-            case .socks5:
++            case .socks5, .xray:
+                 break
+             case .mtp:
+                 let secretIsValid = MTProxySecret.parse(self.secret) != nil
+@@ -252,17 +338,41 @@ struct ProxyServerSettingsControllerState: Equatable {
+     }
+ }
+ 
+-private func proxyServerSettingsControllerEntries(presentationData: PresentationData, state: ProxyServerSettingsControllerState, pasteboardSettings: ProxyServerSettings?) -> [ProxySettingsEntry] {
++private func proxyServerSettingsControllerEntries(presentationData: PresentationData, state: ProxyServerSettingsControllerState, pasteboardSettings: ProxyServerSettings?, existingXrayLink: String?) -> [ProxySettingsEntry] {
+     var entries: [ProxySettingsEntry] = []
+     
+     if let _ = pasteboardSettings {
+         entries.append(.usePasteboardSettings(presentationData.theme, presentationData.strings.SocksProxySetup_PasteFromClipboard))
+     }
+     
++    entries.append(.modeXray(presentationData.theme, "XRAY (VLESS)", state.mode == .xray))
+     entries.append(.modeSocks5(presentationData.theme, presentationData.strings.SocksProxySetup_ProxySocks5, state.mode == .socks5))
+     entries.append(.modeMtp(presentationData.theme, presentationData.strings.SocksProxySetup_ProxyTelegram, state.mode == .mtp))
+     entries.append(.modeWeb(presentationData.theme, presentationData.strings.SocksProxySetup_ProxyWeb, state.mode == .web))
+     
++    if case .xray = state.mode {
++        // Xraygram: тексты — XrayStrings (FEAT-01), RU/EN по языку приложения.
++        let xs = xraygramStrings(presentationData)
++        entries.append(.xrayHeader(xs.linkHeader))
++        entries.append(.xrayPaste(xs.pasteButton))
++        entries.append(.xrayLink("vless://…", state.link))
++        let trimmed = state.link.trimmingCharacters(in: .whitespacesAndNewlines)
++        if trimmed.isEmpty {
++            entries.append(.xrayInfo(xs.linkHint))
++        } else {
++            switch state.xrayCheck {
++            case let .success(info):
++                entries.append(.xrayInfo(xs.serverPreview(info)))
++            case let .failure(error):
++                entries.append(.xrayInfo(xs.errorPreview(error)))
++            }
++        }
++        if existingXrayLink != nil {
++            entries.append(.xrayShare(xs.shareServer))
++        }
++        return entries
++    }
++    
+     entries.append(.connectionHeader(presentationData.theme, presentationData.strings.SocksProxySetup_Connection.uppercased()))
+     entries.append(.connectionServer(presentationData.theme, presentationData.strings, presentationData.strings.SocksProxySetup_Hostname, state.host))
+     if case .web = state.mode {
+@@ -279,6 +389,8 @@ private func proxyServerSettingsControllerEntries(presentationData: Presentation
+         case .mtp:
+             entries.append(.credentialsHeader(presentationData.theme, presentationData.strings.SocksProxySetup_RequiredCredentials))
+             entries.append(.credentialsSecret(presentationData.theme, presentationData.strings, presentationData.strings.SocksProxySetup_SecretPlaceholder, state.secret))
++        case .xray:
++            break
+         case .web:
+             entries.append(.credentialsHeader(presentationData.theme, presentationData.strings.SocksProxySetup_RequiredCredentials))
+             entries.append(.credentialsSecret(presentationData.theme, presentationData.strings, presentationData.strings.SocksProxySetup_SecretPlaceholder, state.secret))
+@@ -293,6 +405,12 @@ func proxyServerSettings(with state: ProxyServerSettingsControllerState) -> Prox
+     guard state.isComplete else {
+         return nil
+     }
++    if case .xray = state.mode {
++        guard case let .success(info) = state.xrayCheck else {
++            return nil
++        }
++        return ProxyServerSettings(host: info.address, port: Int32(clamping: info.port), connection: .xray(link: state.link.trimmingCharacters(in: .whitespacesAndNewlines)))
++    }
+     if case .web = state.mode {
+         return makeWebProxySettings(address: state.host, secret: state.secret)
+     }
+@@ -307,7 +425,7 @@ func proxyServerSettings(with state: ProxyServerSettingsControllerState) -> Prox
+                 return ProxyServerSettings(host: state.host, port: port, connection: .mtp(secret: parsedSecret.serialize()))
+             }
+             return nil
+-        case .web:
++        case .web, .xray:
+             return nil
+     }
+ }
+@@ -318,7 +436,9 @@ public func proxyServerSettingsController(context: AccountContext, currentSettin
+ }
+ 
+ func proxyServerSettingsController(sharedContext: SharedAccountContext, context: AccountContext? = nil, presentationData: PresentationData, updatedPresentationData: Signal<PresentationData, NoError>, accountManager: AccountManager<TelegramAccountManagerTypes>, network: Network, currentSettings: ProxyServerSettings?) -> ViewController {
+-    var currentMode: ProxyServerSettingsControllerMode = .socks5
++    // Xraygram: новый прокси по умолчанию — XRAY (как на macOS).
++    var currentMode: ProxyServerSettingsControllerMode = .xray
++    var currentLink: String?
+     var currentAddress: String?
+     var currentUsername: String?
+     var currentPassword: String?
+@@ -339,10 +459,16 @@ func proxyServerSettingsController(sharedContext: SharedAccountContext, context:
+                 currentAddress = currentSettings.webProxyAddress
+                 currentSecret = webProxySecretString(secret)
+                 currentMode = .web
++            case let .xray(link):
++                currentLink = link
++                currentMode = .xray
+         }
+     } else {
+         let pasteboardText = UIPasteboard.general.string ?? ""
+-        if let webSettings = parseWebProxySettingsLink(pasteboardText) {
++        if let link = XrayLink.extract(from: pasteboardText) {
++            // Xraygram: ссылка xray в буфере — сразу подставляем.
++            currentLink = link
++        } else if let webSettings = parseWebProxySettingsLink(pasteboardText) {
+             pasteboardSettings = webSettings
+         } else if let proxy = parseProxyUrl(sharedContext: sharedContext, url: pasteboardText) {
+             if let secret = proxy.secret, let parsedSecret = MTProxySecret.parseData(secret) {
+@@ -351,9 +477,12 @@ func proxyServerSettingsController(sharedContext: SharedAccountContext, context:
+                 pasteboardSettings = ProxyServerSettings(host: proxy.host, port: proxy.port, connection: .socks5(username: proxy.username, password: proxy.password))
+             }
+         }
++        if let pasteboardSettings = pasteboardSettings {
++            currentMode = proxyServerSettingsControllerMode(for: pasteboardSettings.connection)
++        }
+     }
+ 
+-    let initialState = ProxyServerSettingsControllerState(mode: currentMode, host: currentAddress ?? currentSettings?.host ?? "", port: (currentSettings?.port).flatMap { "\($0)" } ?? "", username: currentUsername ?? "", password: currentPassword ?? "", secret: currentSecret ?? "")
++    let initialState = ProxyServerSettingsControllerState(mode: currentMode, host: currentAddress ?? currentSettings?.host ?? "", port: (currentSettings?.port).flatMap { "\($0)" } ?? "", username: currentUsername ?? "", password: currentPassword ?? "", secret: currentSecret ?? "", link: currentLink ?? "")
+     let stateValue = Atomic(value: initialState)
+     let statePromise = ValuePromise(initialState, ignoreRepeated: true)
+     let updateState: ((ProxyServerSettingsControllerState) -> ProxyServerSettingsControllerState) -> Void = { f in
+@@ -364,6 +493,8 @@ func proxyServerSettingsController(sharedContext: SharedAccountContext, context:
+     var dismissImpl: (() -> Void)?
+     
+     var shareImpl: (() -> Void)?
++    var dismissInputImpl: (() -> Void)?
++    var presentControllerImpl: ((ViewController) -> Void)?
+     
+     let arguments = ProxyServerSettingsControllerArguments(updateState: { f in
+         updateState(f)
+@@ -387,10 +518,39 @@ func proxyServerSettingsController(sharedContext: SharedAccountContext, context:
+                         state.mode = .web
+                         state.host = pasteboardSettings.webProxyAddress ?? pasteboardSettings.host
+                         state.secret = webProxySecretString(secret)
++                    case let .xray(link):
++                        state.mode = .xray
++                        state.link = link
+                 }
+                 return state
+             }
+         }
++    }, pasteXrayLink: { text in
++        // Текст пришёл из системной кнопки «Вставить»; берём первую строку со ссылкой vless:// и т.п.
++        let link = XrayLink.extract(from: text) ?? text.trimmingCharacters(in: .whitespacesAndNewlines)
++        if !link.isEmpty {
++            updateState { state in
++                var state = state
++                state.mode = .xray
++                state.link = link
++                return state
++            }
++        }
++    }, dismissInput: {
++        dismissInputImpl?()
++    }, shareXray: {
++        // FEAT-15: каждый раз предупреждение, затем окно с QR. Делимся ровно сохранённой ссылкой.
++        guard let link = currentSettings?.xrayLink else {
++            return
++        }
++        dismissInputImpl?()
++        let xs = xraygramStrings(sharedContext.currentPresentationData.with { $0 })
++        presentControllerImpl?(textAlertController(sharedContext: sharedContext, title: xs.shareWarningTitle, text: xs.shareWarningText, actions: [
++            TextAlertAction(type: .genericAction, title: xs.cancel, action: {}),
++            TextAlertAction(type: .defaultAction, title: xs.show, action: {
++                sharedContext.mainWindow?.presentNative(XraygramShareServerController(link: link, title: XrayLink.displayTitle(link), strings: xs))
++            })
++        ]))
+     })
+     
+     let signal = combineLatest(updatedPresentationData, statePromise.get())
+@@ -422,6 +582,11 @@ func proxyServerSettingsController(sharedContext: SharedAccountContext, context:
+                         if wasEmpty && settings.servers.count == 1 {
+                             settings.activeServer = proxyServerSettings
+                         }
++                        // Xraygram: новая XRAY-запись — «сохранить и подключиться».
++                        if case .xray = proxyServerSettings.connection {
++                            settings.activeServer = proxyServerSettings
++                            settings.enabled = true
++                        }
+                     }
+                     return settings
+                 }) |> deliverOnMainQueue).start(completed: {
+@@ -431,7 +596,7 @@ func proxyServerSettingsController(sharedContext: SharedAccountContext, context:
+         })
+         
+         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(presentationData.strings.SocksProxySetup_Title), leftNavigationButton: leftNavigationButton, rightNavigationButton: rightNavigationButton, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back), animateChanges: false)
+-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: proxyServerSettingsControllerEntries(presentationData: presentationData, state: state, pasteboardSettings: pasteboardSettings), style: .blocks, emptyStateItem: nil, animateChanges: false)
++        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: proxyServerSettingsControllerEntries(presentationData: presentationData, state: state, pasteboardSettings: pasteboardSettings, existingXrayLink: currentSettings?.xrayLink), style: .blocks, emptyStateItem: nil, animateChanges: false)
+         
+         return (controllerState, (listState, arguments))
+     }
+@@ -444,6 +609,12 @@ func proxyServerSettingsController(sharedContext: SharedAccountContext, context:
+     dismissImpl = { [weak controller] in
+         let _ = controller?.dismiss()
+     }
++    dismissInputImpl = { [weak controller] in
++        controller?.view.endEditing(true)
++    }
++    presentControllerImpl = { [weak controller] c in
++        controller?.present(c, in: .window(.root))
++    }
+     shareImpl = { [weak controller] in
+         let state = stateValue.with { $0 }
+         guard let server = proxyServerSettings(with: state) else {
+diff --git a/submodules/SettingsUI/Sources/Data and Storage/ProxySettingsServerItem.swift b/submodules/SettingsUI/Sources/Data and Storage/ProxySettingsServerItem.swift
+index 9094737b..5d7d31db 100644
+--- a/submodules/SettingsUI/Sources/Data and Storage/ProxySettingsServerItem.swift	
++++ b/submodules/SettingsUI/Sources/Data and Storage/ProxySettingsServerItem.swift	
+@@ -250,8 +250,10 @@ private final class ProxySettingsServerItemNode: ItemListRevealOptionsItemNode {
+             // render as `host/my%5Fapp`. The address is already restricted to ASCII
+             // alphanumerics, `-`, `_`, `.` and `/` by canonicalHost/canonicalPath.
+             let webProxyAddress = item.server.webProxyAddress
+-            titleAttributedString.append(NSAttributedString(string: webProxyAddress ?? urlEncodedStringFromString(item.server.host), font: titleFont, textColor: item.theme.list.itemPrimaryTextColor))
+-            if webProxyAddress == nil {
++            // Xraygram: XRAY-запись подписана `XRAY · <имя>` (как на macOS), без порта.
++            let xrayTitle = item.server.xrayDisplayTitle
++            titleAttributedString.append(NSAttributedString(string: xrayTitle ?? webProxyAddress ?? urlEncodedStringFromString(item.server.host), font: titleFont, textColor: item.theme.list.itemPrimaryTextColor))
++            if webProxyAddress == nil && xrayTitle == nil {
+                 titleAttributedString.append(NSAttributedString(string: ":\(item.server.port)", font: titleFont, textColor: item.theme.list.itemSecondaryTextColor))
+             }
+             let statusAttributedString = NSAttributedString(string: item.label, font: statusFont, textColor: item.labelAccent ? item.theme.list.itemAccentColor : item.theme.list.itemSecondaryTextColor)
+diff --git a/submodules/SettingsUI/Sources/Data and Storage/XraygramGateController.swift b/submodules/SettingsUI/Sources/Data and Storage/XraygramGateController.swift
+new file mode 100644
+index 00000000..bac50072
+--- /dev/null
++++ b/submodules/SettingsUI/Sources/Data and Storage/XraygramGateController.swift	
+@@ -0,0 +1,321 @@
++import Foundation
++import UIKit
++import Display
++import SwiftSignalKit
++import TelegramCore
++import TelegramPresentationData
++import ItemListUI
++import PresentationDataUtils
++import AccountContext
++import AlertUI
++import XraygramKit
++
++// Xraygram: экран «Подключение через XRAY». Показывается (AppDelegate), пока нет ни одной
++// XRAY-записи и не выбрано «напрямую» (ProxySettings.xraygramNetworkBlocked); сеть в это время
++// заблокирована («чёрная дыра» в effectiveActiveServer). Правила — macos/decisions.md, «Экран XRAY».
++// Строки только по-русски, как и остальные строки Xraygram.
++
++private final class XraygramGateArguments {
++    let updateState: ((XraygramGateState) -> XraygramGateState) -> Void
++    let pasteLink: (String) -> Void
++    let connect: () -> Void
++    let connectDirect: () -> Void
++    let dismissInput: () -> Void
++
++    init(updateState: @escaping ((XraygramGateState) -> XraygramGateState) -> Void, pasteLink: @escaping (String) -> Void, connect: @escaping () -> Void, connectDirect: @escaping () -> Void, dismissInput: @escaping () -> Void) {
++        self.updateState = updateState
++        self.pasteLink = pasteLink
++        self.connect = connect
++        self.connectDirect = connectDirect
++        self.dismissInput = dismissInput
++    }
++}
++
++private enum XraygramGateSection: Int32 {
++    case intro
++    case saved
++    case link
++    case connect
++    case direct
++}
++
++private enum XraygramGateSelection: Equatable {
++    case saved(String)
++    case new
++}
++
++private struct XraygramGateState: Equatable {
++    /// nil — ещё не выбирали: первая сохранённая ссылка, если есть, иначе «Новая ссылка».
++    var selection: XraygramGateSelection?
++    var link: String
++
++    func resolvedSelection(savedLinks: [String]) -> XraygramGateSelection {
++        if let selection = self.selection {
++            if case let .saved(link) = selection, !savedLinks.contains(link) {
++                return .new
++            }
++            return selection
++        }
++        if let first = savedLinks.first {
++            return .saved(first)
++        }
++        return .new
++    }
++
++    func linkToConnect(savedLinks: [String]) -> String {
++        switch self.resolvedSelection(savedLinks: savedLinks) {
++        case let .saved(link):
++            return link
++        case .new:
++            return self.link.trimmingCharacters(in: .whitespacesAndNewlines)
++        }
++    }
++}
++
++private enum XraygramGateEntry: ItemListNodeEntry {
++    case intro(String)
++    case savedHeader(String)
++    case saved(Int32, String, String, Bool)
++    case newLink(String, Bool)
++    case linkHeader(String)
++    case paste(String)
++    case link(String, String)
++    case linkInfo(String)
++    case connect(String, Bool)
++    case direct(String)
++
++    var section: ItemListSectionId {
++        switch self {
++        case .intro:
++            return XraygramGateSection.intro.rawValue
++        case .savedHeader, .saved, .newLink:
++            return XraygramGateSection.saved.rawValue
++        case .linkHeader, .paste, .link, .linkInfo:
++            return XraygramGateSection.link.rawValue
++        case .connect:
++            return XraygramGateSection.connect.rawValue
++        case .direct:
++            return XraygramGateSection.direct.rawValue
++        }
++    }
++
++    var stableId: Int32 {
++        switch self {
++        case .intro:
++            return 0
++        case .savedHeader:
++            return 1
++        case let .saved(index, _, _, _):
++            return 100 + index
++        case .newLink:
++            return 10000
++        case .linkHeader:
++            return 10001
++        case .paste:
++            return 10002
++        case .link:
++            return 10003
++        case .linkInfo:
++            return 10004
++        case .connect:
++            return 10005
++        case .direct:
++            return 10006
++        }
++    }
++
++    static func <(lhs: XraygramGateEntry, rhs: XraygramGateEntry) -> Bool {
++        return lhs.stableId < rhs.stableId
++    }
++
++    func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
++        let arguments = arguments as! XraygramGateArguments
++        switch self {
++        case let .intro(text):
++            return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
++        case let .savedHeader(text), let .linkHeader(text):
++            return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
++        case let .saved(_, link, title, checked):
++            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: title, style: .left, checked: checked, zeroSeparatorInsets: false, sectionId: self.section, action: {
++                arguments.updateState { state in
++                    var state = state
++                    state.selection = .saved(link)
++                    return state
++                }
++            })
++        case let .newLink(title, checked):
++            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: title, style: .left, checked: checked, zeroSeparatorInsets: false, sectionId: self.section, action: {
++                arguments.updateState { state in
++                    var state = state
++                    state.selection = .new
++                    return state
++                }
++            })
++        case let .paste(title):
++            // Системная кнопка «Вставить» (UIPasteControl): вставка без запроса разрешения (BUG-14).
++            return XraygramPasteItem(presentationData: presentationData, fallbackTitle: title, sectionId: self.section, pasted: { text in
++                arguments.pasteLink(text)
++            })
++        case let .link(placeholder, text):
++            return ItemListMultilineInputItem(presentationData: presentationData, systemStyle: .glass, text: text, placeholder: placeholder, maxLength: nil, sectionId: self.section, style: .blocks, capitalization: false, autocorrection: false, returnKeyType: .done, minimalHeight: nil, textUpdated: { value in
++                arguments.updateState { state in
++                    var state = state
++                    state.link = value
++                    return state
++                }
++            }, shouldUpdateText: { value in
++                return !value.contains("\n")
++            }, action: {
++                arguments.dismissInput()
++            })
++        case let .linkInfo(text):
++            return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
++        case let .connect(title, enabled):
++            return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: title, kind: enabled ? .generic : .disabled, alignment: .center, sectionId: self.section, style: .blocks, action: {
++                arguments.connect()
++            })
++        case let .direct(title):
++            return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: title, kind: .neutral, alignment: .center, sectionId: self.section, style: .blocks, action: {
++                arguments.connectDirect()
++            })
++        }
++    }
++}
++
++private func xraygramGateEntries(state: XraygramGateState, savedLinks: [String], xs: XrayStrings) -> [XraygramGateEntry] {
++    var entries: [XraygramGateEntry] = []
++    // Тексты — product/features/FEAT-03.md.
++    if savedLinks.isEmpty {
++        entries.append(.intro(xs.gateTextNoSaved))
++    } else {
++        entries.append(.intro(xs.gateTextSaved))
++    }
++
++    let selection = state.resolvedSelection(savedLinks: savedLinks)
++    if !savedLinks.isEmpty {
++        entries.append(.savedHeader(xs.savedServers))
++        for (index, link) in savedLinks.enumerated() {
++            entries.append(.saved(Int32(index), link, XrayLink.displayTitle(link), selection == .saved(link)))
++        }
++        entries.append(.newLink(xs.newLink, selection == .new))
++    }
++
++    var canConnect = false
++    if selection == .new {
++        entries.append(.linkHeader(xs.linkHeader))
++        entries.append(.paste(xs.pasteButton))
++        entries.append(.link("vless://…", state.link))
++        let trimmed = state.link.trimmingCharacters(in: .whitespacesAndNewlines)
++        if trimmed.isEmpty {
++            entries.append(.linkInfo(xs.linkHint))
++        } else {
++            switch XrayLink.check(trimmed) {
++            case let .success(info):
++                entries.append(.linkInfo(xs.serverPreview(info)))
++                canConnect = true
++            case let .failure(error):
++                entries.append(.linkInfo(xs.errorPreview(error)))
++            }
++        }
++    } else if case let .saved(link) = selection, case .success = XrayLink.check(link) {
++        canConnect = true
++    }
++
++    entries.append(.connect(xs.connect, canConnect))
++    entries.append(.direct(xs.connectDirectLink))
++    return entries
++}
++
++/// Xraygram: экран «Подключение через XRAY». Сам не закрывается: его убирает AppDelegate, когда
++/// блокировка снята (появилась XRAY-запись или выбрано «напрямую»).
++public func xraygramGateController(sharedContext: SharedAccountContext, accountManager: AccountManager<TelegramAccountManagerTypes>, didDisappear: @escaping () -> Void) -> ViewController {
++    let presentationData = sharedContext.currentPresentationData.with { $0 }
++
++    let initialState = XraygramGateState(selection: nil, link: "")
++    let stateValue = Atomic(value: initialState)
++    let statePromise = ValuePromise(initialState, ignoreRepeated: true)
++    let updateState: ((XraygramGateState) -> XraygramGateState) -> Void = { f in
++        statePromise.set(stateValue.modify { f($0) })
++    }
++
++    let savedLinksValue = Atomic<[String]>(value: [])
++    let savedLinks: Signal<[String], NoError> = accountManager.sharedData(keys: [SharedDataKeys.proxySettings])
++    |> map { sharedData -> [String] in
++        return (sharedData.entries[SharedDataKeys.proxySettings]?.get(ProxySettings.self) ?? ProxySettings.defaultSettings).xraygramSavedLinks
++    }
++    |> distinctUntilChanged
++
++    var presentControllerImpl: ((ViewController) -> Void)?
++    var dismissInputImpl: (() -> Void)?
++
++    let arguments = XraygramGateArguments(updateState: updateState, pasteLink: { text in
++        let link = XrayLink.extract(from: text) ?? text.trimmingCharacters(in: .whitespacesAndNewlines)
++        if !link.isEmpty {
++            updateState { state in
++                var state = state
++                state.selection = .new
++                state.link = link
++                return state
++            }
++        }
++    }, connect: {
++        dismissInputImpl?()
++        let link = stateValue.with { $0 }.linkToConnect(savedLinks: savedLinksValue.with { $0 })
++        guard case let .success(info) = XrayLink.check(link) else {
++            return
++        }
++        let server = ProxyServerSettings(host: info.address, port: Int32(clamping: info.port), connection: .xray(link: link))
++        let _ = updateProxySettingsInteractively(accountManager: accountManager, { settings in
++            var settings = settings
++            if let existing = settings.servers.first(where: { $0.xrayLink == link }) {
++                settings.activeServer = existing
++            } else {
++                settings.servers.append(server)
++                settings.activeServer = server
++            }
++            settings.enabled = true
++            return settings
++        }).start()
++    }, connectDirect: {
++        dismissInputImpl?()
++        let xs = xraygramStrings(sharedContext.currentPresentationData.with { $0 })
++        presentControllerImpl?(textAlertController(sharedContext: sharedContext, title: xs.directTitle, text: xs.directText, actions: [
++            TextAlertAction(type: .genericAction, title: xs.cancel, action: {}),
++            TextAlertAction(type: .destructiveAction, title: xs.connectDirect, action: {
++                let _ = updateProxySettingsInteractively(accountManager: accountManager, { settings in
++                    var settings = settings
++                    settings.xraygramDirectAllowed = true
++                    return settings
++                }).start()
++            })
++        ]))
++    }, dismissInput: {
++        dismissInputImpl?()
++    })
++
++    let signal = combineLatest(sharedContext.presentationData, statePromise.get(), savedLinks)
++    |> deliverOnMainQueue
++    |> map { presentationData, state, savedLinks -> (ItemListControllerState, (ItemListNodeState, Any)) in
++        let _ = savedLinksValue.swap(savedLinks)
++        var presentationData = presentationData
++        presentationData = presentationData.withUpdated(theme: presentationData.theme.withModalBlocksBackground())
++
++        let xs = xraygramStrings(presentationData)
++        let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(xs.gateTitle), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: nil, animateChanges: false)
++        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: xraygramGateEntries(state: state, savedLinks: savedLinks, xs: xs), style: .blocks, emptyStateItem: nil, animateChanges: true)
++        return (controllerState, (listState, arguments))
++    }
++
++    let controller = ItemListController(presentationData: ItemListPresentationData(presentationData), updatedPresentationData: sharedContext.presentationData |> map(ItemListPresentationData.init(_:)), state: signal, tabBarItem: nil)
++    controller.navigationPresentation = .modal
++    controller.didDisappear = { _ in
++        didDisappear()
++    }
++    presentControllerImpl = { [weak controller] c in
++        controller?.present(c, in: .window(.root))
++    }
++    dismissInputImpl = { [weak controller] in
++        controller?.view.endEditing(true)
++    }
++    return controller
++}
+diff --git a/submodules/SettingsUI/Sources/Data and Storage/XraygramPasteItem.swift b/submodules/SettingsUI/Sources/Data and Storage/XraygramPasteItem.swift
+new file mode 100644
+index 00000000..38d6f9da
+--- /dev/null
++++ b/submodules/SettingsUI/Sources/Data and Storage/XraygramPasteItem.swift	
+@@ -0,0 +1,237 @@
++import Foundation
++import UIKit
++import UniformTypeIdentifiers
++import Display
++import AsyncDisplayKit
++import SwiftSignalKit
++import TelegramPresentationData
++import ItemListUI
++
++// Xraygram: строка со стандартной кнопкой «Вставить» (UIPasteControl, iOS 16+). Чтение буфера по
++// своей кнопке на iOS 16+ требует системного подтверждения, а на iOS 27 (по крайней мере в симуляторе)
++// оно молча отклоняется (BUG-14). Системная кнопка вставки даёт доступ без запроса. Подпись у неё
++// системная («Вставить» / «Paste»), свою задать нельзя. На iOS 15 — обычная кнопка с чтением буфера.
++
++final class XraygramPasteItem: ListViewItem, ItemListItem {
++    let presentationData: ItemListPresentationData
++    let systemStyle: ItemListSystemStyle
++    let fallbackTitle: String
++    let sectionId: ItemListSectionId
++    let pasted: (String) -> Void
++
++    init(presentationData: ItemListPresentationData, systemStyle: ItemListSystemStyle = .glass, fallbackTitle: String, sectionId: ItemListSectionId, pasted: @escaping (String) -> Void) {
++        self.presentationData = presentationData
++        self.systemStyle = systemStyle
++        self.fallbackTitle = fallbackTitle
++        self.sectionId = sectionId
++        self.pasted = pasted
++    }
++
++    func nodeConfiguredForParams(async: @escaping (@escaping () -> Void) -> Void, params: ListViewItemLayoutParams, synchronousLoads: Bool, neighbors: ListViewItemNeighbors, completion: @escaping (ListViewItemNode, @escaping () -> (Signal<Void, NoError>?, (ListViewItemApply) -> Void)) -> Void) {
++        async {
++            let node = XraygramPasteItemNode()
++            let (layout, apply) = node.asyncLayout()(self, params, itemListNeighbors(item: self, topFacet: neighbors.previous?.base(ItemListNeighborFacet.self), bottomFacet: neighbors.next?.base(ItemListNeighborFacet.self)))
++            node.contentSize = layout.contentSize
++            node.insets = layout.insets
++            Queue.mainQueue().async {
++                completion(node, {
++                    return (nil, { _ in apply() })
++                })
++            }
++        }
++    }
++
++    func updateNode(async: @escaping (@escaping () -> Void) -> Void, node: @escaping () -> ListViewItemNode, params: ListViewItemLayoutParams, neighbors: ListViewItemNeighbors, animation: ListViewItemUpdateAnimation, completion: @escaping (ListViewItemNodeLayout, @escaping (ListViewItemApply) -> Void) -> Void) {
++        Queue.mainQueue().async {
++            if let nodeValue = node() as? XraygramPasteItemNode {
++                let makeLayout = nodeValue.asyncLayout()
++                async {
++                    let (layout, apply) = makeLayout(self, params, itemListNeighbors(item: self, topFacet: neighbors.previous?.base(ItemListNeighborFacet.self), bottomFacet: neighbors.next?.base(ItemListNeighborFacet.self)))
++                    Queue.mainQueue().async {
++                        completion(layout, { _ in
++                            apply()
++                        })
++                    }
++                }
++            }
++        }
++    }
++
++    let selectable = false
++}
++
++/// Получатель вставки для UIPasteControl: принимает текст и отдаёт его наверх.
++private final class XraygramPasteTarget: UIResponder {
++    var pasted: ((String) -> Void)?
++
++    override init() {
++        super.init()
++        if #available(iOS 16.0, *) {
++            self.pasteConfiguration = UIPasteConfiguration(acceptableTypeIdentifiers: [UTType.plainText.identifier, UTType.utf8PlainText.identifier, UTType.url.identifier])
++        }
++    }
++
++    override func canPaste(_ itemProviders: [NSItemProvider]) -> Bool {
++        return true
++    }
++
++    override func paste(itemProviders: [NSItemProvider]) {
++        guard let provider = itemProviders.first(where: { $0.canLoadObject(ofClass: NSString.self) }) else {
++            return
++        }
++        let _ = provider.loadObject(ofClass: NSString.self, completionHandler: { [weak self] value, _ in
++            guard let text = value as? String else {
++                return
++            }
++            DispatchQueue.main.async {
++                self?.pasted?(text)
++            }
++        })
++    }
++}
++
++final class XraygramPasteItemNode: ListViewItemNode, ItemListItemNode {
++    private let backgroundNode: ASDisplayNode
++    private let topStripeNode: ASDisplayNode
++    private let bottomStripeNode: ASDisplayNode
++    private let maskNode: ASImageNode
++
++    private let pasteTarget = XraygramPasteTarget()
++    private var pasteControl: UIView?
++    private var item: XraygramPasteItem?
++
++    override var canBeSelected: Bool {
++        return false
++    }
++
++    var tag: ItemListItemTag? {
++        return nil
++    }
++
++    init() {
++        self.backgroundNode = ASDisplayNode()
++        self.backgroundNode.isLayerBacked = true
++        self.maskNode = ASImageNode()
++        self.maskNode.isUserInteractionEnabled = false
++        self.topStripeNode = ASDisplayNode()
++        self.topStripeNode.isLayerBacked = true
++        self.bottomStripeNode = ASDisplayNode()
++        self.bottomStripeNode.isLayerBacked = true
++
++        super.init(layerBacked: false)
++
++        self.pasteTarget.pasted = { [weak self] text in
++            self?.item?.pasted(text)
++        }
++    }
++
++    @objc private func fallbackPressed() {
++        if let text = UIPasteboard.general.string {
++            self.item?.pasted(text)
++        }
++    }
++
++    private func makePasteControl(theme: PresentationTheme, fallbackTitle: String) -> UIView {
++        if #available(iOS 16.0, *) {
++            let configuration = UIPasteControl.Configuration()
++            configuration.displayMode = .iconAndLabel
++            configuration.cornerStyle = .capsule
++            configuration.baseBackgroundColor = theme.list.itemAccentColor
++            configuration.baseForegroundColor = .white
++            let control = UIPasteControl(configuration: configuration)
++            control.target = self.pasteTarget
++            return control
++        } else {
++            let button = UIButton(type: .system)
++            button.setTitle(fallbackTitle, for: .normal)
++            button.setTitleColor(theme.list.itemAccentColor, for: .normal)
++            button.addTarget(self, action: #selector(self.fallbackPressed), for: .touchUpInside)
++            return button
++        }
++    }
++
++    func asyncLayout() -> (_ item: XraygramPasteItem, _ params: ListViewItemLayoutParams, _ neighbors: ItemListNeighbors) -> (ListViewItemNodeLayout, () -> Void) {
++        let currentItem = self.item
++        return { [weak self] item, params, neighbors in
++            let updatedTheme = currentItem?.presentationData.theme !== item.presentationData.theme
++            let separatorHeight = UIScreenPixel
++            let height: CGFloat = 60.0
++            let contentSize = CGSize(width: params.width, height: height)
++            let insets = itemListNeighborsGroupedInsets(neighbors, params)
++            let theme = item.presentationData.theme
++
++            return (ListViewItemNodeLayout(contentSize: contentSize, insets: insets), { [weak self] in
++                guard let self else {
++                    return
++                }
++                self.item = item
++
++                if updatedTheme || self.backgroundNode.supernode == nil {
++                    self.topStripeNode.backgroundColor = theme.list.itemBlocksSeparatorColor
++                    self.bottomStripeNode.backgroundColor = theme.list.itemBlocksSeparatorColor
++                    self.backgroundNode.backgroundColor = theme.list.itemBlocksBackgroundColor
++                }
++                if self.backgroundNode.supernode == nil {
++                    self.insertSubnode(self.backgroundNode, at: 0)
++                    self.insertSubnode(self.topStripeNode, at: 1)
++                    self.insertSubnode(self.bottomStripeNode, at: 2)
++                    self.insertSubnode(self.maskNode, at: 3)
++                }
++                if updatedTheme, let pasteControl = self.pasteControl {
++                    pasteControl.removeFromSuperview()
++                    self.pasteControl = nil
++                }
++                if self.pasteControl == nil {
++                    let control = self.makePasteControl(theme: theme, fallbackTitle: item.fallbackTitle)
++                    self.view.addSubview(control)
++                    self.pasteControl = control
++                }
++
++                let hasCorners = itemListHasRoundedBlockLayout(params)
++                var hasTopCorners = false
++                var hasBottomCorners = false
++                switch neighbors.top {
++                case .sameSection(false):
++                    self.topStripeNode.isHidden = true
++                default:
++                    hasTopCorners = true
++                    self.topStripeNode.isHidden = hasCorners
++                }
++                let leftInset = 16.0 + params.leftInset
++                let bottomStripeInset: CGFloat
++                switch neighbors.bottom {
++                case .sameSection(false):
++                    bottomStripeInset = leftInset
++                    self.bottomStripeNode.isHidden = false
++                default:
++                    bottomStripeInset = 0.0
++                    hasBottomCorners = true
++                    self.bottomStripeNode.isHidden = hasCorners
++                }
++                self.maskNode.image = hasCorners ? PresentationResourcesItemList.cornersImage(theme, top: hasTopCorners, bottom: hasBottomCorners, glass: item.systemStyle == .glass) : nil
++
++                self.backgroundNode.frame = CGRect(origin: CGPoint(x: 0.0, y: -min(insets.top, separatorHeight)), size: CGSize(width: params.width, height: contentSize.height + min(insets.top, separatorHeight) + min(insets.bottom, separatorHeight)))
++                self.maskNode.frame = self.backgroundNode.frame.inset(by: UIEdgeInsets(top: 0.0, left: params.leftInset, bottom: 0.0, right: params.rightInset))
++                self.topStripeNode.frame = CGRect(origin: CGPoint(x: 0.0, y: -min(insets.top, separatorHeight)), size: CGSize(width: params.width, height: separatorHeight))
++                self.bottomStripeNode.frame = CGRect(origin: CGPoint(x: bottomStripeInset, y: contentSize.height - separatorHeight), size: CGSize(width: params.width - bottomStripeInset, height: separatorHeight))
++
++                if let pasteControl = self.pasteControl {
++                    let size = CGSize(width: 160.0, height: 40.0)
++                    pasteControl.frame = CGRect(origin: CGPoint(x: params.leftInset + floor((params.width - params.leftInset - params.rightInset - size.width) / 2.0), y: floor((height - size.height) / 2.0)), size: size)
++                }
++            })
++        }
++    }
++
++    override func animateInsertion(_ currentTimestamp: Double, duration: Double, options: ListViewItemAnimationOptions) {
++        self.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.4)
++    }
++
++    override func animateAdded(_ currentTimestamp: Double, duration: Double) {
++        self.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
++    }
++
++    override func animateRemoved(_ currentTimestamp: Double, duration: Double) {
++        self.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.15, removeOnCompletion: false)
++    }
++}
+diff --git a/submodules/SettingsUI/Sources/Data and Storage/XraygramShareServerController.swift b/submodules/SettingsUI/Sources/Data and Storage/XraygramShareServerController.swift
+new file mode 100644
+index 00000000..d45b5230
+--- /dev/null
++++ b/submodules/SettingsUI/Sources/Data and Storage/XraygramShareServerController.swift	
+@@ -0,0 +1,139 @@
++import Foundation
++import UIKit
++import CoreImage
++import UniformTypeIdentifiers
++import XraygramKit
++
++// Xraygram: окно «Поделиться сервером» (FEAT-15, этап 1). QR со ссылкой XRAY-записи (ровно та, что хранится,
++// с #именем), саму ссылку текстом не показываем. «Копировать ссылку» — только в буфер этого устройства
++// (localOnly: без Universal Clipboard), «Отправить…» — системное меню. Ссылку никуда не логируем.
++// Нативный UIKit-контроллер: показывается через Window1.presentNative.
++
++final class XraygramShareServerController: UIViewController {
++    private let link: String
++    private let titleText: String
++    private let strings: XrayStrings
++    private var copyButton: UIButton?
++
++    init(link: String, title: String, strings: XrayStrings) {
++        self.link = link
++        self.titleText = title
++        self.strings = strings
++        super.init(nibName: nil, bundle: nil)
++        self.modalPresentationStyle = .pageSheet
++        if let sheet = self.sheetPresentationController {
++            sheet.prefersGrabberVisible = true
++        }
++    }
++
++    required init?(coder: NSCoder) {
++        fatalError("init(coder:) has not been implemented")
++    }
++
++    private static func qrImage(for text: String, side: CGFloat) -> UIImage? {
++        guard let filter = CIFilter(name: "CIQRCodeGenerator") else {
++            return nil
++        }
++        filter.setValue(Data(text.utf8), forKey: "inputMessage")
++        filter.setValue("M", forKey: "inputCorrectionLevel")
++        guard let output = filter.outputImage else {
++            return nil
++        }
++        let scale = max(1.0, floor(side / output.extent.width))
++        let scaled = output.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
++        guard let cgImage = CIContext(options: nil).createCGImage(scaled, from: scaled.extent) else {
++            return nil
++        }
++        return UIImage(cgImage: cgImage)
++    }
++
++    private func makeButton(_ title: String, filled: Bool, action: Selector) -> UIButton {
++        let button = UIButton(type: .system)
++        var configuration: UIButton.Configuration = filled ? .filled() : .tinted()
++        configuration.title = title
++        configuration.cornerStyle = .capsule
++        configuration.buttonSize = .large
++        button.configuration = configuration
++        button.addTarget(self, action: action, for: .touchUpInside)
++        return button
++    }
++
++    override func viewDidLoad() {
++        super.viewDidLoad()
++        self.view.backgroundColor = .systemBackground
++
++        let titleLabel = UILabel()
++        titleLabel.text = self.titleText
++        titleLabel.font = UIFont.systemFont(ofSize: 20.0, weight: .semibold)
++        titleLabel.textAlignment = .center
++        titleLabel.numberOfLines = 2
++
++        let qrSide: CGFloat = 260.0
++        let qrView = UIImageView(image: XraygramShareServerController.qrImage(for: self.link, side: qrSide))
++        qrView.contentMode = .scaleAspectFit
++        qrView.layer.magnificationFilter = .nearest
++        qrView.backgroundColor = .white
++        qrView.layer.cornerRadius = 12.0
++        qrView.clipsToBounds = true
++        qrView.translatesAutoresizingMaskIntoConstraints = false
++        qrView.accessibilityLabel = "QR"
++        NSLayoutConstraint.activate([
++            qrView.widthAnchor.constraint(equalToConstant: qrSide + 24.0),
++            qrView.heightAnchor.constraint(equalToConstant: qrSide + 24.0)
++        ])
++
++        let captionLabel = UILabel()
++        captionLabel.text = self.strings.shareCaption
++        captionLabel.font = UIFont.systemFont(ofSize: 15.0)
++        captionLabel.textColor = .secondaryLabel
++        captionLabel.textAlignment = .center
++        captionLabel.numberOfLines = 0
++
++        let copyButton = self.makeButton(self.strings.copyLink, filled: true, action: #selector(self.copyPressed))
++        self.copyButton = copyButton
++        let sendButton = self.makeButton(self.strings.send, filled: false, action: #selector(self.sendPressed))
++        let closeButton = self.makeButton(self.strings.close, filled: false, action: #selector(self.closePressed))
++
++        let stack = UIStackView(arrangedSubviews: [titleLabel, qrView, captionLabel, copyButton, sendButton, closeButton])
++        stack.axis = .vertical
++        stack.alignment = .center
++        stack.spacing = 16.0
++        stack.setCustomSpacing(24.0, after: captionLabel)
++        stack.translatesAutoresizingMaskIntoConstraints = false
++        self.view.addSubview(stack)
++        for button in [copyButton, sendButton, closeButton] {
++            button.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
++        }
++        NSLayoutConstraint.activate([
++            stack.topAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.topAnchor, constant: 32.0),
++            stack.leadingAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.leadingAnchor, constant: 24.0),
++            stack.trailingAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.trailingAnchor, constant: -24.0)
++        ])
++    }
++
++    @objc private func copyPressed() {
++        // Только это устройство: без Universal Clipboard (F15-04).
++        UIPasteboard.general.setItems([[UTType.utf8PlainText.identifier: self.link]], options: [.localOnly: true])
++        guard let copyButton = self.copyButton else {
++            return
++        }
++        let original = self.strings.copyLink
++        copyButton.configuration?.title = self.strings.linkCopied
++        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak copyButton] in
++            copyButton?.configuration?.title = original
++        }
++    }
++
++    @objc private func sendPressed() {
++        let activity = UIActivityViewController(activityItems: [self.link], applicationActivities: nil)
++        if let popover = activity.popoverPresentationController {
++            popover.sourceView = self.view
++            popover.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 1.0, height: 1.0)
++        }
++        self.present(activity, animated: true)
++    }
++
++    @objc private func closePressed() {
++        self.dismiss(animated: true)
++    }
++}
+diff --git a/submodules/TelegramCallsUI/BUILD b/submodules/TelegramCallsUI/BUILD
+index 56178cf9..04c0cafc 100644
+--- a/submodules/TelegramCallsUI/BUILD
++++ b/submodules/TelegramCallsUI/BUILD
+@@ -55,6 +55,7 @@ swift_library(
+         ":TelegramCallsUIBundle",
+     ],
+     deps = [
++        "//submodules/XraygramKit:XraygramKit",
+         "//submodules/SSignalKit/SSignalKit",
+         "//submodules/Postbox:Postbox",
+     	"//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
+diff --git a/submodules/TelegramCallsUI/Sources/PresentationCallManager.swift b/submodules/TelegramCallsUI/Sources/PresentationCallManager.swift
+index 1d4c5dae..abbf1061 100644
+--- a/submodules/TelegramCallsUI/Sources/PresentationCallManager.swift
++++ b/submodules/TelegramCallsUI/Sources/PresentationCallManager.swift
+@@ -12,6 +12,7 @@ import TelegramUIPreferences
+ import AccountContext
+ import CallKit
+ import PhoneNumberFormat
++import XraygramKit
+ 
+ private func callKitIntegrationIfEnabled(_ integration: CallKitIntegration?, settings: VoiceCallSettings?) -> CallKitIntegration?  {
+     let enabled = settings?.enableSystemIntegration ?? true
+@@ -106,6 +107,8 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
+     private let startCallDisposable = MetaDisposable()
+     
+     private var proxyServer: ProxyServerSettings?
++    // Xraygram: активна ли XRAY-запись — для диалога «Без XRAY» перед групповыми звонками (FEAT-04 п. 6).
++    private var xraygramXrayActive = false
+     private var proxyServerDisposable: Disposable?
+     
+     private var callSettings: VoiceCallSettings?
+@@ -288,7 +291,9 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
+         self.proxyServerDisposable = (accountManager.sharedData(keys: [SharedDataKeys.proxySettings])
+         |> deliverOnMainQueue).start(next: { [weak self] sharedData in
+             if let strongSelf = self, let settings = sharedData.entries[SharedDataKeys.proxySettings]?.get(ProxySettings.self) {
+-                if settings.enabled && settings.useForCalls {
++                strongSelf.xraygramXrayActive = settings.enabled && settings.activeServer?.xrayLink != nil
++                // Xraygram: для XRAY-записи прокси в звонке включён всегда (без галки «для звонков»).
++                if settings.enabled && (settings.useForCalls || settings.activeServer?.xrayLink != nil) {
+                     strongSelf.proxyServer = settings.activeServer
+                 } else {
+                     strongSelf.proxyServer = nil
+@@ -931,13 +936,33 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
+         }
+     }
+     
++    /// Xraygram: перед групповым звонком, видеочатом, конференцией или трансляцией при активной XRAY —
++    /// диалог «Без XRAY» (FEAT-04 п. 6): они пока идут напрямую. Тексты — FEAT-04.
++    private func xraygramConfirmWithoutXray(context: AccountContext, _ proceed: @escaping () -> Void) {
++        guard self.xraygramXrayActive else {
++            proceed()
++            return
++        }
++        let (presentationData, present, _) = self.getDeviceAccessData()
++        let xs = XrayStrings(appLanguageCode: presentationData.strings.primaryComponent.languageCode)
++        present(textAlertController(sharedContext: context.sharedContext, title: xs.withoutXrayTitle, text: xs.withoutXrayText, actions: [
++            TextAlertAction(type: .genericAction, title: xs.cancel, action: {}),
++            TextAlertAction(type: .defaultAction, title: xs.proceed, action: {
++                proceed()
++            })
++        ]), nil)
++    }
++    
+     public func scheduleGroupCall(context: AccountContext, peerId: EnginePeer.Id, endCurrentIfAny: Bool, parentController: ViewController) -> RequestScheduleGroupCallResult {
+-        let begin: () -> Void = { [weak self, weak parentController] in
++        let beginUnconfirmed: () -> Void = { [weak self, weak parentController] in
+             guard let parentController else {
+                 return
+             }
+             let _ = self?.requestScheduleGroupCall(accountContext: context, peerId: peerId, parentController: parentController).start()
+         }
++        let begin: () -> Void = { [weak self] in
++            self?.xraygramConfirmWithoutXray(context: context, beginUnconfirmed)
++        }
+         
+         if let currentGroupCall = self.currentGroupCallValue {
+             if endCurrentIfAny {
+@@ -982,7 +1007,7 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
+     }
+     
+     public func joinGroupCall(context: AccountContext, peerId: EnginePeer.Id, invite: String?, requestJoinAsPeerId: ((@escaping (EnginePeer.Id?) -> Void) -> Void)?, initialCall: EngineGroupCallDescription, endCurrentIfAny: Bool) -> JoinGroupCallManagerResult {
+-        let begin: () -> Void = { [weak self] in
++        let beginUnconfirmed: () -> Void = { [weak self] in
+             if let requestJoinAsPeerId = requestJoinAsPeerId, (initialCall.isStream == nil || initialCall.isStream == false) {
+                 requestJoinAsPeerId({ joinAsPeerId in
+                     guard let self else {
+@@ -998,6 +1023,9 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
+             }
+         }
+         
++        let begin: () -> Void = { [weak self] in
++            self?.xraygramConfirmWithoutXray(context: context, beginUnconfirmed)
++        }
+         if let currentGroupCall = self.currentGroupCallValue {
+             if endCurrentIfAny {
+                 switch currentGroupCall {
+@@ -1152,7 +1180,7 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
+             }
+             self.updateCurrentGroupCall(.group(call))
+         }
+-        let begin: () -> Void = { [weak self] in
++        let beginUnconfirmed: () -> Void = { [weak self] in
+             guard let self else {
+                 return
+             }
+@@ -1183,6 +1211,9 @@ public final class PresentationCallManagerImpl: PresentationCallManager {
+             }
+         }
+         
++        let begin: () -> Void = { [weak self] in
++            self?.xraygramConfirmWithoutXray(context: accountContext, beginUnconfirmed)
++        }
+         if let currentGroupCall = self.currentGroupCallValue {
+             if endCurrentIfAny {
+                 switch currentGroupCall {
+diff --git a/submodules/TelegramCore/BUILD b/submodules/TelegramCore/BUILD
+index 23e4e285..a30cd25e 100644
+--- a/submodules/TelegramCore/BUILD
++++ b/submodules/TelegramCore/BUILD
+@@ -16,6 +16,7 @@ swift_library(
+         "//submodules/MtProtoKit:MtProtoKit",
+         "//submodules/MediaPreuploadRegistry:MediaPreuploadRegistry",
+         "//submodules/WebProxyTransport:WebProxyTransport",
++        "//submodules/XraygramKit:XraygramKit",
+         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
+         "//submodules/Postbox:Postbox",
+         "//submodules/CloudData:CloudData",
+diff --git a/submodules/TelegramCore/Sources/Account/Account.swift b/submodules/TelegramCore/Sources/Account/Account.swift
+index 510cb791..673d826b 100644
+--- a/submodules/TelegramCore/Sources/Account/Account.swift
++++ b/submodules/TelegramCore/Sources/Account/Account.swift
+@@ -235,7 +235,8 @@ public class UnauthorizedAccount {
+ 
+         self.proxySettingsDisposable.set((accountManager.sharedData(keys: [SharedDataKeys.proxySettings])
+         |> map { sharedData -> ProxyServerSettings? in
+-            return sharedData.entries[SharedDataKeys.proxySettings]?.get(ProxySettings.self)?.effectiveActiveServer
++            // Xraygram: нет записи настроек (первый запуск) = настройки по умолчанию = блокировка.
++            return (sharedData.entries[SharedDataKeys.proxySettings]?.get(ProxySettings.self) ?? ProxySettings.defaultSettings).effectiveActiveServer
+         }
+         |> distinctUntilChanged).start(next: { [weak network] activeServer in
+             network?.updateProxySettings(activeServer)
+@@ -1583,11 +1584,8 @@ public class Account {
+         }))
+         self.managedOperationsDisposable.add((accountManager.sharedData(keys: [SharedDataKeys.proxySettings])
+         |> map { sharedData -> ProxyServerSettings? in
+-            if let settings = sharedData.entries[SharedDataKeys.proxySettings]?.get(ProxySettings.self) {
+-                return settings.effectiveActiveServer
+-            } else {
+-                return nil
+-            }
++            // Xraygram: нет записи настроек (первый запуск) = настройки по умолчанию = блокировка.
++            return (sharedData.entries[SharedDataKeys.proxySettings]?.get(ProxySettings.self) ?? ProxySettings.defaultSettings).effectiveActiveServer
+         }
+         |> distinctUntilChanged).start(next: { activeServer in
+             network.updateProxySettings(activeServer)
+diff --git a/submodules/TelegramCore/Sources/Network/Network.swift b/submodules/TelegramCore/Sources/Network/Network.swift
+index d0a36f61..778edee9 100644
+--- a/submodules/TelegramCore/Sources/Network/Network.swift
++++ b/submodules/TelegramCore/Sources/Network/Network.swift
+@@ -1,5 +1,6 @@
+ import Foundation
+ import WebProxyTransport
++import XraygramKit
+ import Postbox
+ internal import TelegramApi
+ import SwiftSignalKit
+@@ -550,7 +551,7 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
+             apiEnvironment.disableUpdates = supplementary
+             apiEnvironment = apiEnvironment.withUpdatedLangPackCode(languageCode ?? "en")
+             
+-            if let effectiveActiveServer = proxySettings?.effectiveActiveServer {
++            if let effectiveActiveServer = (proxySettings ?? ProxySettings.defaultSettings).effectiveActiveServer {
+                 apiEnvironment = apiEnvironment.withUpdatedSocksProxySettings(effectiveActiveServer.mtProxySettings)
+             }
+             
+@@ -600,7 +601,7 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
+ 
+             let baseTcpConnectionInterfaceFactory = context.makeTcpConnectionInterface
+             let isAppExtension = Bundle.main.bundlePath.hasSuffix(".appex")
+-            let initialActiveServer = proxySettings?.effectiveActiveServer
++            let initialActiveServer = (proxySettings ?? ProxySettings.defaultSettings).effectiveActiveServer
+             let initialWebProxyConfiguration = initialActiveServer?.webProxyConfiguration
+             WebProxyTransport.shared.apply(configuration: isAppExtension ? nil : initialWebProxyConfiguration)
+             if initialActiveServer?.isWebProxy == true {
+@@ -751,6 +752,8 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
+             
+             let network = Network(queue: queue, datacenterId: datacenterId, context: context, engine: engine, switchingEngine: switchingEngine, engineFactory: arguments.networkEngineFactory, rustEngineDisabled: rustEngineDisabled, rustEngineWaitsForWebProxy: rustEngineWaitsForWebProxy, mainSession: mainSession, mainSessionDelegate: mainSessionDelegate, telemetry: telemetry, _connectionStatus: connectionStatus, basePath: basePath, appDataDisposable: appDataDisposable, encryptionProvider: arguments.encryptionProvider, useRequestTimeoutTimers: useRequestTimeoutTimers, useBetaFeatures: arguments.useBetaFeatures, useExperimentalFeatures: useExperimentalFeatures, baseTcpConnectionInterfaceFactory: baseTcpConnectionInterfaceFactory, isAppExtension: isAppExtension, initialWebProxyActive: initialActiveServer?.isWebProxy == true)
+             
++            network.trackXrayActiveServer(initialActiveServer)
++            
+             if let data = appConfiguration.data, let notifyInterval = data["upload_premium_speedup_notify_period"] as? Double {
+                 network.updateNetworkSpeedLimitedEventNotifyInterval(value: notifyInterval)
+             }
+@@ -907,6 +910,9 @@ public final class Network: NSObject {
+     public let encryptionProvider: EncryptionProvider
+     
+     private let queue: Queue
++    /// Xraygram: активная XRAY-запись этой сети (держит её xray поднятым).
++    private let xrayActiveServer = Atomic<ProxyServerSettings?>(value: nil)
++    private var xrayEndpointsObserver: NSObjectProtocol?
+     public let datacenterId: Int
+     public let context: MTContext
+     private var networkHelper: NetworkHelper?
+@@ -1024,6 +1030,18 @@ public final class Network: NSObject {
+         
+         super.init()
+         
++        // Xraygram: xray перезапустился на другом порту (после фона) — переприменить прокси.
++        self.xrayEndpointsObserver = NotificationCenter.default.addObserver(forName: XrayProxyManager.endpointsChangedNotification, object: nil, queue: nil, using: { [weak self] _ in
++            guard let self else {
++                return
++            }
++            self.queue.async {
++                if let server = self.xrayActiveServer.with({ $0 }) {
++                    self.updateProxySettings(server)
++                }
++            }
++        })
++        
+         mainSessionDelegate.network = self
+         
+         let _contextProxyId = self._contextProxyId
+@@ -1178,7 +1196,25 @@ public final class Network: NSObject {
+         }))
+     }
+ 
++    /// Xraygram: активна ли XRAY-запись (звонки тогда только через SOCKS5 xray).
++    var isXrayProxyActive: Bool {
++        return self.xrayActiveServer.with { $0 } != nil
++    }
++
++    /// Xraygram: retain новой XRAY-записи до release старой, чтобы общий экземпляр не погас.
++    fileprivate func trackXrayActiveServer(_ activeServer: ProxyServerSettings?) {
++        let updated: ProxyServerSettings? = activeServer?.xrayLink != nil ? activeServer : nil
++        if let link = updated?.xrayLink {
++            XrayProxyManager.shared.retain(link)
++        }
++        let previous = self.xrayActiveServer.swap(updated)
++        if let link = previous?.xrayLink {
++            XrayProxyManager.shared.release(link)
++        }
++    }
++
+     func updateProxySettings(_ activeServer: ProxyServerSettings?) {
++        self.trackXrayActiveServer(activeServer)
+         let webConfiguration = activeServer?.webProxyConfiguration
+         WebProxyTransport.shared.apply(configuration: self.isAppExtension ? nil : webConfiguration)
+         self.webProxyActive.set(activeServer?.isWebProxy == true)
+@@ -1222,6 +1258,12 @@ public final class Network: NSObject {
+         self.webProxyCarrierDemandDisposable.dispose()
+         WebProxyTransport.shared.setCarrierDemand(self.webProxyLeaseToken, wanted: false)
+         self.appDataDisposable.dispose()
++        if let xrayEndpointsObserver = self.xrayEndpointsObserver {
++            NotificationCenter.default.removeObserver(xrayEndpointsObserver)
++        }
++        if let link = self.xrayActiveServer.with({ $0 })?.xrayLink {
++            XrayProxyManager.shared.release(link)
++        }
+     }
+     
+     public var globalTime: TimeInterval {
+diff --git a/submodules/TelegramCore/Sources/Network/ProxyServersStatuses.swift b/submodules/TelegramCore/Sources/Network/ProxyServersStatuses.swift
+index 7cd12a04..0dc648a1 100644
+--- a/submodules/TelegramCore/Sources/Network/ProxyServersStatuses.swift
++++ b/submodules/TelegramCore/Sources/Network/ProxyServersStatuses.swift
+@@ -1,6 +1,7 @@
+ import Foundation
+ import SwiftSignalKit
+ import MtProtoKit
++import XraygramKit
+ 
+ 
+ public enum ProxyServerStatus: Equatable {
+@@ -11,9 +12,15 @@ public enum ProxyServerStatus: Equatable {
+ 
+ private final class ProxyServerItemContext {
+     private var disposable: Disposable?
++    private let xrayLink: String?
+     var value: ProxyServerStatus = .checking
+     
+     init(queue: Queue, context: MTContext, datacenterId: Int, server: ProxyServerSettings, updated: @escaping (ProxyServerStatus) -> Void) {
++        // Xraygram: пока идёт проверка, держим xray этой записи поднятым.
++        self.xrayLink = server.xrayLink
++        if let xrayLink = self.xrayLink {
++            XrayProxyManager.shared.retain(xrayLink)
++        }
+         self.disposable = (Signal<ProxyServerStatus, NoError> { subscriber in
+             let disposable = MTProxyConnectivity.pingProxy(with: context, datacenterId: datacenterId, settings: server.mtProxySettings).start(next: { next in
+                 if let next = next as? MTProxyConnectivityStatus {
+@@ -35,6 +42,9 @@ private final class ProxyServerItemContext {
+     
+     deinit {
+         self.disposable?.dispose()
++        if let xrayLink = self.xrayLink {
++            XrayProxyManager.shared.release(xrayLink)
++        }
+     }
+ }
+ 
+diff --git a/submodules/TelegramCore/Sources/Settings/ProxySettings.swift b/submodules/TelegramCore/Sources/Settings/ProxySettings.swift
+index 1245976b..9b3a9a10 100644
+--- a/submodules/TelegramCore/Sources/Settings/ProxySettings.swift
++++ b/submodules/TelegramCore/Sources/Settings/ProxySettings.swift
+@@ -3,6 +3,7 @@ import Postbox
+ import SwiftSignalKit
+ import MtProtoKit
+ import WebProxyTransport
++import XraygramKit
+ 
+ public func updateProxySettingsInteractively(accountManager: AccountManager<TelegramAccountManagerTypes>, _ f: @escaping (ProxySettings) -> ProxySettings) -> Signal<Bool, NoError> {
+     return accountManager.transaction { transaction -> Bool in
+@@ -27,6 +28,10 @@ extension ProxyServerSettings {
+                 return MTSocksProxySettings(ip: self.host, port: UInt16(clamping: self.port), username: nil, password: nil, secret: secret)
+             case let .web(secret, _):
+                 return MTSocksProxySettings(ip: WebProxyConfiguration.canonicalHost(self.host) ?? self.host, port: WebProxyConfiguration.port, username: nil, password: nil, secret: secret, webProxy: true)
++            case let .xray(link):
++                // Поднимает xray (если ещё не запущен) и отдаёт его локальный SOCKS5.
++                let endpoint = XrayProxyManager.shared.endpoint(for: link)
++                return MTSocksProxySettings(ip: endpoint.host, port: endpoint.port, username: endpoint.username, password: endpoint.password, secret: nil)
+         }
+     }
+ 
+@@ -39,6 +44,39 @@ extension ProxyServerSettings {
+ }
+ 
+ extension ProxyServerSettings {
++    /// Xraygram: ссылка XRAY-записи.
++    public var xrayLink: String? {
++        if case let .xray(link) = self.connection {
++            return link
++        } else {
++            return nil
++        }
++    }
++
++    /// Xraygram: `XRAY · <имя из #fragment или адрес>` для списков и экрана настроек.
++    public var xrayDisplayTitle: String? {
++        return self.xrayLink.flatMap(XrayLink.displayTitle)
++    }
++
++    /// Звонки умеют только SOCKS5; XRAY-запись для них — тоже SOCKS5 (локальный).
++    public var canBeUsedForCalls: Bool {
++        switch self.connection {
++        case .socks5, .xray:
++            return true
++        case .mtp, .web:
++            return false
++        }
++    }
++
++    /// Xraygram: локальный SOCKS5 XRAY-записи (поднимает xray). Для звонков (tgcalls).
++    public var xrayLocalSocks: (host: String, port: Int32, username: String, password: String)? {
++        guard let link = self.xrayLink else {
++            return nil
++        }
++        let endpoint = XrayProxyManager.shared.endpoint(for: link)
++        return (endpoint.host, Int32(endpoint.port), endpoint.username, endpoint.password)
++    }
++
+     public var webProxyAddress: String? {
+         guard case let .web(_, path) = self.connection else {
+             return nil
+@@ -156,11 +194,51 @@ private func webProxyPercentEncodedAddress(_ value: String) -> String {
+     return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+ }
+ 
++/// Xraygram: общие правила для любых изменений настроек прокси (UI, ссылки, экран XRAY):
++/// - новая XRAY-ссылка запоминается и сбрасывает выбор «напрямую»;
++/// - если убрали активную XRAY-запись, а другие XRAY-записи есть, — активной становится другая
++///   (upstream в этом случае выключал прокси, т.е. молча уходил напрямую).
++/// Xraygram: сколько сохранённых XRAY-ссылок держим (FEAT-03 п. 12).
++let xraygramSavedLinksLimit = 20
++
++func xraygramNormalizeProxySettings(previous: ProxySettings, updated: ProxySettings) -> ProxySettings {
++    var result = updated
++    var savedLinks = result.xraygramSavedLinks
++    for server in result.servers {
++        guard let link = server.xrayLink else {
++            continue
++        }
++        if !previous.servers.contains(server) {
++            // Новая (или снова добавленная) ссылка — наверх, дубль схлопывается (FEAT-03 п. 12, F03-15).
++            result.xraygramDirectAllowed = false
++            savedLinks.removeAll(where: { $0 == link })
++            savedLinks.insert(link, at: 0)
++        } else if !savedLinks.contains(link) {
++            // Запись была до появления списка сохранённых — в конец.
++            savedLinks.append(link)
++        }
++    }
++    var seen = Set<String>()
++    savedLinks = savedLinks.filter { seen.insert($0).inserted }
++    if savedLinks.count > xraygramSavedLinksLimit {
++        savedLinks = Array(savedLinks.prefix(xraygramSavedLinksLimit))
++    }
++    result.xraygramSavedLinks = savedLinks
++    if let previousActive = previous.activeServer, previousActive.xrayLink != nil, previous.enabled {
++        let activeStillThere = result.activeServer.flatMap { result.servers.contains($0) ? $0 : nil } != nil
++        if !activeStillThere, let replacement = result.servers.first(where: { $0.xrayLink != nil }) {
++            result.activeServer = replacement
++            result.enabled = true
++        }
++    }
++    return result
++}
++
+ public func updateProxySettingsInteractively(transaction: AccountManagerModifier<TelegramAccountManagerTypes>, _ f: @escaping (ProxySettings) -> ProxySettings) -> Bool {
+     var hasChanges = false
+     transaction.updateSharedData(SharedDataKeys.proxySettings, { current in
+         let previous = current?.get(ProxySettings.self) ?? ProxySettings.defaultSettings
+-        let updated = f(previous)
++        let updated = xraygramNormalizeProxySettings(previous: previous, updated: f(previous))
+         hasChanges = previous != updated
+         return PreferencesEntry(updated)
+     })
+diff --git a/submodules/TelegramCore/Sources/State/CallSessionManager.swift b/submodules/TelegramCore/Sources/State/CallSessionManager.swift
+index f332b5e3..4e4d0b9c 100644
+--- a/submodules/TelegramCore/Sources/State/CallSessionManager.swift
++++ b/submodules/TelegramCore/Sources/State/CallSessionManager.swift
+@@ -569,8 +569,21 @@ private final class CallSessionManagerContext {
+         self.versions = versions.reversed()
+     }
+     
++    /// Xraygram: версии tgcalls, у которых звонок умеет идти через SOCKS5 xray (патч tgcalls
++    /// 0001-socks5-tcp-relay: InstanceV2Impl 7–13, InstanceV2ReferenceImpl 10–11). Compat (14),
++    /// Pump/wasm (18, 19) и v1 прокси не используют — при XRAY их не предлагаем и не принимаем:
++    /// пусть звонок не соединится, но не пойдёт напрямую.
++    private static let xrayProxiedCallVersions: Set<String> = ["7.0.0", "8.0.0", "9.0.0", "10.0.0", "11.0.0", "12.0.0", "13.0.0"]
++    
++    private var effectiveVersions: [CallSessionManagerImplementationVersion] {
++        if self.network.isXrayProxyActive {
++            return self.versions.filter { CallSessionManagerContext.xrayProxiedCallVersions.contains($0.version) }
++        }
++        return self.versions
++    }
++    
+     func filteredVersions(enableVideo: Bool) -> [String] {
+-        return self.versions.compactMap { version -> String? in
++        return self.effectiveVersions.compactMap { version -> String? in
+             if enableVideo {
+                 return version.version
+             } else if !version.supportsVideo {
+@@ -582,7 +595,7 @@ private final class CallSessionManagerContext {
+     }
+     
+     func videoVersions() -> [String] {
+-        return self.versions.compactMap { version -> String? in
++        return self.effectiveVersions.compactMap { version -> String? in
+             if version.supportsVideo {
+                 return version.version
+             } else {
+@@ -989,7 +1002,7 @@ private final class CallSessionManagerContext {
+         if let context = self.contexts[internalId] {
+             switch context.state {
+                 case let .ringing(id, accessHash, gAHash, b, _):
+-                    let acceptVersions = self.versions.map({ $0.version })
++                    let acceptVersions = self.effectiveVersions.map({ $0.version })
+                     context.state = .accepting(id: id, accessHash: accessHash, gAHash: gAHash, b: b, disposable: (acceptCallSession(accountPeerId: self.accountPeerId, postbox: self.postbox, network: self.network, stableId: id, accessHash: accessHash, b: b, maxLayer: self.maxLayer, versions: acceptVersions) |> deliverOn(self.queue)).start(next: { [weak self] result in
+                         if let strongSelf = self, let context = strongSelf.contexts[internalId] {
+                             if case .accepting = context.state {
+@@ -1089,7 +1102,7 @@ private final class CallSessionManagerContext {
+                 remoteVersions = versions
+             }
+             if let internalId = self.contextIdByStableId[id] {
+-                if let selectedVersions = selectVersionOnAccept(localVersions: self.versions, remoteVersions: remoteVersions) {
++                if let selectedVersions = selectVersionOnAccept(localVersions: self.effectiveVersions, remoteVersions: remoteVersions) {
+                     if let context = self.contexts[internalId] {
+                         switch context.state {
+                             case let .requested(_, accessHash, a, gA, config, _):
+diff --git a/submodules/TelegramCore/Sources/SyncCore/SyncCore_ProxySettings.swift b/submodules/TelegramCore/Sources/SyncCore/SyncCore_ProxySettings.swift
+index 3fda88e0..103e7ebc 100644
+--- a/submodules/TelegramCore/Sources/SyncCore/SyncCore_ProxySettings.swift
++++ b/submodules/TelegramCore/Sources/SyncCore/SyncCore_ProxySettings.swift
+@@ -5,6 +5,10 @@ public enum ProxyServerConnection: Equatable, Hashable, Codable {
+     case socks5(username: String?, password: String?)
+     case mtp(secret: Data)
+     case web(secret: Data, path: String)
++    /// Xraygram: share-ссылка xray (vless://, vmess://, trojan://, ss://, hysteria2://).
++    /// В сеть уходит как SOCKS5 на 127.0.0.1 (XraygramKit поднимает xray внутри процесса);
++    /// host/port записи — адрес сервера из ссылки, только для показа.
++    case xray(link: String)
+     
+     public init(from decoder: Decoder) throws {
+         let container = try decoder.container(keyedBy: StringCodingKey.self)
+@@ -18,6 +22,8 @@ public enum ProxyServerConnection: Equatable, Hashable, Codable {
+                 self = .web(secret: try container.decode(Data.self, forKey: "secret"), path: "")
+             case 3:
+                 self = .web(secret: try container.decode(Data.self, forKey: "secret"), path: try container.decode(String.self, forKey: "path"))
++            case 4:
++                self = .xray(link: try container.decode(String.self, forKey: "link"))
+             default:
+                 self = .socks5(username: nil, password: nil)
+         }
+@@ -43,6 +49,9 @@ public enum ProxyServerConnection: Equatable, Hashable, Codable {
+                     try container.encode(secret, forKey: "secret")
+                     try container.encode(path, forKey: "path")
+                 }
++            case let .xray(link):
++                try container.encode(4 as Int32, forKey: "_t")
++                try container.encode(link, forKey: "link")
+         }
+     }
+ }
+@@ -96,6 +105,12 @@ public struct ProxySettings: Codable, Equatable {
+     public var servers: [ProxyServerSettings]
+     public var activeServer: ProxyServerSettings?
+     public var useForCalls: Bool
++    /// Xraygram: пользователь явно выбрал «Подключиться без XRAY (напрямую)». Сбрасывается при
++    /// добавлении любой XRAY-записи.
++    public var xraygramDirectAllowed: Bool = false
++    /// Xraygram: все XRAY-ссылки, которые когда-либо добавлялись (в том числе удалённые из списка), —
++    /// для выбора на экране «Подключение через XRAY».
++    public var xraygramSavedLinks: [String] = []
+     
+     public static var defaultSettings: ProxySettings {
+         return ProxySettings(enabled: false, servers: [], activeServer: nil, useForCalls: false)
+@@ -115,6 +130,8 @@ public struct ProxySettings: Codable, Equatable {
+         self.servers = try container.decode([ProxyServerSettings].self, forKey: "servers")
+         self.activeServer = try container.decodeIfPresent(ProxyServerSettings.self, forKey: "activeServer")
+         self.useForCalls = ((try? container.decode(Int32.self, forKey: "useForCalls")) ?? 0) != 0
++        self.xraygramDirectAllowed = ((try? container.decodeIfPresent(Int32.self, forKey: "xgDirect")) ?? 0) != 0
++        self.xraygramSavedLinks = (try? container.decodeIfPresent([String].self, forKey: "xgLinks")) ?? []
+     }
+     
+     public func encode(to encoder: Encoder) throws {
+@@ -124,9 +141,35 @@ public struct ProxySettings: Codable, Equatable {
+         try container.encode(self.servers, forKey: "servers")
+         try container.encodeIfPresent(self.activeServer, forKey: "activeServer")
+         try container.encode((self.useForCalls ? 1 : 0) as Int32, forKey: "useForCalls")
++        try container.encode((self.xraygramDirectAllowed ? 1 : 0) as Int32, forKey: "xgDirect")
++        try container.encode(self.xraygramSavedLinks, forKey: "xgLinks")
+     }
+     
++    /// Xraygram: есть ли в списке хоть одна XRAY-запись.
++    public var xraygramHasXrayEntries: Bool {
++        return self.servers.contains(where: { server in
++            if case .xray = server.connection {
++                return true
++            } else {
++                return false
++            }
++        })
++    }
++    
++    /// Xraygram: сеть заблокирована — нет ни одной XRAY-записи и не выбрано «напрямую».
++    /// Тогда клиент никуда не подключается и показывает экран «Подключение через XRAY».
++    public var xraygramNetworkBlocked: Bool {
++        return !self.xraygramHasXrayEntries && !self.xraygramDirectAllowed
++    }
++    
++    /// Xraygram: «чёрная дыра» на время блокировки — SOCKS5 127.0.0.1:1, там никто не слушает,
++    /// соединение отклоняется локально, ни байта в сторону Telegram.
++    public static let xraygramBlackholeServer = ProxyServerSettings(host: "127.0.0.1", port: 1, connection: .socks5(username: nil, password: nil))
++    
+     public var effectiveActiveServer: ProxyServerSettings? {
++        if self.xraygramNetworkBlocked {
++            return ProxySettings.xraygramBlackholeServer
++        }
+         if self.enabled, let activeServer = self.activeServer {
+             return activeServer
+         } else {
+diff --git a/submodules/TelegramUI/BUILD b/submodules/TelegramUI/BUILD
+index 116004c3..5505708c 100644
+--- a/submodules/TelegramUI/BUILD
++++ b/submodules/TelegramUI/BUILD
+@@ -73,6 +73,7 @@ swift_library(
+         "//submodules/Display:Display",
+         "//submodules/Postbox:Postbox",
+         "//submodules/TelegramCore:TelegramCore",
++        "//submodules/XraygramKit:XraygramKit",
+         "//submodules/WebProxyTransport:WebProxyTransport",
+         "//submodules/MtProtoKit:MtProtoKit",
+         "//submodules/TelegramPresentationData:TelegramPresentationData",
+diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoSettingsItems.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoSettingsItems.swift
+index 8e3f9d25..d28e9a33 100644
+--- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoSettingsItems.swift
++++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoSettingsItems.swift
+@@ -185,6 +185,8 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
+                     proxyType = presentationData.strings.SocksProxySetup_ProxyWeb
+                 case .socks5:
+                     proxyType = presentationData.strings.SocksProxySetup_ProxySocks5
++                case .xray:
++                    proxyType = "XRAY"
+                 }
+             } else {
+                 proxyType = presentationData.strings.Settings_ProxyDisabled
+diff --git a/submodules/TelegramUI/Components/ProxyServerPreviewScreen/Sources/ProxyServerPreviewScreen.swift b/submodules/TelegramUI/Components/ProxyServerPreviewScreen/Sources/ProxyServerPreviewScreen.swift
+index ae5cd541..356c8588 100644
+--- a/submodules/TelegramUI/Components/ProxyServerPreviewScreen/Sources/ProxyServerPreviewScreen.swift
++++ b/submodules/TelegramUI/Components/ProxyServerPreviewScreen/Sources/ProxyServerPreviewScreen.swift
+@@ -325,7 +325,8 @@ private final class ProxyServerPreviewSheetContent: CombinedComponent {
+                     ))
+                 }
+             // A web proxy is secret-based like .mtp, so it previews the same masked secret row.
+-            case .mtp, .web:
++            // Xraygram: у XRAY-ссылки тоже секрет (uuid/пароль), показываем маску.
++            case .mtp, .web, .xray:
+                 tableItems.append(.init(
+                     id: "secret",
+                     title: strings.SocksProxySetup_Secret,
+diff --git a/submodules/TelegramUI/Sources/AppDelegate.swift b/submodules/TelegramUI/Sources/AppDelegate.swift
+index cf304286..dd8305c1 100644
+--- a/submodules/TelegramUI/Sources/AppDelegate.swift
++++ b/submodules/TelegramUI/Sources/AppDelegate.swift
+@@ -54,6 +54,7 @@ import WalletSendScreen
+ import PasscodeCore
+ import LiquidGlassShapes
+ import MTProtoRustEngine
++import XraygramKit
+ 
+ #if DEBUG
+ import AlertComponent
+@@ -245,6 +246,10 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
+     private var memoryUsageOverlayView: UILabel?
+     
+     private let crashReportPromptDisposable = MetaDisposable()
++    // Xraygram: экран «Подключение через XRAY», пока сеть заблокирована (нет XRAY-записей).
++    private let xraygramGateDisposable = MetaDisposable()
++    private var xraygramGateBlocked = false
++    private weak var xraygramGate: ViewController?
+     private var buildConfig: BuildConfig?
+     let episodeId = arc4random()
+     
+@@ -1192,6 +1197,50 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
+                 }
+                 strongSelf.mainWindow.present(c, on: .root)
+             }
++            
++            #if targetEnvironment(simulator)
++            // Xraygram, только симулятор (для автотестов QA): завести XRAY-запись без UI.
++            // `SIMCTL_CHILD_XRAYGRAM_ADD_LINK='vless://…' xcrun simctl launch <udid> <bundle>`
++            // или `SIMCTL_CHILD_XRAYGRAM_ADD_LINK_FILE=/путь/к/файлу` (файл со ссылкой на Маке).
++            // Запись добавляется (если её нет), становится активной, прокси включается.
++            do {
++                let environment = ProcessInfo.processInfo.environment
++                var testLink = environment["XRAYGRAM_ADD_LINK"]
++                if testLink == nil, let path = environment["XRAYGRAM_ADD_LINK_FILE"] {
++                    testLink = try? String(contentsOfFile: path, encoding: .utf8)
++                }
++                if let testLink, let link = XrayLink.extract(from: testLink), case let .success(info) = XrayLink.check(link) {
++                    Logger.shared.log("Xraygram", "simulator: adding XRAY entry from environment")
++                    let server = ProxyServerSettings(host: info.address, port: Int32(clamping: info.port), connection: .xray(link: link))
++                    let _ = updateProxySettingsInteractively(accountManager: accountManager, { settings in
++                        var settings = settings
++                        if let existing = settings.servers.first(where: { $0.xrayLink == link }) {
++                            settings.activeServer = existing
++                        } else {
++                            settings.servers.append(server)
++                            settings.activeServer = server
++                        }
++                        settings.enabled = true
++                        return settings
++                    }).start()
++                }
++            }
++            #endif
++            
++            // Xraygram: пока нет ни одной XRAY-записи и не выбрано «напрямую», сеть заблокирована
++            // (ProxySettings.effectiveActiveServer = «чёрная дыра»), а поверх всего — экран XRAY.
++            self.xraygramGateDisposable.set((accountManager.sharedData(keys: [SharedDataKeys.proxySettings])
++            |> map { sharedData -> Bool in
++                return (sharedData.entries[SharedDataKeys.proxySettings]?.get(ProxySettings.self) ?? ProxySettings.defaultSettings).xraygramNetworkBlocked
++            }
++            |> distinctUntilChanged
++            |> deliverOnMainQueue).start(next: { [weak self, weak sharedContext] blocked in
++                guard let self, let sharedContext else {
++                    return
++                }
++                self.xraygramGateBlocked = blocked
++                self.updateXraygramGate(sharedContext: sharedContext)
++            }))
+             sharedContext.presentCrossfadeController = { [weak self] in
+                 guard let strongSelf = self else {
+                     return
+@@ -2108,7 +2157,69 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
+         })
+     }
+ 
++    private func updateXraygramGate(sharedContext: SharedAccountContextImpl) {
++        if self.xraygramGateBlocked {
++            // Экран показывается оверлеем в верхний NavigationController окна (window.present уровня
++            // .root). До появления экрана входа или чатов его перекрыл бы экран входа, который сам
++            // показывается на .root позже, — подождать, пока хозяин появится.
++            let hostReady: Bool
++            if let authContext = self.authContextValue {
++                hostReady = authContext.rootController.isViewLoaded && authContext.rootController.view.window != nil
++            } else if self.contextValue != nil {
++                hostReady = self.mainWindow.viewController != nil
++            } else {
++                hostReady = false
++            }
++            if !hostReady {
++                Queue.mainQueue().after(0.5) { [weak self, weak sharedContext] in
++                    guard let self, let sharedContext else {
++                        return
++                    }
++                    self.updateXraygramGate(sharedContext: sharedContext)
++                }
++                return
++            }
++            if self.xraygramGate == nil {
++                let controller = xraygramGateController(sharedContext: sharedContext, accountManager: sharedContext.accountManager, didDisappear: { [weak self, weak sharedContext] in
++                    // Закрыли жестом или сменой экрана, а блокировка осталась — показать снова.
++                    self?.xraygramGate = nil
++                    Queue.mainQueue().after(0.5) {
++                        guard let self, let sharedContext else {
++                            return
++                        }
++                        self.updateXraygramGate(sharedContext: sharedContext)
++                    }
++                })
++                controller.presentationArguments = ViewControllerPresentationArguments(presentationAnimation: .modalSheet)
++                self.xraygramGate = controller
++                Logger.shared.log("Xraygram", "network blocked: presenting XRAY gate")
++                self.mainWindow.present(controller, on: .root)
++                // При старте окно может ещё не иметь корневого контроллера, и показ теряется —
++                // проверить через секунду, что экран действительно в окне.
++                Queue.mainQueue().after(1.0) { [weak self, weak controller, weak sharedContext] in
++                    guard let self, let sharedContext, self.xraygramGateBlocked else {
++                        return
++                    }
++                    if let controller, controller.isViewLoaded, controller.view.window != nil {
++                        return
++                    }
++                    Logger.shared.log("Xraygram", "XRAY gate is not on screen, presenting again")
++                    if let controller, self.xraygramGate === controller {
++                        self.xraygramGate = nil
++                    }
++                    self.updateXraygramGate(sharedContext: sharedContext)
++                }
++            }
++        } else if let controller = self.xraygramGate {
++            Logger.shared.log("Xraygram", "network unblocked: dismissing XRAY gate")
++            self.xraygramGate = nil
++            controller.dismiss()
++        }
++    }
++    
+     func handleWillEnterForeground() {
++        // Xraygram: iOS мог отобрать слушающий сокет xray, пока приложение спало.
++        XrayProxyManager.shared.handleWillEnterForeground()
+         if self.isActiveValue {
+             self.isInForegroundValue = true
+             self.isInForegroundPromise.set(true)
+diff --git a/submodules/TelegramVoip/Sources/OngoingCallContext.swift b/submodules/TelegramVoip/Sources/OngoingCallContext.swift
+index 852d6a70..d9b0d95b 100644
+--- a/submodules/TelegramVoip/Sources/OngoingCallContext.swift
++++ b/submodules/TelegramVoip/Sources/OngoingCallContext.swift
+@@ -974,6 +974,13 @@ public final class OngoingCallContext {
+                     switch proxyServer.connection {
+                     case let .socks5(username, password):
+                         voipProxyServer = VoipProxyServerWebrtc(host: proxyServer.host, port: proxyServer.port, username: username, password: password)
++                    case .xray:
++                        // Xraygram: звонки через локальный SOCKS5 xray (WebRTC ходит к relay по TCP).
++                        if let socks = proxyServer.xrayLocalSocks {
++                            voipProxyServer = VoipProxyServerWebrtc(host: socks.host, port: socks.port, username: socks.username, password: socks.password)
++                        }
++                        // Только TCP-ретрансляторы Telegram через SOCKS5, без прямого P2P (как на macOS).
++                        allowP2P = false
+                     case .mtp:
+                         break
+                     case .web:
+diff --git a/submodules/XraygramKit/BUILD b/submodules/XraygramKit/BUILD
+new file mode 100644
+index 00000000..85631f07
+--- /dev/null
++++ b/submodules/XraygramKit/BUILD
+@@ -0,0 +1,21 @@
++load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
++
++# Xraygram: обёртка над XraygramCore (xray внутри процесса, локальный SOCKS5 с паролем).
++# Исходники — ios/xraykit/swift/XraygramKit в репозитории Xraygram; сюда их копирует
++# ios/scripts/build.sh (prepare). Только Foundation, без UIKit: годится и для macOS-клиента.
++swift_library(
++    name = "XraygramKit",
++    module_name = "XraygramKit",
++    srcs = glob([
++        "Sources/**/*.swift",
++    ]),
++    copts = [
++        "-warnings-as-errors",
++    ],
++    deps = [
++        "//third-party/XraygramCore:XraygramCore",
++    ],
++    visibility = [
++        "//visibility:public",
++    ],
++)
+diff --git a/third-party/XraygramCore/BUILD b/third-party/XraygramCore/BUILD
+new file mode 100644
+index 00000000..7e9e3378
+--- /dev/null
++++ b/third-party/XraygramCore/BUILD
+@@ -0,0 +1,22 @@
++load(
++    "@build_bazel_rules_apple//apple:apple.bzl",
++    "apple_static_xcframework_import",
++)
++
++# Xraygram: Xray-core + libXray `share` как Go c-archive (ios/xraykit/go в репозитории Xraygram).
++# XraygramCore.xcframework кладёт сюда ios/scripts/build.sh (prepare); в патч он не входит.
++# В процессе может быть только один Go-рантайм: линкуем ровно в одно место (TelegramCore через XraygramKit).
++apple_static_xcframework_import(
++    name = "XraygramCore",
++    xcframework_imports = glob(["XraygramCore.xcframework/**"]),
++    linkopts = [
++        "-lresolv",
++    ],
++    sdk_frameworks = [
++        "CoreFoundation",
++        "Security",
++    ],
++    visibility = [
++        "//visibility:public",
++    ],
++)

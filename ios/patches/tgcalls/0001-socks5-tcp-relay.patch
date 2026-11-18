@@ -1,0 +1,479 @@
+diff --git a/tgcalls/v2/InstanceV2ReferenceImpl.cpp b/tgcalls/v2/InstanceV2ReferenceImpl.cpp
+index e8309ff..0fa7ac1 100644
+--- a/tgcalls/v2/InstanceV2ReferenceImpl.cpp
++++ b/tgcalls/v2/InstanceV2ReferenceImpl.cpp
+@@ -726,10 +726,15 @@ public:
+             }
+         }
+ 
++        if (_proxy) {
++            portAllocator->set_flags(ProxiedPortAllocatorFlags(portAllocator->flags()));
++            portAllocator->set_proxy("t/1.0", MakeSocks5ProxyInfo(*_proxy));
++        }
++
+         peerConnectionDependencies.allocator = std::move(portAllocator);
+ 
+         webrtc::PeerConnectionInterface::RTCConfiguration peerConnectionConfiguration;
+-        if (_enableP2P) {
++        if (_enableP2P && !_proxy) {
+             peerConnectionConfiguration.type = webrtc::PeerConnectionInterface::IceTransportsType::kAll;
+         } else {
+             peerConnectionConfiguration.type = webrtc::PeerConnectionInterface::IceTransportsType::kRelay;
+@@ -746,8 +751,10 @@ public:
+ 
+         const bool allowHostnameIceServers = getCustomParameterBoolDefaultTrue(_customParameters, "network_reference_allow_hostname_ice_servers");
+ 
++        int proxiedRelayCount = 0;
+         for (auto &server : _rtcServers) {
+-            if (server.isTcp) {
++            // With a proxy only TCP relays are usable: UDP cannot go through SOCKS5.
++            if (_proxy ? !(server.isTurn && server.isTcp) : server.isTcp) {
+                 continue;
+             }
+ 
+@@ -788,7 +795,11 @@ public:
+                 webrtc::PeerConnectionInterface::IceServer mappedServer;
+ 
+                 mappedServer.urls.push_back(
+-                    "turn:" + address.HostAsURIString() + ":" + std::to_string(server.port));
++                    "turn:" + address.HostAsURIString() + ":" + std::to_string(server.port)
++                    + (server.isTcp ? "?transport=tcp" : ""));
++                if (_proxy) {
++                    ++proxiedRelayCount;
++                }
+                 mappedServer.username = server.login;
+                 mappedServer.password = server.password;
+ 
+@@ -803,6 +814,10 @@ public:
+             }
+         }
+ 
++        if (_proxy) {
++            RTC_LOG(LS_INFO) << "InstanceV2ReferenceImpl: SOCKS5 proxy, TCP relays only: " << proxiedRelayCount;
++        }
++
+         if (_useMtProto) {
+             // Half two: see the factory option above.
+             peerConnectionDependencies.dtls_transport_factory = std::make_unique<MtProtoDtlsTransportFactory>(_encryptionKey);
+diff --git a/tgcalls/v2/NativeNetworkingImpl.cpp b/tgcalls/v2/NativeNetworkingImpl.cpp
+index da8a890..772c258 100644
+--- a/tgcalls/v2/NativeNetworkingImpl.cpp
++++ b/tgcalls/v2/NativeNetworkingImpl.cpp
+@@ -601,6 +601,12 @@ void NativeNetworkingImpl::resetDtlsSrtpTransport() {
+         _portAllocator->SetCandidateFilter(candidateFilter);
+     }
+     
++    if (_proxy) {
++        flags = ProxiedPortAllocatorFlags(flags);
++        _portAllocator->SetCandidateFilter(cricket::CF_RELAY);
++        _portAllocator->set_proxy("t/1.0", MakeSocks5ProxyInfo(*_proxy));
++    }
++    
+     _portAllocator->set_step_delay(cricket::kMinimumStepDelay);
+ 
+     _portAllocator->set_flags(flags);
+@@ -609,8 +615,15 @@ void NativeNetworkingImpl::resetDtlsSrtpTransport() {
+     cricket::ServerAddresses stunServers;
+     std::vector<cricket::RelayServerConfig> turnServers;
+ 
++    int proxiedRelayCount = 0;
+     for (auto &server : _rtcServers) {
++        if (_proxy && !(server.isTurn && server.isTcp)) {
++            continue;
++        }
+         if (server.isTurn) {
++            if (_proxy) {
++                ++proxiedRelayCount;
++            }
+             turnServers.push_back(cricket::RelayServerConfig(
+                 rtc::SocketAddress(server.host, server.port),
+                 server.login,
+@@ -623,6 +636,10 @@ void NativeNetworkingImpl::resetDtlsSrtpTransport() {
+         }
+     }
+ 
++    if (_proxy) {
++        RTC_LOG(LS_INFO) << "NativeNetworkingImpl: SOCKS5 proxy, TCP relays only: " << proxiedRelayCount;
++    }
++
+     _portAllocator->SetConfiguration(stunServers, turnServers, 0, webrtc::NO_PRUNE, _turnCustomizer.get());
+ 
+     webrtc::IceTransportInit iceTransportInit;
+diff --git a/tgcalls/v2/ReflectorPort.cpp b/tgcalls/v2/ReflectorPort.cpp
+index 90c921a..0cfd181 100644
+--- a/tgcalls/v2/ReflectorPort.cpp
++++ b/tgcalls/v2/ReflectorPort.cpp
+@@ -15,7 +15,11 @@
+ #include "p2p/base/p2p_constants.h"
+ #include "rtc_base/async_packet_socket.h"
+ #include "rtc_base/byte_order.h"
++#include "rtc_base/byte_buffer.h"
+ #include "rtc_base/checks.h"
++#include "rtc_base/ip_address.h"
++#include "rtc_base/proxy_info.h"
++#include "rtc_base/socket_adapters.h"
+ #include "rtc_base/logging.h"
+ #include "rtc_base/net_helpers.h"
+ #include "rtc_base/socket_address.h"
+@@ -58,6 +62,224 @@ int BindSocket(rtc::Socket* socket,
+     return ret;
+ }
+ 
++// SOCKS5 client (RFC 1928, username/password auth RFC 1929) in front of a
++// TCP socket. libwebrtc dropped AsyncSocksProxySocket, so reflector TCP
++// connections need their own adapter to honour PortAllocator::set_proxy().
++class Socks5ProxySocket : public rtc::BufferedReadAdapter {
++public:
++    Socks5ProxySocket(
++        rtc::Socket *socket,
++        const rtc::SocketAddress &proxy,
++        std::string username,
++        std::string password) :
++    BufferedReadAdapter(socket, 1024),
++    proxy_(proxy),
++    username_(std::move(username)),
++    password_(std::move(password)) {
++    }
++
++    int Connect(const rtc::SocketAddress &address) override {
++        dest_ = address;
++        state_ = State::Init;
++        BufferInput(true);
++        return BufferedReadAdapter::Connect(proxy_);
++    }
++
++    rtc::SocketAddress GetRemoteAddress() const override {
++        return dest_;
++    }
++
++    int Close() override {
++        state_ = State::Init;
++        BufferInput(false);
++        return BufferedReadAdapter::Close();
++    }
++
++    ConnState GetState() const override {
++        if (state_ == State::Tunnel) {
++            return CS_CONNECTED;
++        } else if (state_ == State::Error) {
++            return CS_CLOSED;
++        }
++        return CS_CONNECTING;
++    }
++
++protected:
++    void OnConnectEvent(rtc::Socket *socket) override {
++        sendHello();
++    }
++
++    void ProcessInput(char *data, size_t *len) override {
++        rtc::ByteBufferReader response(rtc::MakeArrayView(
++            reinterpret_cast<const uint8_t*>(data),
++            *len));
++        if (state_ == State::Hello) {
++            uint8_t version = 0;
++            uint8_t method = 0;
++            if (!response.ReadUInt8(&version) || !response.ReadUInt8(&method)) {
++                return;
++            }
++            if (version != 5) {
++                fail(0);
++                return;
++            }
++            if (method == 0) {
++                sendConnect();
++            } else if (method == 2 && !username_.empty()) {
++                sendAuth();
++            } else {
++                fail(0);
++                return;
++            }
++        } else if (state_ == State::Auth) {
++            uint8_t version = 0;
++            uint8_t status = 0;
++            if (!response.ReadUInt8(&version) || !response.ReadUInt8(&status)) {
++                return;
++            }
++            if (version != 1 || status != 0) {
++                fail(SOCKET_EACCES);
++                return;
++            }
++            sendConnect();
++        } else if (state_ == State::Connect) {
++            uint8_t version = 0;
++            uint8_t reply = 0;
++            uint8_t reserved = 0;
++            uint8_t addressType = 0;
++            if (!response.ReadUInt8(&version)
++                || !response.ReadUInt8(&reply)
++                || !response.ReadUInt8(&reserved)
++                || !response.ReadUInt8(&addressType)) {
++                return;
++            }
++            if (version != 5 || reply != 0) {
++                RTC_LOG(LS_ERROR) << "SOCKS5 CONNECT to " << dest_.ToSensitiveString() << " failed, reply " << int(reply);
++                fail(0);
++                return;
++            }
++            [[maybe_unused]] uint16_t port = 0;
++            std::string skipped;
++            if (addressType == 1) {
++                [[maybe_unused]] uint32_t address = 0;
++                if (!response.ReadUInt32(&address) || !response.ReadUInt16(&port)) {
++                    return;
++                }
++            } else if (addressType == 3) {
++                uint8_t length = 0;
++                if (!response.ReadUInt8(&length)
++                    || !response.ReadString(&skipped, length)
++                    || !response.ReadUInt16(&port)) {
++                    return;
++                }
++            } else if (addressType == 4) {
++                if (!response.ReadString(&skipped, 16) || !response.ReadUInt16(&port)) {
++                    return;
++                }
++            } else {
++                fail(0);
++                return;
++            }
++            state_ = State::Tunnel;
++        }
++
++        *len = response.Length();
++        if (*len > 0) {
++            memmove(data, response.Data(), *len);
++        }
++        if (state_ != State::Tunnel) {
++            return;
++        }
++        const auto remainder = (*len > 0);
++        BufferInput(false);
++        SignalConnectEvent(this);
++        if (remainder) {
++            SignalReadEvent(this);
++        }
++    }
++
++private:
++    enum class State {
++        Init,
++        Hello,
++        Auth,
++        Connect,
++        Tunnel,
++        Error,
++    };
++
++    void sendHello() {
++        rtc::ByteBufferWriter request;
++        request.WriteUInt8(5);
++        if (username_.empty()) {
++            request.WriteUInt8(1);
++            request.WriteUInt8(0);
++        } else {
++            request.WriteUInt8(2);
++            request.WriteUInt8(0);
++            request.WriteUInt8(2);
++        }
++        DirectSend(request.Data(), request.Length());
++        state_ = State::Hello;
++    }
++
++    void sendAuth() {
++        rtc::ByteBufferWriter request;
++        request.WriteUInt8(1);
++        request.WriteUInt8(static_cast<uint8_t>(std::min<size_t>(username_.size(), 255)));
++        request.WriteString(absl::string_view(username_).substr(0, 255));
++        request.WriteUInt8(static_cast<uint8_t>(std::min<size_t>(password_.size(), 255)));
++        request.WriteString(absl::string_view(password_).substr(0, 255));
++        DirectSend(request.Data(), request.Length());
++        state_ = State::Auth;
++    }
++
++    void sendConnect() {
++        rtc::ByteBufferWriter request;
++        request.WriteUInt8(5);
++        request.WriteUInt8(1);
++        request.WriteUInt8(0);
++        if (dest_.IsUnresolvedIP()) {
++            const auto hostname = dest_.hostname();
++            request.WriteUInt8(3);
++            request.WriteUInt8(static_cast<uint8_t>(std::min<size_t>(hostname.size(), 255)));
++            request.WriteString(absl::string_view(hostname).substr(0, 255));
++        } else if (dest_.family() == AF_INET6) {
++            const auto address = dest_.ipaddr().ipv6_address();
++            request.WriteUInt8(4);
++            request.WriteBytes(reinterpret_cast<const uint8_t*>(&address), 16);
++        } else {
++            request.WriteUInt8(1);
++            request.WriteUInt32(dest_.ip());
++        }
++        request.WriteUInt16(dest_.port());
++        DirectSend(request.Data(), request.Length());
++        state_ = State::Connect;
++    }
++
++    void fail(int error) {
++        state_ = State::Error;
++        BufferInput(false);
++        BufferedReadAdapter::Close();
++        SetError(SOCKET_EACCES);
++        SignalCloseEvent(this, error);
++    }
++
++    rtc::SocketAddress proxy_;
++    rtc::SocketAddress dest_;
++    std::string username_;
++    std::string password_;
++    State state_ = State::Init;
++};
++
++std::string CryptStringToString(const rtc::CryptString &value) {
++    std::string result(value.GetLength(), '\0');
++    if (!result.empty()) {
++        value.CopyTo(result.data(), false);
++    }
++    return result;
++}
++
+ rtc::AsyncPacketSocket *CreateClientRawTcpSocket(
+                                               rtc::SocketFactory *socket_factory_,
+                                               const rtc::SocketAddress& local_address,
+@@ -65,17 +287,22 @@ rtc::AsyncPacketSocket *CreateClientRawTcpSocket(
+                                               const rtc::ProxyInfo& proxy_info,
+                                               const std::string& user_agent,
+                                               const rtc::PacketSocketTcpOptions& tcp_options) {
++    // Through a SOCKS5 proxy the TCP connection goes to the proxy, so the
++    // socket must match the proxy address family and bind to "any".
++    const bool useSocks5 = (proxy_info.type == rtc::PROXY_SOCKS5);
++    const int family = useSocks5 ? proxy_info.address.family() : local_address.family();
++    const rtc::SocketAddress bindAddress = useSocks5 ? rtc::SocketAddress(rtc::GetAnyIP(family), 0) : local_address;
+     rtc::Socket* socket =
+-    socket_factory_->CreateSocket(local_address.family(), SOCK_STREAM);
++    socket_factory_->CreateSocket(family, SOCK_STREAM);
+     if (!socket) {
+         return NULL;
+     }
+     
+-    if (BindSocket(socket, local_address, 0, 0) < 0) {
++    if (BindSocket(socket, bindAddress, 0, 0) < 0) {
+         // Allow BindSocket to fail if we're binding to the ANY address, since this
+         // is mostly redundant in the first place. The socket will be bound when we
+         // call Connect() instead.
+-        if (local_address.IsAnyIP()) {
++        if (bindAddress.IsAnyIP()) {
+             RTC_LOG(LS_WARNING) << "TCP bind failed with error " << socket->GetError()
+             << "; ignoring since socket is using 'any' address.";
+         } else {
+@@ -95,6 +322,11 @@ rtc::AsyncPacketSocket *CreateClientRawTcpSocket(
+         << socket->GetError();
+     }
+     
++    if (useSocks5) {
++        RTC_LOG(LS_INFO) << "REFLECTOR TCP via SOCKS5 proxy " << proxy_info.address.ToSensitiveString();
++        socket = new Socks5ProxySocket(socket, proxy_info.address, proxy_info.username, CryptStringToString(proxy_info.password));
++    }
++
+     if (socket->Connect(remote_address) < 0) {
+         RTC_LOG(LS_ERROR) << "TCP connect failed with error " << socket->GetError();
+         delete socket;
+diff --git a/tgcalls/v2/ReflectorRelayPortFactory.cpp b/tgcalls/v2/ReflectorRelayPortFactory.cpp
+index 7c3224c..7e9dcd2 100644
+--- a/tgcalls/v2/ReflectorRelayPortFactory.cpp
++++ b/tgcalls/v2/ReflectorRelayPortFactory.cpp
+@@ -1,11 +1,68 @@
+ #include "v2/ReflectorRelayPortFactory.h"
+ 
+ #include "p2p/base/turn_port.h"
++#include "p2p/base/port_allocator.h"
++#include "rtc_base/crypt_string.h"
++#include "rtc_base/proxy_info.h"
+ 
+ #include "v2/ReflectorPort.h"
+ 
+ namespace tgcalls {
+ 
++namespace {
++
++class ProxyPasswordString : public rtc::CryptStringImpl {
++public:
++    explicit ProxyPasswordString(std::string value) : _value(std::move(value)) {
++    }
++
++    size_t GetLength() const override {
++        return _value.size();
++    }
++
++    void CopyTo(char *dest, bool nullterminate) const override {
++        memcpy(dest, _value.data(), _value.size());
++        if (nullterminate) {
++            dest[_value.size()] = 0;
++        }
++    }
++
++    std::string UrlEncode() const override {
++        return _value;
++    }
++
++    rtc::CryptStringImpl *Copy() const override {
++        return new ProxyPasswordString(_value);
++    }
++
++    void CopyRawTo(std::vector<unsigned char> *dest) const override {
++        dest->assign(_value.begin(), _value.end());
++    }
++
++private:
++    std::string _value;
++};
++
++} // namespace
++
++rtc::ProxyInfo MakeSocks5ProxyInfo(const Proxy &proxy) {
++    rtc::ProxyInfo result;
++    result.type = rtc::ProxyType::PROXY_SOCKS5;
++    result.address = rtc::SocketAddress(proxy.host, proxy.port);
++    result.username = proxy.login;
++    result.password = rtc::CryptString(ProxyPasswordString(proxy.password));
++    return result;
++}
++
++uint32_t ProxiedPortAllocatorFlags(uint32_t flags) {
++    return flags
++        | cricket::PORTALLOCATOR_DISABLE_UDP
++        | cricket::PORTALLOCATOR_DISABLE_STUN
++        | cricket::PORTALLOCATOR_DISABLE_TCP
++        | cricket::PORTALLOCATOR_DISABLE_UDP_RELAY
++        | cricket::PORTALLOCATOR_DISABLE_ADAPTER_ENUMERATION;
++}
++
+ ReflectorRelayPortFactory::ReflectorRelayPortFactory(std::vector<RtcServer> servers, bool standaloneReflectorMode, uint32_t standaloneReflectorRoleId, rtc::SocketFactory *underlyingSocketFactory, bool resolveRemoteCandidateIp) :
+ _servers(servers),
+ _standaloneReflectorMode(standaloneReflectorMode),
+diff --git a/tgcalls/v2/ReflectorRelayPortFactory.h b/tgcalls/v2/ReflectorRelayPortFactory.h
+index 41c901a..cbcc2e3 100644
+--- a/tgcalls/v2/ReflectorRelayPortFactory.h
++++ b/tgcalls/v2/ReflectorRelayPortFactory.h
+@@ -9,6 +9,7 @@
+ namespace rtc {
+ 
+ class SocketFactory;
++struct ProxyInfo;
+ 
+ }
+ 
+@@ -34,6 +35,13 @@ private:
+     bool _resolveRemoteCandidateIp = false;
+ };
+ 
++// SOCKS5 settings for PortAllocator::set_proxy(), used by ReflectorPort TCP.
++rtc::ProxyInfo MakeSocks5ProxyInfo(const Proxy &proxy);
++
++// Port allocator flags that keep a proxied call on TCP relays only:
++// no host/srflx candidates, no UDP of any kind, no direct TCP.
++uint32_t ProxiedPortAllocatorFlags(uint32_t flags);
++
+ } // namespace tgcalls
+ 
+ #endif

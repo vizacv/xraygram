@@ -1,17 +1,46 @@
 diff --git a/Telegram/CMakeLists.txt b/Telegram/CMakeLists.txt
-index 1601b50..063b457 100644
+index 1601b50..7640f3c 100644
 --- a/Telegram/CMakeLists.txt
 +++ b/Telegram/CMakeLists.txt
-@@ -596,6 +596,8 @@ PRIVATE
+@@ -596,6 +596,10 @@ PRIVATE
      core/core_settings.h
      core/core_settings_proxy.cpp
      core/core_settings_proxy.h
 +    xraygram/xraygram_core.cpp
 +    xraygram/xraygram_core.h
++    xraygram/xraygram_gate.cpp
++    xraygram/xraygram_gate.h
      core/crash_report_window.cpp
      core/crash_report_window.h
      core/crash_reports.cpp
-@@ -2855,9 +2857,9 @@ if (build_macstore)
+@@ -2755,7 +2759,16 @@ elseif (APPLE)
+         set(icon_path ${icons_path}/Icon.iconset)
+         find_program(ICONUTIL iconutil)
+         find_program(PNG2ICNS png2icns)
+-        if (ICONUTIL)
++        set(XRAYGRAM_ICNS "" CACHE FILEPATH "Xraygram: ready Icon.icns to bundle instead of the Telegram icon.")
++        if (XRAYGRAM_ICNS)
++            add_custom_command(
++                OUTPUT Icon.icns
++                COMMAND ${CMAKE_COMMAND} -E copy ${XRAYGRAM_ICNS} Icon.icns
++                DEPENDS ${XRAYGRAM_ICNS}
++            )
++            set_source_files_properties(Icon.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
++            target_add_resource(Telegram Icon.icns)
++        elseif (ICONUTIL)
+             add_custom_command(
+                 OUTPUT Icon.icns
+                 COMMAND ${ICONUTIL}
+@@ -2777,7 +2790,7 @@ elseif (APPLE)
+                     ${icon_path}/icon_512x512.png
+             )
+         endif()
+-        if (ICONUTIL OR PNG2ICNS)
++        if (NOT XRAYGRAM_ICNS AND (ICONUTIL OR PNG2ICNS))
+             set_source_files_properties(Icon.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+             target_add_resource(Telegram Icon.icns)
+         endif()
+@@ -2855,9 +2868,9 @@ if (build_macstore)
      )
  else()
      if (CMAKE_GENERATOR STREQUAL Xcode)
@@ -37,18 +66,19 @@ index 31c60aa..99bc1a3 100644
  	auto layout = box->verticalLayout();
  
 diff --git a/Telegram/SourceFiles/boxes/connection_box.cpp b/Telegram/SourceFiles/boxes/connection_box.cpp
-index 43f8a2a..fa82dd8 100644
+index 43f8a2a..a992187 100644
 --- a/Telegram/SourceFiles/boxes/connection_box.cpp
 +++ b/Telegram/SourceFiles/boxes/connection_box.cpp
-@@ -55,6 +55,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+@@ -55,6 +55,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
  #include "ui/ui_utility.h"
  #include "boxes/abstract_box.h" // Ui::show().
  #include "window/window_session_controller.h"
 +#include "xraygram/xraygram_core.h"
++#include "xraygram/xraygram_gate.h"
  #include "styles/style_boxes.h"
  #include "styles/style_chat_helpers.h"
  #include "styles/style_connection_box.h"
-@@ -74,6 +75,14 @@ constexpr auto kSaveSettingsDelayedTimeout = crl::time(1000);
+@@ -74,6 +76,14 @@ constexpr auto kSaveSettingsDelayedTimeout = crl::time(1000);
  
  using ProxyData = MTP::ProxyData;
  
@@ -63,7 +93,7 @@ index 43f8a2a..fa82dd8 100644
  struct TopButtonMenuState {
  	~TopButtonMenuState() {
  		closing = true;
-@@ -113,6 +122,9 @@ struct TopButtonMenuState {
+@@ -113,6 +123,9 @@ struct TopButtonMenuState {
  
  [[nodiscard]] bool ProxyDataIsShareable(const ProxyData &proxy) {
  	using Type = ProxyData::Type;
@@ -73,7 +103,95 @@ index 43f8a2a..fa82dd8 100644
  	return (proxy.type == Type::Socks5)
  		|| (proxy.type == Type::Mtproto)
  		|| (proxy.type == Type::Web);
-@@ -423,6 +435,10 @@ void ShareProxy(
+@@ -297,6 +310,87 @@ void ShowProxyQrBox(std::shared_ptr<Ui::Show> show, const QString &link) {
+ 	}));
+ }
+ 
++void ShowXrayServerQrBox(
++		std::shared_ptr<Ui::Show> show,
++		const QString &title,
++		const QString &link) {
++	show->showBox(Box([=](not_null<Ui::GenericBox*> box) {
++		box->setTitle(title);
++		const auto qr = ProxyQrTile(
++			link,
++			st::boxWidth
++				- st::boxRowPadding.left()
++				- st::boxRowPadding.right());
++		const auto size = qr.width() / style::DevicePixelRatio();
++		const auto height = st::inviteLinkQrSkip * 2 + size;
++		const auto container = box->addRow(
++			object_ptr<Ui::BoxContentDivider>(box, height),
++			st::inviteLinkQrMargin);
++		const auto image = Ui::CreateChild<Ui::RpWidget>(container);
++		image->resize(size, size);
++		image->paintRequest(
++		) | rpl::on_next([=] {
++			QPainter(image).drawImage(QRect(0, 0, size, size), qr);
++		}, image->lifetime());
++		container->widthValue(
++		) | rpl::on_next([=](int width) {
++			image->move((width - size) / 2, st::inviteLinkQrSkip);
++		}, image->lifetime());
++		box->addRow(object_ptr<Ui::FlatLabel>(
++			box,
++			Xraygram::Tr(
++				u"Отсканируйте камерой телефона, затем вставьте ссылку в "
++				"Xraygram"_q,
++				u"Scan with a phone camera, then paste the link into "
++				"Xraygram"_q),
++			st::boxDividerLabel));
++
++		box->addButton(
++			rpl::single(Xraygram::Tr(u"Закрыть"_q, u"Close"_q)),
++			[=] { box->closeBox(); });
++		box->addLeftButton(
++			rpl::single(
++				Xraygram::Tr(u"Копировать ссылку"_q, u"Copy link"_q)),
++			[=] {
++				QGuiApplication::clipboard()->setText(link);
++				show->showToast({
++					.text = {
++						Xraygram::Tr(
++							u"Ссылка скопирована"_q,
++							u"Link copied"_q),
++					},
++					.iconLottie = u"toast/copy"_q,
++					.iconLottieSize = st::toastLottieIconSize,
++				});
++			});
++	}));
++}
++
++void ShareXrayServer(
++		std::shared_ptr<Ui::Show> show,
++		const ProxyData &proxy) {
++	const auto link = Xraygram::LinkFor(proxy);
++	if (link.isEmpty()) {
++		return;
++	}
++	const auto title = u"XRAY · "_q + Xraygram::TitleFor(proxy);
++	show->showBox(Ui::MakeConfirmBox({
++		.text = Xraygram::Tr(
++			u"Кто получит эту ссылку, сможет пользоваться вашим сервером "
++			"XRAY. Отправляйте её только тем, кому доверяете."_q,
++			u"Anyone who gets this link can use your XRAY server. Send it "
++			"only to people you trust."_q),
++		.confirmed = [=](Fn<void()> close) {
++			close();
++			ShowXrayServerQrBox(show, title, link);
++		},
++		.confirmText = Xraygram::Tr(u"Показать"_q, u"Show"_q),
++		.title = Xraygram::Tr(
++			u"Поделиться сервером?"_q,
++			u"Share server?"_q),
++	}));
++}
++
+ void ShareProxy(
+ 		std::shared_ptr<Ui::Show> show,
+ 		not_null<Main::Account*> account,
+@@ -423,6 +517,10 @@ void ShareProxy(
  void AddProxyFromClipboard(
  		not_null<ProxiesBoxController*> controller,
  		std::shared_ptr<Ui::Show> show) {
@@ -84,7 +202,7 @@ index 43f8a2a..fa82dd8 100644
  	const auto proxyString = u"proxy"_q;
  	const auto socksString = u"socks"_q;
  	const auto webproxyString = u"webproxy"_q;
-@@ -756,7 +772,9 @@ private:
+@@ -756,7 +854,9 @@ private:
  
  	void prepare() override;
  	void setInnerFocus() override {
@@ -95,7 +213,7 @@ index 43f8a2a..fa82dd8 100644
  			_webHost->setFocusFast();
  		} else {
  			_host->setFocusFast();
-@@ -773,6 +791,9 @@ private:
+@@ -773,6 +873,9 @@ private:
  	void setupWebAddress(const ProxyData &data);
  	void setupCredentials(const ProxyData &data);
  	void setupMtprotoCredentials(const ProxyData &data);
@@ -105,7 +223,7 @@ index 43f8a2a..fa82dd8 100644
  
  	void addLabel(
  		not_null<Ui::VerticalLayout*> parent,
-@@ -799,6 +820,13 @@ private:
+@@ -799,6 +902,13 @@ private:
  	QPointer<Ui::SlideWrap<Ui::VerticalLayout>> _credentials;
  	QPointer<Ui::SlideWrap<Ui::VerticalLayout>> _mtprotoCredentials;
  
@@ -119,7 +237,56 @@ index 43f8a2a..fa82dd8 100644
  };
  
  ProxyRow::ProxyRow(QWidget *parent, View &&view)
-@@ -1853,7 +1881,8 @@ ProxyBox::ProxyBox(
+@@ -985,6 +1095,9 @@ void ProxyRow::paintEvent(QPaintEvent *e) {
+ 	top += st::semiboldFont->height + st::proxyRowSkip;
+ 
+ 	const auto statusFg = [&] {
++		if (!_view.xrayStatus.isEmpty()) {
++			return st::proxyRowStatusFgOffline;
++		}
+ 		switch (_view.state) {
+ 		case State::Online:
+ 			return st::proxyRowStatusFgOnline;
+@@ -999,6 +1112,9 @@ void ProxyRow::paintEvent(QPaintEvent *e) {
+ 		}
+ 	}();
+ 	const auto status = [&] {
++		if (!_view.xrayStatus.isEmpty()) {
++			return _view.xrayStatus;
++		}
+ 		switch (_view.state) {
+ 		case State::Available:
+ 			return tr::lng_proxy_available(
+@@ -1211,6 +1327,13 @@ void ProxyRow::fillMenu(const AddAction &addAction) {
+ 			_openBrowserClicks.fire({});
+ 		}, &st::menuIconLink);
+ 	}
++	if (_view.xrayShare) {
++		addAction(Xraygram::Tr(
++			u"Поделиться сервером"_q,
++			u"Share server"_q), [=] {
++			_showQrClicks.fire({});
++		}, &st::menuIconQrCode);
++	}
+ 	if (_view.supportsShare) {
+ 		addAction(tr::lng_proxy_edit_share(tr::now), [=] {
+ 			_shareClicks.fire({});
+@@ -1436,6 +1559,14 @@ void ProxiesBox::setupContent() {
+ 		st::proxyRowPadding.bottom()));
+ 
+ 	_proxySettings->setChangedCallback([=](ProxyData::Settings value) {
++		if (_controller->directNeedsConfirmation(value)) {
++			_proxySettings->setValue(_settings.settings());
++			Xraygram::ConfirmDirectConnection(uiShow(), crl::guard(this, [=] {
++				_controller->setProxySettings(value);
++				refreshProxyRotation();
++			}));
++			return;
++		}
+ 		if (!_controller->setProxySettings(value)) {
+ 			_proxySettings->setValue(_settings.settings());
+ 			addNewProxy();
+@@ -1853,7 +1984,8 @@ ProxyBox::ProxyBox(
  : _allowShare(data.type != Type::None)
  , _callback(std::move(callback))
  , _shareCallback(std::move(shareCallback))
@@ -129,7 +296,7 @@ index 43f8a2a..fa82dd8 100644
  	setupControls(data);
  }
  
-@@ -1912,6 +1941,8 @@ void ProxyBox::prepare() {
+@@ -1912,6 +2044,8 @@ void ProxyBox::prepare() {
  	) | rpl::on_next(submit, _user->lifetime());
  	_webHost->submits(
  	) | rpl::on_next(submit, _webHost->lifetime());
@@ -138,7 +305,20 @@ index 43f8a2a..fa82dd8 100644
  	connect(_password.data(), &Ui::MaskedInputField::submitted, submit);
  	connect(_secret.data(), &Ui::MaskedInputField::submitted, submit);
  
-@@ -1947,6 +1978,9 @@ void ProxyBox::share() {
+@@ -1930,6 +2064,12 @@ void ProxyBox::refreshButtons() {
+ 			|| type == Type::Mtproto
+ 			|| type == Type::Web)) {
+ 		addLeftButton(tr::lng_proxy_share(), [=] { share(); });
++	} else if (type == kXrayType && _xrayExisting) {
++		addLeftButton(
++			rpl::single(Xraygram::Tr(
++				u"Поделиться сервером"_q,
++				u"Share server"_q)),
++			[=] { ShareXrayServer(uiShow(), _xrayExisting); });
+ 	}
+ }
+ 
+@@ -1947,6 +2087,9 @@ void ProxyBox::share() {
  }
  
  ProxyData ProxyBox::collectData() {
@@ -148,7 +328,7 @@ index 43f8a2a..fa82dd8 100644
  	auto result = ProxyData();
  	result.type = _type->current();
  	const auto web = (result.type == Type::Web);
-@@ -1992,6 +2026,7 @@ ProxyData ProxyBox::collectData() {
+@@ -1992,6 +2135,7 @@ ProxyData ProxyBox::collectData() {
  
  void ProxyBox::setupTypes() {
  	const auto types = std::vector<std::pair<Type, QString>>{
@@ -156,7 +336,7 @@ index 43f8a2a..fa82dd8 100644
  		{ Type::Mtproto, u"MTPROTO"_q },
  		{ Type::Socks5, u"SOCKS5"_q },
  		{ Type::Http, u"HTTP"_q },
-@@ -2140,10 +2175,91 @@ void ProxyBox::setupMtprotoCredentials(const ProxyData &data) {
+@@ -2140,10 +2284,107 @@ void ProxyBox::setupMtprotoCredentials(const ProxyData &data) {
  	mtproto->add(std::move(secretWrap), st::proxyEditInputPadding);
  }
  
@@ -166,7 +346,7 @@ index 43f8a2a..fa82dd8 100644
 +			_content,
 +			object_ptr<Ui::VerticalLayout>(_content)));
 +	const auto content = _xray->entity();
-+	addLabel(content, u"Ссылка"_q);
++	addLabel(content, Xraygram::Tr(u"Ссылка"_q, u"Link"_q));
 +	const auto initial = Xraygram::IsXrayProxy(data)
 +		? Xraygram::LinkFor(data)
 +		: (data.type == Type::None)
@@ -189,6 +369,17 @@ index 43f8a2a..fa82dd8 100644
 +			QString(),
 +			st::boxDividerLabel),
 +		st::proxyEditInputPadding);
++	content->add(
++		object_ptr<Ui::FlatLabel>(
++			content,
++			Xraygram::Tr(
++				u"Ссылка на ваш сервер: vless://, vmess://, trojan://, ss:// "
++				"или hysteria2://. Если она скопирована, подставится сама."_q,
++				u"Link to your server: vless://, vmess://, trojan://, ss:// "
++				"or hysteria2://. If it is copied, it is filled in "
++				"automatically."_q),
++			st::boxDividerLabel),
++		st::proxyEditInputPadding);
 +	_xrayLink->changes(
 +	) | rpl::on_next([=] {
 +		++_xrayCheckId;
@@ -201,26 +392,30 @@ index 43f8a2a..fa82dd8 100644
 +	const auto link = _xrayLink->getLastText().trimmed();
 +	const auto id = ++_xrayCheckId;
 +	if (link.isEmpty()) {
-+		_xrayStatus->setText(u"Вставьте ссылку vless:// (а также vmess://, "
-+			"trojan://, ss://, hysteria2://). Xraygram запустит встроенный "
-+			"xray и подключится через него."_q);
++		_xrayStatus->setText(QString());
 +		return;
 +	}
-+	_xrayStatus->setText(u"Проверяю ссылку…"_q);
++	_xrayStatus->setText(
++		Xraygram::Tr(u"Проверяю ссылку…"_q, u"Checking link…"_q));
 +	Xraygram::CheckLink(link, crl::guard(this, [=](
 +			Xraygram::CheckResult result) {
 +		if (id != _xrayCheckId) {
 +			return;
 +		}
 +		_xrayStatus->setText(result.error.isEmpty()
-+			? (u"Сервер: "_q + Xraygram::FormatSummary(result.summary))
-+			: (u"Ошибка: "_q + result.error));
++			? (Xraygram::Tr(u"Сервер: "_q, u"Server: "_q)
++				+ Xraygram::FormatSummary(result.summary))
++			: (Xraygram::Tr(u"Ошибка: "_q, u"Error: "_q) + result.error));
 +	}));
 +}
 +
 +ProxyData ProxyBox::collectXrayData() {
 +	const auto link = _xrayLink->getLastText().trimmed();
 +	if (link.isEmpty()) {
++		++_xrayCheckId;
++		_xrayStatus->setText(Xraygram::Tr(
++			u"Ошибка: Вставьте ссылку на сервер"_q,
++			u"Error: Paste the server link"_q));
 +		_xrayLink->showError();
 +		return ProxyData();
 +	}
@@ -230,7 +425,8 @@ index 43f8a2a..fa82dd8 100644
 +	}
 +	if (!result.error.isEmpty()) {
 +		++_xrayCheckId;
-+		_xrayStatus->setText(u"Ошибка: "_q + result.error);
++		_xrayStatus->setText(
++			Xraygram::Tr(u"Ошибка: "_q, u"Error: "_q) + result.error);
 +		_xrayLink->showError();
 +		return ProxyData();
 +	}
@@ -250,7 +446,7 @@ index 43f8a2a..fa82dd8 100644
  			: data.type));
  	_content.create(this);
  	_content->resizeToWidth(st::boxWideWidth);
-@@ -2154,13 +2270,18 @@ void ProxyBox::setupControls(const ProxyData &data) {
+@@ -2154,13 +2395,18 @@ void ProxyBox::setupControls(const ProxyData &data) {
  	setupWebAddress(data);
  	setupCredentials(data);
  	setupMtprotoCredentials(data);
@@ -270,7 +466,185 @@ index 43f8a2a..fa82dd8 100644
  		_webAddress->toggle(web, anim::type::instant);
  		_credentials->toggle(credentialsShown, anim::type::instant);
  		_mtprotoCredentials->toggle(mtprotoShown, anim::type::instant);
-@@ -2916,7 +3037,11 @@ rpl::producer<bool> ProxiesBoxController::listShareableChanges() const {
+@@ -2216,6 +2462,15 @@ ProxiesBoxController::ProxiesBoxController(not_null<Main::Account*> account)
+ 		}
+ 	}, _lifetime);
+ 
++	Xraygram::StateChanges(
++	) | rpl::on_next([=] {
++		for (const auto &item : _list) {
++			if (Xraygram::IsXrayProxy(item.data)) {
++				updateView(item);
++			}
++		}
++	}, _lifetime);
++
+ 	MTP::WebProxy::Transport::StateChanges(
+ 	) | rpl::on_next([=](const MTP::WebProxy::Transport::StateChange &change) {
+ 		const auto i = findByProxy(change.proxy);
+@@ -2611,20 +2866,74 @@ auto ProxiesBoxController::findByProxy(const ProxyData &proxy)
+ 		[](const Item &item) { return item.data; });
+ }
+ 
++bool ProxiesBoxController::deletionLeavesDirect(
++		const base::flat_set<int> &ids) const {
++	if (!_settings.isEnabled()
++		|| !Xraygram::IsXrayProxy(_settings.selected())) {
++		return false;
++	}
++	auto removesSelected = false;
++	for (const auto &item : _list) {
++		if (item.deleted) {
++			continue;
++		} else if (ids.contains(item.id)) {
++			if (item.data == _settings.selected()) {
++				removesSelected = true;
++			}
++		} else if (Xraygram::IsXrayProxy(item.data)) {
++			return false;
++		}
++	}
++	return removesSelected;
++}
++
++void ProxiesBoxController::confirmDeletion(
++		const base::flat_set<int> &ids,
++		Fn<void()> done) {
++	if (!deletionLeavesDirect(ids) || !_show) {
++		done();
++		return;
++	}
++	_show->showBox(Ui::MakeConfirmBox({
++		.text = Xraygram::Tr(
++			u"Без неё Xraygram не будет подключаться к Telegram, пока вы "
++			"не добавите ссылку или явно не выберете подключение напрямую. "
++			"Ссылка останется в сохранённых серверах."_q,
++			u"Without it Xraygram will not connect to Telegram until you "
++			"add a link or explicitly choose a direct connection. The link "
++			"stays in saved servers."_q),
++		.confirmed = [=](Fn<void()> close) {
++			close();
++			done();
++		},
++		.confirmText = Xraygram::Tr(u"Удалить"_q, u"Delete"_q),
++		.confirmStyle = &st::attentionBoxButton,
++		.title = Xraygram::Tr(
++			u"Удалить последнюю XRAY-запись?"_q,
++			u"Delete the last XRAY entry?"_q),
++	}));
++}
++
+ void ProxiesBoxController::deleteItem(int id) {
+-	setDeleted(id, true);
++	confirmDeletion({ id }, [=] {
++		setDeleted(id, true);
++	});
+ }
+ 
+ void ProxiesBoxController::deleteItems() {
++	auto ids = base::flat_set<int>();
+ 	for (const auto &item : _list) {
+-		setDeleted(item.id, true);
++		ids.emplace(item.id);
+ 	}
++	deleteItems(ids);
+ }
+ 
+ void ProxiesBoxController::deleteItems(const base::flat_set<int> &ids) {
+-	for (const auto id : ids) {
+-		setDeleted(id, true);
+-	}
++	confirmDeletion(ids, [=] {
++		for (const auto id : ids) {
++			setDeleted(id, true);
++		}
++	});
+ }
+ 
+ void ProxiesBoxController::restoreItem(int id) {
+@@ -2632,7 +2941,12 @@ void ProxiesBoxController::restoreItem(int id) {
+ }
+ 
+ void ProxiesBoxController::shareItem(int id, bool qr) {
+-	share(findById(id)->data, qr);
++	const auto &data = findById(id)->data;
++	if (Xraygram::IsXrayProxy(data)) {
++		ShareXrayServer(_show, data);
++		return;
++	}
++	share(data, qr);
+ }
+ 
+ void ProxiesBoxController::shareItems() {
+@@ -2702,12 +3016,39 @@ void ProxiesBoxController::setDeleted(int id, bool deleted) {
+ 		return;
+ 	}
+ 	item->deleted = deleted;
++	const auto wasBlocked = Xraygram::NetworkBlocked();
++	const auto guard = gsl::finally([=] {
++		if (Xraygram::NetworkBlocked() != wasBlocked) {
++			crl::on_main([] {
++				Xraygram::RefreshGate();
++			});
++		}
++	});
+ 
+ 	if (deleted) {
+ 		const auto removed = _settings.removeFromList(item->data);
+ 		Assert(removed);
++		if (Xraygram::IsXrayProxy(item->data)) {
++			Xraygram::SetEntryActive(item->data, false);
++		}
+ 
+-		if (item->data == _settings.selected()) {
++		const auto fallback = (item->data == _settings.selected()
++			&& _settings.isEnabled()
++			&& Xraygram::IsXrayProxy(item->data))
++			? ranges::find_if(_list, [&](const Item &other) {
++				return !other.deleted
++					&& (other.id != item->id)
++					&& Xraygram::IsXrayProxy(other.data);
++			})
++			: end(_list);
++		if (fallback != end(_list)) {
++			_lastSelectedProxy = item->data;
++			_lastSelectedProxyUsed = false;
++			Core::App().setCurrentProxy(
++				fallback->data,
++				ProxyData::Settings::Enabled);
++			updateView(*fallback);
++		} else if (item->data == _settings.selected()) {
+ 			_lastSelectedProxy = _settings.selected();
+ 			_settings.setSelected(MTP::ProxyData());
+ 			if (_settings.isEnabled()) {
+@@ -2735,6 +3076,9 @@ void ProxiesBoxController::setDeleted(int id, bool deleted) {
+ 				: int(proxies.size());
+ 			_settings.insertToList(insertIndex, item->data);
+ 		}
++		if (Xraygram::IsXrayProxy(item->data)) {
++			Xraygram::SetEntryActive(item->data, true);
++		}
+ 
+ 		if (!_settings.selected() && _lastSelectedProxy == item->data) {
+ 			Assert(!_settings.isEnabled());
+@@ -2848,6 +3192,16 @@ void ProxiesBoxController::addNewItem(const ProxyData &proxy) {
+ 	applyItem(_list.back().id);
+ }
+ 
++bool ProxiesBoxController::directNeedsConfirmation(
++		ProxyData::Settings value) const {
++	if (value == ProxyData::Settings::Enabled || !_settings.isEnabled()) {
++		return false;
++	}
++	return ranges::any_of(_list, [](const Item &item) {
++		return !item.deleted && Xraygram::IsXrayProxy(item.data);
++	});
++}
++
+ bool ProxiesBoxController::setProxySettings(ProxyData::Settings value) {
+ 	if (_settings.settings() == value) {
+ 		return true;
+@@ -2916,7 +3270,11 @@ rpl::producer<bool> ProxiesBoxController::listShareableChanges() const {
  void ProxiesBoxController::updateView(const Item &item) {
  	const auto selected = (_settings.selected() == item.data);
  	const auto deleted = item.deleted;
@@ -282,8 +656,12 @@ index 43f8a2a..fa82dd8 100644
  		switch (item.data.type) {
  		case Type::Http: return u"HTTP"_q;
  		case Type::Socks5: return u"SOCKS5"_q;
-@@ -2951,7 +3076,9 @@ void ProxiesBoxController::updateView(const Item &item) {
- 	_views.fire({
+@@ -2948,10 +3306,12 @@ void ProxiesBoxController::updateView(const Item &item) {
+ 		return ItemState::Connecting;
+ 	}();
+ 	const auto supportsShare = ProxyDataIsShareable(item.data);
+-	_views.fire({
++	auto view = ItemView{
  		item.id,
  		type,
 -		((item.data.type == Type::Web)
@@ -293,7 +671,7 @@ index 43f8a2a..fa82dd8 100644
  			? item.data.webAddress()
  			: item.data.host),
  		item.data.port,
-@@ -2959,7 +3086,7 @@ void ProxiesBoxController::updateView(const Item &item) {
+@@ -2959,7 +3319,7 @@ void ProxiesBoxController::updateView(const Item &item) {
  		!deleted && selected,
  		deleted,
  		!deleted && supportsShare,
@@ -302,6 +680,52 @@ index 43f8a2a..fa82dd8 100644
  		!deleted
  			&& selected
  			&& _settings.isEnabled()
+@@ -2967,7 +3327,12 @@ void ProxiesBoxController::updateView(const Item &item) {
+ 			&& (state == ItemState::WaitingForBrowser
+ 				|| state == ItemState::Unavailable),
+ 		state,
+-	});
++	};
++	if (xray && !deleted) {
++		view.xrayStatus = Xraygram::StatusFor(item.data);
++		view.xrayShare = true;
++	}
++	_views.fire(std::move(view));
+ }
+ 
+ void ProxiesBoxController::share(const ProxyData &proxy, bool qr) {
+diff --git a/Telegram/SourceFiles/boxes/connection_box.h b/Telegram/SourceFiles/boxes/connection_box.h
+index 8458bd5..1e2ce7c 100644
+--- a/Telegram/SourceFiles/boxes/connection_box.h
++++ b/Telegram/SourceFiles/boxes/connection_box.h
+@@ -77,6 +77,8 @@ public:
+ 		bool web = false;
+ 		bool canOpenBrowser = false;
+ 		ItemState state = ItemState::Checking;
++		QString xrayStatus;
++		bool xrayShare = false;
+ 
+ 	};
+ 
+@@ -92,6 +94,8 @@ public:
+ 	object_ptr<Ui::BoxContent> editItemBox(int id);
+ 	object_ptr<Ui::BoxContent> addNewItemBox();
+ 	bool setProxySettings(ProxyData::Settings value);
++	[[nodiscard]] bool directNeedsConfirmation(
++		ProxyData::Settings value) const;
+ 	void setProxyRotationEnabled(bool enabled);
+ 	void setProxyRotationTimeout(int value);
+ 	void setTryIPv6(bool enabled);
+@@ -126,6 +130,9 @@ private:
+ 	void share(const ProxyData &proxy, bool qr = false);
+ 	void saveDelayed();
+ 	void refreshChecker(Item &item);
++	[[nodiscard]] bool deletionLeavesDirect(
++		const base::flat_set<int> &ids) const;
++	void confirmDeletion(const base::flat_set<int> &ids, Fn<void()> done);
+ 
+ 	void replaceItemWith(
+ 		std::vector<Item>::iterator which,
 diff --git a/Telegram/SourceFiles/boxes/connection_box.style b/Telegram/SourceFiles/boxes/connection_box.style
 index 76457e2..46e141c 100644
 --- a/Telegram/SourceFiles/boxes/connection_box.style
@@ -316,20 +740,251 @@ index 76457e2..46e141c 100644
  connectionPasswordInputField: InputField(defaultInputField) {
  }
  proxyUsePadding: margins(22px, 6px, 22px, 5px);
+diff --git a/Telegram/SourceFiles/calls/calls_call.cpp b/Telegram/SourceFiles/calls/calls_call.cpp
+index 22553a4..1ea4450 100644
+--- a/Telegram/SourceFiles/calls/calls_call.cpp
++++ b/Telegram/SourceFiles/calls/calls_call.cpp
+@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ #include "calls/calls_panel.h"
+ #include "core/application.h"
+ #include "core/core_settings.h"
++#include "xraygram/xraygram_core.h"
+ #include "data/data_group_call.h"
+ #include "data/data_session.h"
+ #include "data/data_user.h"
+@@ -209,7 +210,28 @@ uint64 ComputeFingerprint(bytes::const_span authKey) {
+ 	}) | ranges::to<QVector<MTPstring>>;
+ }
+ 
++[[nodiscard]] bool XrayCallsActive() {
++	const auto &proxy = Core::App().settings().proxy();
++	return proxy.isEnabled() && Xraygram::IsXrayProxy(proxy.selected());
++}
++
++// v1 (InstanceImpl: 2.7.7, 5.0.0) sends UDP relay traffic past the SOCKS5
++// proxy; 7+ are InstanceV2Impl / InstanceV2ReferenceImpl, patched for it.
++[[nodiscard]] std::vector<std::string> XrayCallVersions() {
++	auto result = tgcalls::Meta::Versions();
++	result.erase(ranges::remove_if(result, [](const std::string &v) {
++		return std::atoi(v.c_str()) < 7;
++	}), end(result));
++	ranges::sort(result, ranges::greater(), [](const std::string &v) {
++		return std::atoi(v.c_str());
++	});
++	return result;
++}
++
+ [[nodiscard]] QVector<MTPstring> CollectVersionsForApi() {
++	if (XrayCallsActive()) {
++		return WrapVersions(XrayCallVersions());
++	}
+ 	return WrapVersions(tgcalls::Meta::Versions() | ranges::actions::reverse);
+ }
+ 
+@@ -1241,8 +1263,28 @@ void Call::createAndStartController(const MTPDphoneCall &call) {
+ 	{
+ 		const auto &settingsProxy = Core::App().settings().proxy();
+ 		using ProxyData = MTP::ProxyData;
+-		if (settingsProxy.useProxyForCalls() && settingsProxy.isEnabled()) {
+-			const auto &selected = settingsProxy.selected();
++		const auto &selected = settingsProxy.selected();
++		const auto xray = settingsProxy.isEnabled()
++			&& Xraygram::IsXrayProxy(selected);
++		auto tcpRelays = 0;
++		for (const auto &server : descriptor.rtcServers) {
++			if (server.isTurn && server.isTcp) {
++				++tcpRelays;
++			}
++		}
++		LOG(("Call Info: %1 rtc servers, %2 TCP relays, xray proxy: %3."
++			).arg(descriptor.rtcServers.size()
++			).arg(tcpRelays
++			).arg(xray ? u"yes"_q : u"no"_q));
++		if (xray) {
++			descriptor.proxy = std::make_unique<tgcalls::Proxy>();
++			descriptor.proxy->host = selected.host.toStdString();
++			descriptor.proxy->port = selected.port;
++			descriptor.proxy->login = selected.user.toStdString();
++			descriptor.proxy->password = selected.password.toStdString();
++			descriptor.config.enableP2P = false;
++		} else if (settingsProxy.useProxyForCalls()
++			&& settingsProxy.isEnabled()) {
+ 			if (selected.supportsCalls() && !selected.host.isEmpty()) {
+ 				Assert(selected.type == ProxyData::Type::Socks5);
+ 				descriptor.proxy = std::make_unique<tgcalls::Proxy>();
+@@ -1253,6 +1295,13 @@ void Call::createAndStartController(const MTPDphoneCall &call) {
+ 			}
+ 		}
+ 	}
++	if (descriptor.proxy
++		&& !ranges::contains(XrayCallVersions(), versionString)) {
++		LOG(("Call Error: version %1 is not allowed through XRAY."
++			).arg(QString::fromStdString(versionString)));
++		finish(FinishType::Failed);
++		return;
++	}
+ 	_instance = tgcalls::Meta::Create(versionString, std::move(descriptor));
+ 	if (!_instance) {
+ 		LOG(("Call Error: Wrong library version: %1."
+diff --git a/Telegram/SourceFiles/calls/calls_instance.cpp b/Telegram/SourceFiles/calls/calls_instance.cpp
+index 70e43dc..b3c3840 100644
+--- a/Telegram/SourceFiles/calls/calls_instance.cpp
++++ b/Telegram/SourceFiles/calls/calls_instance.cpp
+@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ #include "calls/group/calls_group_panel.h"
+ #include "calls/calls_call.h"
+ #include "calls/calls_panel.h"
++#include "window/window_controller.h"
+ #include "data/data_user.h"
+ #include "data/data_group_call.h"
+ #include "data/data_changes.h"
+@@ -42,6 +43,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ #include "base/unixtime.h"
+ #include "mtproto/mtproto_config.h"
+ #include "boxes/abstract_box.h" // Ui::show().
++#include "xraygram/xraygram_core.h"
+ 
+ #include <tgcalls/VideoCaptureInterface.h>
+ #include <tgcalls/StaticThreads.h>
+@@ -225,10 +227,75 @@ void Instance::startOutgoingCall(
+ 	}), args.video);
+ }
+ 
++namespace {
++
++[[nodiscard]] bool XrayProxyActive() {
++	const auto &proxy = Core::App().settings().proxy();
++	return proxy.isEnabled() && Xraygram::IsXrayProxy(proxy.selected());
++}
++
++void ConfirmGroupCallWithoutXray(
++		std::shared_ptr<Ui::Show> show,
++		Fn<void()> proceed,
++		Fn<void()> cancelled = nullptr) {
++	if (!XrayProxyActive()) {
++		proceed();
++		return;
++	} else if (!show) {
++		if (const auto window = Core::App().activePrimaryWindow()) {
++			show = window->uiShow();
++		}
++	}
++	if (!show) {
++		LOG(("Xraygram: no window for the XRAY warning, group call skipped."));
++		if (cancelled) {
++			cancelled();
++		}
++		return;
++	}
++	show->showBox(Ui::MakeConfirmBox({
++		.text = Xraygram::Tr(
++			u"Групповые звонки, видеочаты и конференции пока идут "
++			"напрямую, без XRAY: провайдер увидит соединение с серверами "
++			"Telegram, а при блокировке звонок может не соединиться.\n\n"
++			"Сообщения и звонки один на один по-прежнему идут через XRAY."_q,
++			u"Group calls, video chats and conferences currently go "
++			"directly, without XRAY: your provider will see a connection to "
++			"Telegram servers, and where Telegram is blocked the call may "
++			"not connect.\n\n"
++			"Messages and one-on-one calls still go through XRAY."_q),
++		.confirmed = [=](Fn<void()> close) {
++			close();
++			proceed();
++		},
++		.cancelled = [=](Fn<void()> close) {
++			close();
++			if (cancelled) {
++				cancelled();
++			}
++		},
++		.confirmText = Xraygram::Tr(u"Продолжить"_q, u"Continue"_q),
++		.title = Xraygram::Tr(u"Без XRAY"_q, u"Without XRAY"_q),
++		.strictCancel = true,
++	}));
++}
++
++} // namespace
++
+ void Instance::startOrJoinGroupCall(
+ 		std::shared_ptr<Ui::Show> show,
+ 		not_null<PeerData*> peer,
+ 		StartGroupCallArgs args) {
++	const auto existing = peer->groupCall();
++	if (!existing || !existing->rtmp()) {
++		if (!args.xrayWarningShown) {
++			args.xrayWarningShown = true;
++			ConfirmGroupCallWithoutXray(show, [=] {
++				startOrJoinGroupCall(show, peer, args);
++			});
++			return;
++		}
++	}
+ 	confirmLeaveCurrent(show, peer, args, [=](StartGroupCallArgs args) {
+ 		using JoinConfirm = Calls::StartGroupCallArgs::JoinConfirm;
+ 		const auto context = (args.confirm == JoinConfirm::Always)
+@@ -254,6 +321,23 @@ void Instance::startOrJoinGroupCall(
+ void Instance::startOrJoinConferenceCall(StartConferenceInfo args) {
+ 	Expects(args.call || args.show);
+ 
++	if (!args.xrayWarningShown) {
++		args.xrayWarningShown = true;
++		auto show = std::shared_ptr<Ui::Show>(args.show);
++		if (!show && _currentCallPanel) {
++			show = _currentCallPanel->uiShow();
++		}
++		ConfirmGroupCallWithoutXray(show, [=] {
++			startOrJoinConferenceCall(args);
++		}, [=] {
++			const auto call = _currentCall.get();
++			if (call && call->conferenceInvite()) {
++				call->hangup();
++			}
++		});
++		return;
++	}
++
+ 	const auto migrationInfo = (args.migrating
+ 		&& args.call
+ 		&& _currentCallPanel)
+diff --git a/Telegram/SourceFiles/calls/calls_instance.h b/Telegram/SourceFiles/calls/calls_instance.h
+index 3d6aa98..a2a6cc4 100644
+--- a/Telegram/SourceFiles/calls/calls_instance.h
++++ b/Telegram/SourceFiles/calls/calls_instance.h
+@@ -69,6 +69,7 @@ struct StartGroupCallArgs {
+ 	QString joinHash;
+ 	JoinConfirm confirm = JoinConfirm::IfNowInAnother;
+ 	bool scheduleNeeded = false;
++	bool xrayWarningShown = false;
+ };
+ 
+ struct ConferenceInviteMessages {
+diff --git a/Telegram/SourceFiles/calls/group/calls_group_common.h b/Telegram/SourceFiles/calls/group/calls_group_common.h
+index 5498e39..a2ac79b 100644
+--- a/Telegram/SourceFiles/calls/group/calls_group_common.h
++++ b/Telegram/SourceFiles/calls/group/calls_group_common.h
+@@ -76,6 +76,7 @@ struct StartConferenceInfo {
+ 	bool muted = false;
+ 	std::shared_ptr<tgcalls::VideoCaptureInterface> videoCapture;
+ 	QString videoCaptureScreenId;
++	bool xrayWarningShown = false;
+ };
+ 
+ struct ConferencePanelMigration {
 diff --git a/Telegram/SourceFiles/core/application.cpp b/Telegram/SourceFiles/core/application.cpp
-index 94b64dc..50f606c 100644
+index 94b64dc..a41d0a7 100644
 --- a/Telegram/SourceFiles/core/application.cpp
 +++ b/Telegram/SourceFiles/core/application.cpp
-@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+@@ -7,6 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
  */
  #include "core/application.h"
  
 +#include "xraygram/xraygram_core.h"
++#include "xraygram/xraygram_gate.h"
 +
  #include "data/data_abstract_structure.h"
  #include "data/data_channel.h"
  #include "data/data_forum.h"
-@@ -288,6 +290,7 @@ Application::~Application() {
+@@ -288,6 +291,7 @@ Application::~Application() {
  
  	_private->proxyRotation = nullptr;
  	_domain->finish();
@@ -337,7 +992,7 @@ index 94b64dc..50f606c 100644
  	MTP::WebProxy::Transport::Shutdown();
  
  	Local::finish();
-@@ -324,6 +327,7 @@ void Application::run() {
+@@ -324,6 +328,7 @@ void Application::run() {
  
  	ValidateScale();
  
@@ -345,7 +1000,17 @@ index 94b64dc..50f606c 100644
  	refreshGlobalProxy(); // Depends on app settings being read.
  
  	if (const auto old = Local::oldSettingsVersion(); old < AppVersion) {
-@@ -2066,6 +2070,7 @@ void Application::refreshGlobalProxy() {
+@@ -445,6 +450,9 @@ void Application::run() {
+ 	startTray();
+ 
+ 	_lastActivePrimaryWindow->firstShow();
++	crl::on_main([] {
++		Xraygram::ShowGateIfNeeded();
++	});
+ 
+ 	startMediaView();
+ 
+@@ -2066,6 +2074,7 @@ void Application::refreshGlobalProxy() {
  	} else {
  		MTP::WebProxy::Transport::Deactivate();
  	}
@@ -366,6 +1031,28 @@ index 3e436f7..402453b 100644
  
  #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
  	// fallback session management is useless for tdesktop since it doesn't have
+diff --git a/Telegram/SourceFiles/core/sandbox.cpp b/Telegram/SourceFiles/core/sandbox.cpp
+index bdbb662..58fa8b8 100644
+--- a/Telegram/SourceFiles/core/sandbox.cpp
++++ b/Telegram/SourceFiles/core/sandbox.cpp
+@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #include "core/sandbox.h"
+ 
++#include "xraygram/xraygram_core.h"
++
+ #include "base/platform/base_platform_info.h"
+ #include "base/platform/base_platform_process.h"
+ #include "platform/platform_specific.h"
+@@ -715,6 +717,8 @@ void Sandbox::checkForQuit() {
+ void Sandbox::refreshGlobalProxy() {
+ 	const auto proxy = !Core::IsAppLaunched()
+ 		? _sandboxProxy
++		: Xraygram::NetworkBlocked()
++		? Xraygram::BlockedProxy()
+ 		: Core::App().settings().proxy().isEnabled()
+ 		? Core::App().settings().proxy().selected()
+ 		: MTP::ProxyData();
 diff --git a/Telegram/SourceFiles/core/version.h b/Telegram/SourceFiles/core/version.h
 index a1a1aaf..0c5da0b 100644
 --- a/Telegram/SourceFiles/core/version.h
@@ -379,6 +1066,93 @@ index a1a1aaf..0c5da0b 100644
  constexpr auto AppFile = "Telegram"_cs;
  constexpr auto AppVersion = 7004004;
  constexpr auto AppVersionStr = "7.4.4";
+diff --git a/Telegram/SourceFiles/intro/intro_start.cpp b/Telegram/SourceFiles/intro/intro_start.cpp
+index d1b835a..2c0c7c9 100644
+--- a/Telegram/SourceFiles/intro/intro_start.cpp
++++ b/Telegram/SourceFiles/intro/intro_start.cpp
+@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #include "intro/intro_start.h"
+ 
++#include "xraygram/xraygram_core.h"
++
+ #include "lang/lang_keys.h"
+ #include "intro/intro_qr.h"
+ #include "intro/intro_phone.h"
+@@ -24,8 +26,12 @@ StartWidget::StartWidget(
+ 	not_null<Data*> data)
+ : Step(parent, account, data, true) {
+ 	setMouseTracking(true);
+-	setTitleText(rpl::single(u"Telegram Desktop"_q));
+-	setDescriptionText(tr::lng_intro_about());
++	setTitleText(rpl::single(u"Xraygram"_q));
++	setDescriptionText(Xraygram::Tr(
++		u"Неофициальный клиент Telegram, который подключается через ваш "
++		"сервер XRAY."_q,
++		u"An unofficial Telegram client that connects through your own "
++		"XRAY server."_q));
+ 	show();
+ }
+ 
+diff --git a/Telegram/SourceFiles/mtproto/mtp_instance.cpp b/Telegram/SourceFiles/mtproto/mtp_instance.cpp
+index 7745223..bb8fdcb 100644
+--- a/Telegram/SourceFiles/mtproto/mtp_instance.cpp
++++ b/Telegram/SourceFiles/mtproto/mtp_instance.cpp
+@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #include "mtproto/mtp_instance.h"
+ 
++#include "xraygram/xraygram_core.h"
++
+ #include "mtproto/details/mtproto_dcenter.h"
+ #include "mtproto/details/mtproto_rsa_public_key.h"
+ #include "mtproto/special_config_request.h"
+@@ -374,7 +376,8 @@ Instance::Private::Private(
+ 	_proxySettings.connectionTypeChanges(
+ 	) | rpl::on_next([=] {
+ 		if (_configLoader) {
+-			_configLoader->setProxyEnabled(_proxySettings.isEnabled());
++			_configLoader->setProxyEnabled(_proxySettings.isEnabled()
++				|| Xraygram::NetworkBlocked());
+ 		}
+ 	}, _lifetime);
+ }
+@@ -528,7 +531,7 @@ void Instance::Private::requestConfig() {
+ 		[=](const Error &error, const Response &) {
+ 			return configLoadFail(error);
+ 		},
+-		_proxySettings.isEnabled());
++		_proxySettings.isEnabled() || Xraygram::NetworkBlocked());
+ 	_configLoader->load();
+ }
+ 
+diff --git a/Telegram/SourceFiles/mtproto/session.cpp b/Telegram/SourceFiles/mtproto/session.cpp
+index e515ad2..eb38027 100644
+--- a/Telegram/SourceFiles/mtproto/session.cpp
++++ b/Telegram/SourceFiles/mtproto/session.cpp
+@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #include "mtproto/session.h"
+ 
++#include "xraygram/xraygram_core.h"
++
+ #include "mtproto/details/mtproto_dcenter.h"
+ #include "mtproto/session_private.h"
+ #include "mtproto/mtproto_auth_key.h"
+@@ -239,8 +241,11 @@ void Session::restart() {
+ 
+ void Session::refreshOptions() {
+ 	const auto &settings = Core::App().settings().proxy();
+-	const auto &proxy = settings.selected();
+-	const auto isEnabled = settings.isEnabled();
++	const auto blocked = Xraygram::NetworkBlocked();
++	const auto proxy = blocked
++		? Xraygram::BlockedProxy()
++		: settings.selected();
++	const auto isEnabled = blocked || settings.isEnabled();
+ 	const auto proxyType = (isEnabled ? proxy.type : ProxyData::Type::None);
+ 	const auto useTcp = (proxyType != ProxyData::Type::Http);
+ 	const auto useHttp = (proxyType != ProxyData::Type::Mtproto)
 diff --git a/Telegram/SourceFiles/platform/mac/window_title_mac.mm b/Telegram/SourceFiles/platform/mac/window_title_mac.mm
 index 0a30447..bce6949 100644
 --- a/Telegram/SourceFiles/platform/mac/window_title_mac.mm
@@ -409,6 +1183,18 @@ index 62f8c79..c91fc19 100644
  		return;
  	}
  	const auto history = thread->owningHistory();
+diff --git a/Telegram/SourceFiles/window/window_connecting_widget.cpp b/Telegram/SourceFiles/window/window_connecting_widget.cpp
+index e921eb7..00a7993 100644
+--- a/Telegram/SourceFiles/window/window_connecting_widget.cpp
++++ b/Telegram/SourceFiles/window/window_connecting_widget.cpp
+@@ -451,6 +451,7 @@ auto ConnectionState::computeLayout(const State &state) const -> Layout {
+ 	result.visible = state.exposed
+ 		&& !state.updateReady
+ 		&& (state.useProxy
++			|| !_account->sessionExists()
+ 			|| state.type == State::Type::Connecting
+ 			|| state.type == State::Type::Waiting);
+ 	switch (state.type) {
 diff --git a/Telegram/SourceFiles/window/window_restore_shell.cpp b/Telegram/SourceFiles/window/window_restore_shell.cpp
 index 3e49f93..fbb0883 100644
 --- a/Telegram/SourceFiles/window/window_restore_shell.cpp
@@ -437,10 +1223,10 @@ index d32b252..58ca539 100644
  		: (name + u" @ "_q + user);
 diff --git a/Telegram/SourceFiles/xraygram/xraygram_core.cpp b/Telegram/SourceFiles/xraygram/xraygram_core.cpp
 new file mode 100644
-index 0000000..31bfbce
+index 0000000..051f9ed
 --- /dev/null
 +++ b/Telegram/SourceFiles/xraygram/xraygram_core.cpp
-@@ -0,0 +1,779 @@
+@@ -0,0 +1,1078 @@
 +/*
 +This file is part of Xraygram, a fork of Telegram Desktop.
 +
@@ -451,6 +1237,7 @@ index 0000000..31bfbce
 +
 +#include "core/application.h"
 +#include "core/core_settings.h"
++#include "lang/lang_instance.h"
 +#include "settings.h"
 +
 +#include <QtCore/QCoreApplication>
@@ -476,6 +1263,7 @@ index 0000000..31bfbce
 +constexpr auto kMaxRestartDelay = crl::time(120000);
 +constexpr auto kStableRunTime = crl::time(60000);
 +constexpr auto kMaxTailSize = 4096;
++constexpr auto kMaxSaved = 20;
 +
 +struct Entry {
 +	QString link;
@@ -504,7 +1292,12 @@ index 0000000..31bfbce
 +	};
 +}
 +
-+[[nodiscard]] std::vector<Entry> ReadEntries() {
++struct Stored {
++	std::vector<Entry> entries;
++	bool directAllowed = false;
++};
++
++[[nodiscard]] Stored ReadStored() {
 +	auto file = QFile(ConfigPath());
 +	if (!file.open(QIODevice::ReadOnly)) {
 +		return {};
@@ -523,13 +1316,18 @@ index 0000000..31bfbce
 +			|| entry.password.isEmpty()
 +			|| entry.port <= 0;
 +	}), end(result));
-+	return result;
++	return {
++		.entries = std::move(result),
++		.directAllowed = object.value(u"directAllowed"_q).toBool(),
++	};
 +}
 +
-+bool WriteEntries(const std::vector<const Entry*> &entries) {
++bool WriteEntries(
++		const std::vector<const Entry*> &entries,
++		bool directAllowed) {
 +	QDir().mkpath(cWorkingDir() + u"tdata"_q);
 +	const auto path = ConfigPath();
-+	if (entries.empty()) {
++	if (entries.empty() && !directAllowed) {
 +		return !QFile::exists(path) || QFile::remove(path);
 +	}
 +	auto list = QJsonArray();
@@ -544,6 +1342,9 @@ index 0000000..31bfbce
 +	auto root = QJsonObject();
 +	root.insert(u"version"_q, 2);
 +	root.insert(u"entries"_q, list);
++	if (directAllowed) {
++		root.insert(u"directAllowed"_q, true);
++	}
 +
 +	auto file = QFile(path);
 +	if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
@@ -625,6 +1426,58 @@ index 0000000..31bfbce
 +	};
 +}
 +
++[[nodiscard]] QString EmptyLinkError() {
++	return Tr(u"Вставьте ссылку на сервер"_q, u"Paste the server link"_q);
++}
++
++[[nodiscard]] QString CheckFailedError() {
++	return Tr(
++		u"Не удалось проверить ссылку. Попробуйте ещё раз"_q,
++		u"Could not check the link. Try again"_q);
++}
++
++[[nodiscard]] QString HumanCheckError(const QString &raw) {
++	if (raw.isEmpty()) {
++		return CheckFailedError();
++	} else if (raw.contains(u"empty link"_q)) {
++		return EmptyLinkError();
++	} else if (raw.contains(u"unsupported share format"_q)) {
++		return Tr(
++			u"Это не ссылка на сервер. Нужна ссылка vless://, vmess://, "
++			"trojan://, ss:// или hysteria2://"_q,
++			u"This is not a server link. Use vless://, vmess://, "
++			"trojan://, ss:// or hysteria2://"_q);
++	} else if (raw.contains(u"no valid outbound found"_q)) {
++		return Tr(
++			u"В ссылке не хватает данных (адрес, порт, ключ или "
++			"параметры). Скопируйте её целиком ещё раз"_q,
++			u"The link is incomplete (address, port, key or parameters). "
++			"Copy the whole link again"_q);
++	}
++	return Tr(
++		u"Ссылка не распознана (%1)"_q,
++		u"Link not recognized (%1)"_q).arg(raw);
++}
++
++[[nodiscard]] std::optional<CheckResult> PrecheckLink(const QString &link) {
++	const auto trimmed = link.trimmed();
++	if (trimmed.isEmpty()) {
++		return CheckResult{ .error = EmptyLinkError() };
++	} else if (trimmed.startsWith(u"http://"_q, Qt::CaseInsensitive)
++		|| trimmed.startsWith(u"https://"_q, Qt::CaseInsensitive)) {
++		return CheckResult{
++			.error = Tr(
++				u"Это ссылка на сайт или подписку. Нужна ссылка на "
++				"один сервер: vless://, vmess://, trojan://, ss:// или "
++				"hysteria2://"_q,
++				u"This is a web or subscription link. A single-server "
++				"link is needed: vless://, vmess://, trojan://, ss:// or "
++				"hysteria2://"_q),
++		};
++	}
++	return std::nullopt;
++}
++
 +[[nodiscard]] CheckResult ParseCheck(QProcess &process) {
 +	const auto out = FirstLine(process.readAllStandardOutput());
 +	if (process.exitStatus() == QProcess::NormalExit
@@ -632,45 +1485,68 @@ index 0000000..31bfbce
 +		&& out.startsWith(u"OK"_q)) {
 +		return { .summary = StripPrefix(out, u"OK"_q) };
 +	}
-+	const auto error = FirstLine(process.readAllStandardError());
-+	return {
-+		.error = (error.isEmpty()
-+			? u"ссылка не распознана"_q
-+			: StripPrefix(error, u"ERROR"_q)),
-+	};
++	const auto raw = StripPrefix(
++		FirstLine(process.readAllStandardError()),
++		u"ERROR"_q);
++	DEBUG_LOG(("Xraygram: link check failed: %1").arg(raw));
++	return { .error = HumanCheckError(raw) };
++}
++
++[[nodiscard]] QString HostOnly(const QString &endpoint) {
++	if (endpoint.startsWith('[')) {
++		const auto end = endpoint.indexOf(']');
++		return (end > 0) ? endpoint.mid(1, end - 1) : endpoint;
++	} else if (endpoint.count(':') == 1) {
++		return endpoint.mid(0, endpoint.indexOf(':'));
++	}
++	return endpoint;
++}
++
++[[nodiscard]] QString TitleForSummary(const QString &summary) {
++	const auto parts = SplitSummary(summary);
++	if (parts.size() > 2 && !parts[2].isEmpty()) {
++		return parts[2];
++	} else if (parts.size() > 1 && !parts[1].isEmpty()) {
++		return HostOnly(parts[1]);
++	}
++	return QString();
 +}
 +
 +[[nodiscard]] CheckResult CheckSync(const QString &link) {
++	if (auto result = PrecheckLink(link)) {
++		return *result;
++	}
 +	auto process = QProcess();
 +	process.setProgram(HelperPath());
 +	process.setArguments({ u"check"_q });
 +	process.start();
 +	if (!process.waitForStarted(kCheckTimeout)) {
-+		return {
-+			.error = u"не удалось запустить %1: %2"_q.arg(
-+				HelperPath(),
-+				process.errorString()),
-+		};
++		LOG(("Xraygram Error: could not start %1: %2"
++			).arg(HelperPath(), process.errorString()));
++		return { .error = CheckFailedError() };
 +	}
 +	process.write(link.toUtf8());
 +	process.closeWriteChannel();
 +	if (!process.waitForFinished(kCheckTimeout)) {
 +		process.kill();
 +		process.waitForFinished(kStopTimeout);
-+		return { .error = u"xraygram-core check: таймаут"_q };
++		LOG(("Xraygram Error: link check timeout."));
++		return { .error = CheckFailedError() };
 +	}
 +	return ParseCheck(process);
 +}
 +
 +class Instance final {
 +public:
-+	Instance(Entry entry, Fn<void()> changed);
++	Instance(Entry entry, Fn<void()> changed, Fn<void()> notify);
 +	~Instance();
 +
 +	[[nodiscard]] const Entry &entry() const;
 +	[[nodiscard]] MTP::ProxyData proxy() const;
 +	[[nodiscard]] bool running() const;
 +	[[nodiscard]] QString lastError() const;
++	[[nodiscard]] QString statusText() const;
++	void setDisabled(bool disabled);
 +
 +	void setLink(const QString &link, const QString &summary);
 +	bool start();
@@ -690,22 +1566,56 @@ index 0000000..31bfbce
 +
 +	Entry _entry;
 +	Fn<void()> _changed;
++	Fn<void()> _notify;
 +	std::unique_ptr<QObject> _guard;
 +	std::unique_ptr<QProcess> _process;
 +	QByteArray _tail;
 +	QString _lastError;
 +	bool _ready = false;
 +	bool _restartScheduled = false;
++	bool _disabled = false;
 +	int _failures = 0;
 +	crl::time _startedAt = 0;
 +	crl::time _nextAttemptAt = 0;
 +
 +};
 +
-+Instance::Instance(Entry entry, Fn<void()> changed)
++Instance::Instance(Entry entry, Fn<void()> changed, Fn<void()> notify)
 +: _entry(std::move(entry))
 +, _changed(std::move(changed))
++, _notify(std::move(notify))
 +, _guard(std::make_unique<QObject>()) {
++}
++
++QString Instance::statusText() const {
++	if (_disabled || running()) {
++		return QString();
++	} else if (_entry.port <= 0) {
++		return Tr(
++			u"XRAY: нет свободного локального порта"_q,
++			u"XRAY: no free local port"_q);
++	} else if (_restartScheduled) {
++		const auto left = std::max(_nextAttemptAt - crl::now(), crl::time(0));
++		return Tr(
++			u"XRAY: перезапуск через %1 с"_q,
++			u"XRAY: restarting in %1 s"_q).arg((left + 999) / 1000);
++	} else if (!_lastError.isEmpty()) {
++		return Tr(
++			u"XRAY: не удалось запустить"_q,
++			u"XRAY: failed to start"_q);
++	}
++	return QString();
++}
++
++void Instance::setDisabled(bool disabled) {
++	_disabled = disabled;
++	if (disabled) {
++		stop();
++		_lastError = QString();
++	}
++	if (_notify) {
++		_notify();
++	}
 +}
 +
 +Instance::~Instance() {
@@ -739,12 +1649,14 @@ index 0000000..31bfbce
 +}
 +
 +bool Instance::start() {
++	_disabled = false;
 +	ensurePort();
 +	return launch();
 +}
 +
 +void Instance::ensureRunning() {
-+	if (!running()
++	if (!_disabled
++		&& !running()
 +		&& !_restartScheduled
 +		&& crl::now() >= _nextAttemptAt) {
 +		launch();
@@ -752,7 +1664,7 @@ index 0000000..31bfbce
 +}
 +
 +void Instance::restart() {
-+	if (running()) {
++	if (_disabled || running()) {
 +		return;
 +	}
 +	const auto selectedChanged = ensurePort();
@@ -808,6 +1720,11 @@ index 0000000..31bfbce
 +}
 +
 +bool Instance::launch() {
++	const auto guard = gsl::finally([&] {
++		if (_notify) {
++			_notify();
++		}
++	});
 +	if (tryLaunch()) {
 +		_startedAt = crl::now();
 +		return true;
@@ -821,7 +1738,7 @@ index 0000000..31bfbce
 +	_lastError = QString();
 +	const auto path = HelperPath();
 +	if (!QFile::exists(path)) {
-+		_lastError = u"не найден %1"_q.arg(path);
++		_lastError = Tr(u"не найден %1"_q, u"%1 not found"_q).arg(path);
 +		LOG(("Xraygram Error: %1").arg(_lastError));
 +		return false;
 +	}
@@ -865,7 +1782,9 @@ index 0000000..31bfbce
 +	if (!out.contains("READY")) {
 +		const auto error = FirstLine(raw->readAllStandardError());
 +		_lastError = error.isEmpty()
-+			? u"xraygram-core не ответил"_q
++			? Tr(
++				u"xraygram-core не ответил"_q,
++				u"xraygram-core did not respond"_q)
 +			: StripPrefix(error, u"ERROR"_q);
 +		LOG(("Xraygram Error: %1").arg(_lastError));
 +		stop();
@@ -931,7 +1850,9 @@ index 0000000..31bfbce
 +void Instance::processFinished(int exitCode) {
 +	readLogs();
 +	const auto tail = QString::fromUtf8(_tail).trimmed();
-+	_lastError = u"xray завершился (код %1)"_q.arg(exitCode);
++	_lastError = Tr(
++		u"xray завершился (код %1)"_q,
++		u"xray exited (code %1)"_q).arg(exitCode);
 +	LOG(("Xraygram Error: %1, log tail: %2").arg(_lastError, tail));
 +	_ready = false;
 +	if (_process) {
@@ -943,10 +1864,13 @@ index 0000000..31bfbce
 +	}
 +	noteFailure();
 +	scheduleRestart();
++	if (_notify) {
++		_notify();
++	}
 +}
 +
 +void Instance::scheduleRestart() {
-+	if (_restartScheduled) {
++	if (_restartScheduled || _disabled) {
 +		return;
 +	}
 +	_restartScheduled = true;
@@ -986,6 +1910,13 @@ index 0000000..31bfbce
 +		const MTP::ProxyData &existing);
 +	void checkLink(const QString &link, Fn<void(CheckResult)> done);
 +
++	[[nodiscard]] bool directAllowed() const;
++	void allowDirect();
++	[[nodiscard]] std::vector<SavedEntry> saved() const;
++	[[nodiscard]] ApplyResult activate(const MTP::ProxyData &proxy);
++	void setActive(const MTP::ProxyData &proxy, bool active);
++	[[nodiscard]] rpl::producer<> stateChanges() const;
++
 +private:
 +	void save();
 +	[[nodiscard]] std::vector<int> takenPorts() const;
@@ -993,6 +1924,8 @@ index 0000000..31bfbce
 +
 +	std::unique_ptr<QObject> _guard;
 +	std::vector<std::unique_ptr<Instance>> _instances;
++	rpl::event_stream<> _stateChanges;
++	bool _directAllowed = false;
 +	bool _shutdown = false;
 +
 +};
@@ -1002,21 +1935,71 @@ index 0000000..31bfbce
 +
 +void Manager::start() {
 +	const auto &settings = Core::App().settings().proxy();
-+	auto dropped = false;
-+	for (auto &entry : ReadEntries()) {
-+		const auto proxy = ProxyFor(entry);
-+		if (settings.indexInList(proxy) < 0 && settings.selected() != proxy) {
-+			dropped = true;
-+			continue;
-+		}
++	auto stored = ReadStored();
++	_directAllowed = stored.directAllowed;
++	for (auto &entry : stored.entries) {
 +		add(std::move(entry));
 +	}
-+	if (dropped) {
++	for (const auto &instance : _instances) {
++		const auto proxy = instance->proxy();
++		if (settings.indexInList(proxy) >= 0 || settings.selected() == proxy) {
++			instance->start();
++		} else {
++			instance->setDisabled(true);
++		}
++	}
++}
++
++void Manager::setActive(const MTP::ProxyData &proxy, bool active) {
++	const auto instance = find(proxy);
++	if (!instance) {
++		return;
++	} else if (active) {
++		instance->start();
++	} else {
++		instance->setDisabled(true);
 +		save();
 +	}
-+	for (const auto &instance : _instances) {
-+		instance->start();
++}
++
++rpl::producer<> Manager::stateChanges() const {
++	return _stateChanges.events();
++}
++
++std::vector<SavedEntry> Manager::saved() const {
++	const auto &settings = Core::App().settings().proxy();
++	auto result = std::vector<SavedEntry>();
++	auto links = QStringList();
++	for (auto i = _instances.rbegin(); i != _instances.rend(); ++i) {
++		const auto &entry = (*i)->entry();
++		const auto proxy = (*i)->proxy();
++		if (settings.indexInList(proxy) >= 0 || links.contains(entry.link)) {
++			continue;
++		}
++		links.push_back(entry.link);
++		const auto title = TitleForSummary(entry.summary);
++		result.push_back({
++			.proxy = proxy,
++			.label = title.isEmpty() ? u"XRAY"_q : title,
++		});
++		if (int(result.size()) == kMaxSaved) {
++			break;
++		}
 +	}
++	return result;
++}
++
++ApplyResult Manager::activate(const MTP::ProxyData &proxy) {
++	const auto instance = find(proxy);
++	if (!instance) {
++		return { .error = Tr(u"запись не найдена"_q, u"entry not found"_q) };
++	}
++	if (!instance->running() && (!instance->start() || !instance->running())) {
++		return { .proxy = instance->proxy(), .error = instance->lastError() };
++	}
++	_directAllowed = false;
++	save();
++	return { .proxy = instance->proxy() };
 +}
 +
 +void Manager::shutdown() {
@@ -1048,7 +2031,8 @@ index 0000000..31bfbce
 +Instance *Manager::add(Entry entry) {
 +	_instances.push_back(std::make_unique<Instance>(
 +		std::move(entry),
-+		[=] { save(); }));
++		[=] { save(); },
++		[=] { _stateChanges.fire({}); }));
 +	return _instances.back().get();
 +}
 +
@@ -1064,31 +2048,66 @@ index 0000000..31bfbce
 +	if (_shutdown) {
 +		return;
 +	}
++	const auto &settings = Core::App().settings().proxy();
++	auto inactive = 0;
++	for (auto i = int(_instances.size()); i != 0; --i) {
++		const auto proxy = _instances[i - 1]->proxy();
++		if (settings.indexInList(proxy) >= 0 || settings.selected() == proxy) {
++			continue;
++		} else if (++inactive > kMaxSaved) {
++			_instances.erase(begin(_instances) + (i - 1));
++		}
++	}
 +	auto entries = std::vector<const Entry*>();
 +	for (const auto &instance : _instances) {
 +		entries.push_back(&instance->entry());
 +	}
-+	WriteEntries(entries);
++	WriteEntries(entries, _directAllowed);
++}
++
++bool Manager::directAllowed() const {
++	return _directAllowed;
++}
++
++void Manager::allowDirect() {
++	LOG(("Xraygram: the user chose to connect directly, without XRAY."));
++	_directAllowed = true;
++	save();
 +}
 +
 +ApplyResult Manager::saveLink(
 +		const QString &link,
 +		const MTP::ProxyData &existing) {
 +	const auto trimmed = link.trimmed();
-+	if (trimmed.isEmpty()) {
-+		return { .error = u"пустая ссылка"_q };
-+	}
 +	const auto checked = CheckSync(trimmed);
 +	if (!checked.error.isEmpty()) {
 +		return { .error = checked.error };
 +	}
++	_directAllowed = false;
 +	auto instance = find(existing);
++	if (!instance) {
++		const auto &settings = Core::App().settings().proxy();
++		const auto i = ranges::find_if(_instances, [&](const auto &other) {
++			return (other->entry().link == trimmed)
++				&& (settings.indexInList(other->proxy()) < 0);
++		});
++		if (i != end(_instances)) {
++			auto moved = std::move(*i);
++			_instances.erase(i);
++			_instances.push_back(std::move(moved));
++			instance = _instances.back().get();
++		}
++	}
 +	if (instance) {
 +		instance->setLink(trimmed, checked.summary);
 +	} else {
 +		const auto port = PickFreePort(takenPorts());
 +		if (port <= 0) {
-+			return { .error = u"нет свободного локального порта"_q };
++			return {
++				.error = Tr(
++					u"нет свободного локального порта"_q,
++					u"no free local port"_q),
++			};
 +		}
 +		instance = add({
 +			.link = trimmed,
@@ -1110,6 +2129,9 @@ index 0000000..31bfbce
 +void Manager::checkLink(const QString &link, Fn<void(CheckResult)> done) {
 +	if (!_guard) {
 +		return;
++	} else if (auto result = PrecheckLink(link)) {
++		done(std::move(*result));
++		return;
 +	}
 +	const auto process = new QProcess(_guard.get());
 +	const auto finish = [=](CheckResult result) {
@@ -1128,9 +2150,8 @@ index 0000000..31bfbce
 +		process,
 +		[=](QProcess::ProcessError error) {
 +			if (error == QProcess::FailedToStart) {
-+				finish({
-+					.error = u"не удалось запустить %1"_q.arg(HelperPath()),
-+				});
++				LOG(("Xraygram Error: could not start %1").arg(HelperPath()));
++				finish({ .error = CheckFailedError() });
 +			}
 +		});
 +	QTimer::singleShot(kCheckTimeout, process, [=] {
@@ -1162,6 +2183,48 @@ index 0000000..31bfbce
 +	Get().ensureRunning(proxy);
 +}
 +
++bool HasXrayEntries() {
++	const auto &list = Core::App().settings().proxy().list();
++	return ranges::any_of(list, IsXrayProxy);
++}
++
++bool NetworkBlocked() {
++	const auto direct = Get().directAllowed();
++	const auto xray = HasXrayEntries();
++	const auto result = !direct && !xray;
++	static auto logged = std::optional<bool>();
++	if (logged != result) {
++		logged = result;
++		LOG(("Xraygram: network %1 (XRAY entries: %2, direct allowed: %3)."
++			).arg(result ? u"BLOCKED"_q : u"unblocked"_q
++			).arg(xray ? u"yes"_q : u"no"_q
++			).arg(direct ? u"yes"_q : u"no"_q));
++	}
++	return result;
++}
++
++MTP::ProxyData BlockedProxy() {
++	auto result = MTP::ProxyData();
++	result.type = MTP::ProxyData::Type::Socks5;
++	result.host = QString::fromLatin1(kHost);
++	result.port = 1;
++	result.user = u"xraygram-blocked"_q;
++	result.password = u"blocked"_q;
++	return result;
++}
++
++void AllowDirect() {
++	Get().allowDirect();
++}
++
++std::vector<SavedEntry> SavedEntries() {
++	return Get().saved();
++}
++
++ApplyResult ActivateSaved(const MTP::ProxyData &proxy) {
++	return Get().activate(proxy);
++}
++
 +bool IsXrayProxy(const MTP::ProxyData &proxy) {
 +	return (proxy.type == MTP::ProxyData::Type::Socks5)
 +		&& (proxy.host == QString::fromLatin1(kHost))
@@ -1175,15 +2238,25 @@ index 0000000..31bfbce
 +
 +QString TitleFor(const MTP::ProxyData &proxy) {
 +	const auto instance = Get().find(proxy);
-+	const auto parts = instance
-+		? SplitSummary(instance->entry().summary)
-+		: QStringList();
-+	if (parts.size() > 2 && !parts[2].isEmpty()) {
-+		return parts[2];
-+	} else if (parts.size() > 1 && !parts[1].isEmpty()) {
-+		return parts[1];
-+	}
-+	return u"%1:%2"_q.arg(proxy.host).arg(proxy.port);
++	const auto title = instance
++		? TitleForSummary(instance->entry().summary)
++		: QString();
++	return title.isEmpty()
++		? u"%1:%2"_q.arg(proxy.host).arg(proxy.port)
++		: title;
++}
++
++QString StatusFor(const MTP::ProxyData &proxy) {
++	const auto instance = Get().find(proxy);
++	return instance ? instance->statusText() : QString();
++}
++
++void SetEntryActive(const MTP::ProxyData &proxy, bool active) {
++	Get().setActive(proxy, active);
++}
++
++rpl::producer<> StateChanges() {
++	return Get().stateChanges();
 +}
 +
 +QString FormatSummary(const QString &summary) {
@@ -1198,6 +2271,18 @@ index 0000000..31bfbce
 +
 +void CheckLink(const QString &link, Fn<void(CheckResult)> done) {
 +	Get().checkLink(link, std::move(done));
++}
++
++QString Tr(const QString &ru, const QString &en) {
++	const auto russian = [](const QString &id) {
++		return id.startsWith(u"ru"_q, Qt::CaseInsensitive);
++	};
++	// Lang::Instance keeps an empty id until the user picks a language.
++	const auto &lang = Lang::GetInstance();
++	if (lang.id().isEmpty()) {
++		return russian(lang.systemLangCode()) ? ru : en;
++	}
++	return (russian(lang.id()) || russian(lang.baseId())) ? ru : en;
 +}
 +
 +bool LooksLikeShareLink(const QString &text) {
@@ -1222,10 +2307,10 @@ index 0000000..31bfbce
 +} // namespace Xraygram
 diff --git a/Telegram/SourceFiles/xraygram/xraygram_core.h b/Telegram/SourceFiles/xraygram/xraygram_core.h
 new file mode 100644
-index 0000000..0683d6a
+index 0000000..2bf22f2
 --- /dev/null
 +++ b/Telegram/SourceFiles/xraygram/xraygram_core.h
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,92 @@
 +/*
 +This file is part of Xraygram, a fork of Telegram Desktop.
 +
@@ -1264,9 +2349,39 @@ index 0000000..0683d6a
 +// Called when the proxy settings are applied.
 +void EnsureRunning(const MTP::ProxyData &proxy);
 +
++// "Add XRAY" gate: while there is no XRAY entry in the proxy list and the
++// user did not explicitly choose a direct connection, nothing may reach
++// Telegram. MTP sessions, the config loader and the Qt application proxy
++// use BlockedProxy() instead of the real settings in that case.
++[[nodiscard]] bool HasXrayEntries();
++[[nodiscard]] bool NetworkBlocked();
++[[nodiscard]] MTP::ProxyData BlockedProxy();
++void AllowDirect();
++
++// XRAY links that are known (xraygram.json) but have no entry in the proxy
++// list, for example after the last XRAY entry was deleted.
++struct SavedEntry {
++	MTP::ProxyData proxy;
++	QString label;
++};
++[[nodiscard]] std::vector<SavedEntry> SavedEntries();
++
++// Starts the helper of a saved entry and returns its SOCKS5 entry.
++[[nodiscard]] ApplyResult ActivateSaved(const MTP::ProxyData &proxy);
++
 +[[nodiscard]] bool IsXrayProxy(const MTP::ProxyData &proxy);
 +[[nodiscard]] QString LinkFor(const MTP::ProxyData &proxy);
 +[[nodiscard]] QString TitleFor(const MTP::ProxyData &proxy);
++
++// "XRAY: <reason>" when the helper of this entry is not running, else empty.
++[[nodiscard]] QString StatusFor(const MTP::ProxyData &proxy);
++
++// Deleted entry: stop its helper, keep the link in saved servers.
++// Restored entry: start the helper again.
++void SetEntryActive(const MTP::ProxyData &proxy, bool active);
++
++// Fires when any helper starts, fails or exits.
++[[nodiscard]] rpl::producer<> StateChanges();
 +
 +// "vless · example.com · name" from the helper `check` output.
 +[[nodiscard]] QString FormatSummary(const QString &summary);
@@ -1280,8 +2395,376 @@ index 0000000..0683d6a
 +// Asynchronous validation, `done` is called on the main thread.
 +void CheckLink(const QString &link, Fn<void(CheckResult)> done);
 +
++// Russian or English: the app language if the user picked one, otherwise
++// the system language.
++[[nodiscard]] QString Tr(const QString &ru, const QString &en);
++
 +// True for vless://, vmess://, trojan://, ss://, hysteria2:// and the like.
 +[[nodiscard]] bool LooksLikeShareLink(const QString &text);
++
++} // namespace Xraygram
+diff --git a/Telegram/SourceFiles/xraygram/xraygram_gate.cpp b/Telegram/SourceFiles/xraygram/xraygram_gate.cpp
+new file mode 100644
+index 0000000..5b83a69
+--- /dev/null
++++ b/Telegram/SourceFiles/xraygram/xraygram_gate.cpp
+@@ -0,0 +1,324 @@
++/*
++This file is part of Xraygram, a fork of Telegram Desktop.
++
++For license and copyright information please follow this link:
++https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
++*/
++#include "xraygram/xraygram_gate.h"
++
++#include "xraygram/xraygram_core.h"
++#include "base/timer.h"
++#include "boxes/abstract_box.h"
++#include "core/application.h"
++#include "core/core_settings.h"
++#include "storage/localstorage.h"
++#include "ui/boxes/confirm_box.h"
++#include "ui/layers/generic_box.h"
++#include "ui/layers/show.h"
++#include "ui/vertical_list.h"
++#include "ui/widgets/buttons.h"
++#include "ui/widgets/checkbox.h"
++#include "ui/wrap/slide_wrap.h"
++#include "ui/wrap/vertical_layout.h"
++#include "ui/widgets/fields/input_field.h"
++#include "ui/widgets/labels.h"
++#include "window/window_controller.h"
++#include "styles/style_boxes.h"
++#include "styles/style_connection_box.h"
++#include "styles/style_layers.h"
++
++#include <QtGui/QClipboard>
++#include <QtGui/QGuiApplication>
++
++namespace Xraygram {
++namespace {
++
++base::weak_qptr<Ui::GenericBox> CurrentGate;
++
++[[nodiscard]] QString DirectWarningText() {
++	return Tr(
++		u"Xraygram подключится к Telegram без XRAY: провайдер увидит это "
++		"соединение, а там, где Telegram блокируют, связи не будет. "
++		"Вернуться к XRAY: Настройки → Продвинутые → Тип соединения."_q,
++		u"Xraygram will connect to Telegram without XRAY: your provider will "
++		"see this connection, and where Telegram is blocked it will not "
++		"work. To go back to XRAY: Settings → Advanced → Connection type."_q);
++}
++
++void ApplyCurrentProxy() {
++	auto &settings = Core::App().settings().proxy();
++	Core::App().setCurrentProxy(settings.selected(), settings.settings());
++	Local::writeSettings();
++}
++
++void ConfirmDirectImpl(std::shared_ptr<Ui::Show> show, Fn<void()> done) {
++	show->showBox(Ui::MakeConfirmBox({
++		.text = DirectWarningText(),
++		.confirmed = [=](Fn<void()> close) {
++			close();
++			done();
++		},
++		.confirmText = Tr(u"Подключиться напрямую"_q, u"Connect directly"_q),
++		.confirmStyle = &st::attentionBoxButton,
++		.title = Tr(u"Подключиться напрямую?"_q, u"Connect directly?"_q),
++	}));
++}
++
++void GateBox(not_null<Ui::GenericBox*> box, std::shared_ptr<Ui::Show> show) {
++	struct State {
++		base::Timer timer;
++		int checkId = 0;
++		bool closing = false;
++	};
++	const auto state = box->lifetime().make_state<State>();
++
++	box->setTitle(
++		Tr(u"Подключение через XRAY"_q, u"Connect through XRAY"_q));
++	box->setWidth(st::boxWideWidth);
++	box->setCloseByEscape(false);
++	box->setCloseByOutsideClick(false);
++
++	const auto saved = SavedEntries();
++	const auto clipboard = QGuiApplication::clipboard()->text().trimmed();
++	const auto clipboardLink = LooksLikeShareLink(clipboard)
++		? clipboard
++		: QString();
++	constexpr auto kNewLink = -1;
++
++	box->addRow(object_ptr<Ui::FlatLabel>(
++		box,
++		(saved.empty()
++			? Tr(
++				u"Xraygram подключается к Telegram только через ваш сервер "
++				"XRAY. Вставьте ссылку на него: vless://, vmess://, "
++				"trojan://, ss:// или hysteria2://. Пока ссылки нет, "
++				"Xraygram никуда не подключается."_q,
++				u"Xraygram connects to Telegram only through your XRAY "
++				"server. Paste its link: vless://, vmess://, trojan://, "
++				"ss:// or hysteria2://. Until there is a link, Xraygram "
++				"does not connect anywhere."_q)
++			: Tr(
++				u"Xraygram подключается к Telegram только через ваш сервер "
++				"XRAY. Выберите сохранённый сервер или вставьте новую "
++				"ссылку. До этого Xraygram никуда не подключается."_q,
++				u"Xraygram connects to Telegram only through your XRAY "
++				"server. Choose a saved server or paste a new link. Until "
++				"then Xraygram does not connect anywhere."_q)),
++		st::boxLabel));
++	Ui::AddSkip(box->verticalLayout());
++
++	const auto choice = std::make_shared<Ui::RadiobuttonGroup>(
++		(saved.empty() || !clipboardLink.isEmpty()) ? kNewLink : 0);
++	if (!saved.empty()) {
++		Ui::AddSubsectionTitle(
++			box->verticalLayout(),
++			rpl::single(Tr(u"Сохранённые серверы"_q, u"Saved servers"_q)));
++		for (auto i = 0, count = int(saved.size()); i != count; ++i) {
++			box->addRow(object_ptr<Ui::Radiobutton>(
++				box,
++				choice,
++				i,
++				u"XRAY · "_q + saved[i].label,
++				st::defaultBoxCheckbox));
++		}
++		box->addRow(object_ptr<Ui::Radiobutton>(
++			box,
++			choice,
++			kNewLink,
++			Tr(u"Новая ссылка"_q, u"New link"_q),
++			st::defaultBoxCheckbox));
++		Ui::AddSkip(box->verticalLayout());
++	}
++
++	const auto linkWrap = box->addRow(
++		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
++			box,
++			object_ptr<Ui::VerticalLayout>(box)),
++		style::margins());
++	const auto linkContent = linkWrap->entity();
++	const auto field = linkContent->add(
++		object_ptr<Ui::InputField>(
++			linkContent,
++			st::connectionXrayLinkField,
++			Ui::InputField::Mode::MultiLine,
++			rpl::single(u"vless://…"_q),
++			clipboardLink),
++		st::boxRowPadding);
++	field->setInputMethodHints(Qt::ImhUrlCharactersOnly
++		| Qt::ImhNoAutoUppercase
++		| Qt::ImhNoPredictiveText);
++	const auto status = linkContent->add(
++		object_ptr<Ui::FlatLabel>(
++			linkContent,
++			QString(),
++			st::boxDividerLabel),
++		st::boxRowPadding);
++	linkContent->add(
++		object_ptr<Ui::FlatLabel>(
++			linkContent,
++			Tr(
++				u"Ссылка на ваш сервер: vless://, vmess://, trojan://, ss:// "
++				"или hysteria2://. Если она скопирована, подставится сама."_q,
++				u"Link to your server: vless://, vmess://, trojan://, ss:// "
++				"or hysteria2://. If it is copied, it is filled in "
++				"automatically."_q),
++			st::boxDividerLabel),
++		st::boxRowPadding);
++	linkWrap->toggleOn(choice->value() | rpl::map([=](int value) {
++		return (value == kNewLink);
++	}), anim::type::instant);
++	choice->changes() | rpl::on_next([=](int value) {
++		if (value == kNewLink) {
++			field->setFocusFast();
++		}
++	}, field->lifetime());
++
++	const auto refresh = [=] {
++		const auto link = field->getLastText().trimmed();
++		const auto id = ++state->checkId;
++		if (link.isEmpty()) {
++			status->setText(QString());
++			return;
++		}
++		status->setText(Tr(u"Проверяю ссылку…"_q, u"Checking link…"_q));
++		CheckLink(link, crl::guard(box.get(), [=](CheckResult result) {
++			if (id != state->checkId) {
++				return;
++			}
++			status->setText(result.error.isEmpty()
++				? (Tr(u"Сервер: "_q, u"Server: "_q)
++					+ FormatSummary(result.summary))
++				: (Tr(u"Ошибка: "_q, u"Error: "_q) + result.error));
++		}));
++	};
++	state->timer.setCallback(refresh);
++	field->changes(
++	) | rpl::on_next([=] {
++		++state->checkId;
++		state->timer.callOnce(300);
++	}, field->lifetime());
++	refresh();
++
++	const auto connect = [=] {
++		const auto index = choice->current();
++		const auto useSaved = (index >= 0 && index < int(saved.size()));
++		const auto link = field->getLastText().trimmed();
++		if (!useSaved && link.isEmpty()) {
++			++state->checkId;
++			status->setText(Tr(
++				u"Ошибка: Вставьте ссылку на сервер"_q,
++				u"Error: Paste the server link"_q));
++			field->showError();
++			return;
++		}
++		const auto result = useSaved
++			? ActivateSaved(saved[index].proxy)
++			: SaveLink(link, MTP::ProxyData());
++		if (!result.proxy) {
++			if (useSaved) {
++				show->showToast(
++					Tr(u"Ошибка: "_q, u"Error: "_q) + result.error);
++				return;
++			}
++			++state->checkId;
++			status->setText(
++				Tr(u"Ошибка: "_q, u"Error: "_q) + result.error);
++			field->showError();
++			return;
++		}
++		auto &settings = Core::App().settings().proxy();
++		if (settings.indexInList(result.proxy) < 0) {
++			settings.addToList(result.proxy);
++		}
++		Core::App().setCurrentProxy(
++			result.proxy,
++			MTP::ProxyData::Settings::Enabled);
++		Local::writeSettings();
++		if (!result.error.isEmpty()) {
++			show->showToast(Tr(
++				u"XRAY сохранён, но пока не запустился: "_q,
++				u"XRAY saved but has not started yet: "_q) + result.error);
++		}
++		state->closing = true;
++		box->closeBox();
++	};
++	field->submits(
++	) | rpl::on_next([=] {
++		connect();
++	}, field->lifetime());
++	box->setFocusCallback([=] {
++		if (choice->current() == kNewLink) {
++			field->setFocusFast();
++		}
++	});
++	box->addButton(
++		rpl::single(Tr(u"Подключить"_q, u"Connect"_q)),
++		connect);
++
++	Ui::AddSkip(box->verticalLayout());
++	const auto direct = box->addRow(
++		object_ptr<Ui::LinkButton>(
++			box,
++			Tr(
++				u"Подключиться без XRAY (напрямую)"_q,
++				u"Connect without XRAY (direct)"_q),
++			st::boxLinkButton),
++		style::al_left);
++	direct->setClickedCallback([=] {
++		ConfirmDirectImpl(show, [=] {
++			AllowDirect();
++			ApplyCurrentProxy();
++			state->closing = true;
++			box->closeBox();
++		});
++	});
++
++	rpl::merge(
++		Core::App().proxyChanges() | rpl::to_empty,
++		Core::App().settings().proxy().connectionTypeChanges()
++	) | rpl::on_next([=] {
++		crl::on_main(box.get(), [=] {
++			if (!state->closing && !NetworkBlocked()) {
++				state->closing = true;
++				box->closeBox();
++			}
++		});
++	}, box->lifetime());
++}
++
++} // namespace
++
++void ConfirmDirectConnection(
++		std::shared_ptr<Ui::Show> show,
++		Fn<void()> confirmed) {
++	ConfirmDirectImpl(std::move(show), std::move(confirmed));
++}
++
++void ShowGateIfNeeded() {
++	if (Core::Quitting() || !NetworkBlocked() || CurrentGate) {
++		return;
++	}
++	const auto window = Core::App().activePrimaryWindow();
++	if (!window) {
++		return;
++	}
++	LOG(("Xraygram: network blocked, showing the XRAY gate (saved: %1)."
++		).arg(SavedEntries().size()));
++	const auto show = window->uiShow();
++	auto box = Box(GateBox, show);
++	const auto raw = box.data();
++	CurrentGate = raw;
++	raw->lifetime().add([] {
++		crl::on_main([] {
++			ShowGateIfNeeded();
++		});
++	});
++	show->showBox(std::move(box), Ui::LayerOption::KeepOther);
++}
++
++void RefreshGate() {
++	ApplyCurrentProxy();
++	ShowGateIfNeeded();
++}
++
++} // namespace Xraygram
+diff --git a/Telegram/SourceFiles/xraygram/xraygram_gate.h b/Telegram/SourceFiles/xraygram/xraygram_gate.h
+new file mode 100644
+index 0000000..f2734d7
+--- /dev/null
++++ b/Telegram/SourceFiles/xraygram/xraygram_gate.h
+@@ -0,0 +1,28 @@
++/*
++This file is part of Xraygram, a fork of Telegram Desktop.
++
++For license and copyright information please follow this link:
++https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
++*/
++#pragma once
++
++namespace Ui {
++class Show;
++} // namespace Ui
++
++namespace Xraygram {
++
++// "Connect directly?" confirmation (FEAT-03 texts), `confirmed` on the red button.
++void ConfirmDirectConnection(
++	std::shared_ptr<Ui::Show> show,
++	Fn<void()> confirmed);
++
++// Shows the modal "Add XRAY" box over the active primary window while the
++// network is blocked (no XRAY entry and no explicit direct connection).
++void ShowGateIfNeeded();
++
++// Re-applies the current proxy settings so that MTP and Qt pick up a change
++// of the gate state, then shows the gate if the network got blocked.
++void RefreshGate();
 +
 +} // namespace Xraygram
 diff --git a/Telegram/Telegram.plist b/Telegram/Telegram.plist

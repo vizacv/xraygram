@@ -11,6 +11,12 @@ RUST_PATCHES="23d349a3ff09dbc1fa8127ce39ba9223de0edf21"
 RUST_TOOLCHAIN="1.96.1"
 GIT_BASE="https://github.com"
 
+# Патчи сабмодулей tdesktop: "путь сабмодуля|патч относительно macos/patches".
+# Пути внутри патча — от корня репозитория сабмодуля (так его могут взять Android/iOS).
+XG_SUBMODULE_PATCHES=(
+	"Telegram/ThirdParty/tgcalls|tgcalls/0001-socks5-tcp-relay.patch"
+)
+
 BREW_LIBS=(ada-url ffmpeg@6 jpeg-xl libavif libheif minizip openal-soft openh264 openssl opus qtbase qtimageformats qtshadertools qtsvg xz)
 BREW_TOOLS=(autoconf automake boost cmake libtool ninja pkg-config python go jq wget)
 

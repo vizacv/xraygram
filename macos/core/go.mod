@@ -2,9 +2,12 @@ module xraygram/core
 
 go 1.27.3
 
-// libXray v26.11.9 (SemVer-зеркало тега). Тянет Xray-core v26.11.9.
-// go.sum сгенерирован `go mod tidy` (Go 1.27.4), коммитим его для воспроизводимости.
-require github.com/xtls/libxray v1.261109.0
+require (
+	// libXray v26.11.9 (SemVer-зеркало тега). Тянет Xray-core v26.11.9.
+	// go.sum сгенерирован `go mod tidy` (Go 1.27.4), коммитим его для воспроизводимости.
+	github.com/xtls/libxray v1.261109.0
+	github.com/xtls/xray-core v1.260327.1-0.20261109052709-676eaf66f8f0
+)
 
 require (
 	github.com/apernet/quic-go v0.63.1-0.20261004180939-a10df75c260c // indirect
@@ -40,7 +43,6 @@ require (
 	github.com/vishvananda/netns v0.0.5 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/xtls/reality v0.0.0-20261108101329-4bb46b2afd8b // indirect
-	github.com/xtls/xray-core v1.260327.1-0.20261109052709-676eaf66f8f0 // indirect
 	github.com/yuin/gopher-lua v1.1.2 // indirect
 	go4.org/netipx v0.0.0-20260823151212-3075585bcbeb // indirect
 	golang.org/x/crypto v0.58.0 // indirect

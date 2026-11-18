@@ -8,11 +8,20 @@
 //	xraygram-core check            < link   → "OK <protocol> <address> <name>" или ошибка, код 1
 //	xraygram-core run -listen 127.0.0.1:PORT < link
 //	    env XRAYGRAM_SOCKS_USER / XRAYGRAM_SOCKS_PASS — логин/пароль локального SOCKS5.
-//	    Печатает "READY" в stdout, когда inbound поднят. Завершается по SIGTERM/SIGINT
+//	    Печатает "READY" в stdout, когда порт слушается. Завершается по SIGTERM/SIGINT
 //	    или когда умирает родитель (Telegram), чтобы не оставлять висящий xray.
+//
+// SOCKS5 (CONNECT, логин/пароль) обслуживает сам помощник, а соединения отдаёт в ядро
+// xray через core.Dial. Своих слушающих сокетов у xray нет: xray-core ставит
+// SO_REUSEPORT на все свои listener'ы, и чужой процесс мог бы сесть на тот же
+// 127.0.0.1:порт и получать логин/пароль (BUG-11). net.Listen в Go так не делает.
 package main
 
 import (
+	"bufio"
+	"context"
+	"crypto/subtle"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -21,12 +30,14 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/xtls/libxray/share"
 	"github.com/xtls/libxray/xray"
+	xnet "github.com/xtls/xray-core/common/net"
+	"github.com/xtls/xray-core/core"
 )
 
 const maxLinkSize = 64 * 1024
@@ -64,48 +75,47 @@ func describe(outbound map[string]any) string {
 	protocol, _ := outbound["protocol"].(string)
 	name, _ := outbound["tag"].(string)
 	address := ""
+	port := ""
+	take := func(item map[string]any) {
+		if value, ok := item["address"]; ok && value != nil {
+			address = fmt.Sprint(value)
+		}
+		if value, ok := item["port"]; ok && value != nil {
+			port = fmt.Sprint(value)
+		}
+	}
 	if settings, ok := outbound["settings"].(map[string]any); ok {
-		// vless/vmess: settings.vnext[0].address, остальные: settings.servers[0].address
-		// или settings.address (новый плоский формат).
+		// vless/vmess: settings.vnext[0], остальные: settings.servers[0]
+		// или плоский формат settings.address/port.
 		pick := func(list any) {
 			if items, ok := list.([]any); ok && len(items) > 0 {
 				if item, ok := items[0].(map[string]any); ok {
-					address = fmt.Sprint(item["address"])
+					take(item)
 				}
 			}
 		}
-		if value, ok := settings["address"]; ok {
-			address = fmt.Sprint(value)
+		if _, ok := settings["address"]; ok {
+			take(settings)
 		} else if value, ok := settings["vnext"]; ok {
 			pick(value)
 		} else if value, ok := settings["servers"]; ok {
 			pick(value)
 		}
 	}
-	return fmt.Sprintf("%s %s %s", protocol, address, name)
+	// Формат: "<протокол> <хост:порт> <имя>", имя может содержать пробелы.
+	endpoint := address
+	if port != "" {
+		endpoint = net.JoinHostPort(address, port)
+	}
+	return fmt.Sprintf("%s %s %s", protocol, endpoint, name)
 }
 
-func buildConfig(outbound map[string]any, host string, port int, user, pass string) (string, error) {
+// buildConfig: только outbound из ссылки (первый — маршрут по умолчанию) и freedom.
+// Входов нет: соединения приходят через core.Dial из serveSocks.
+func buildConfig(outbound map[string]any) (string, error) {
 	outbound["tag"] = "proxy"
-	socks := map[string]any{
-		"auth": "noauth",
-		"udp":  false,
-	}
-	if user != "" {
-		socks["auth"] = "password"
-		socks["accounts"] = []map[string]any{{"user": user, "pass": pass}}
-	}
 	config := map[string]any{
 		"log": map[string]any{"loglevel": "warning"},
-		"inbounds": []map[string]any{{
-			"tag":      "socks-in",
-			"listen":   host,
-			"port":     port,
-			"protocol": "socks",
-			"settings": socks,
-		}},
-		// Первый outbound — маршрут по умолчанию. Без routing/geo-файлов:
-		// весь трафик Телеги идёт через сервер.
 		"outbounds": []map[string]any{
 			outbound,
 			{"tag": "direct", "protocol": "freedom"},
@@ -138,14 +148,6 @@ func cmdRun(args []string) int {
 		fmt.Fprintln(os.Stderr, "ERROR "+err.Error())
 		return 1
 	}
-	host, portText, err := net.SplitHostPort(*listen)
-	if err != nil {
-		return fail(err)
-	}
-	port, err := strconv.Atoi(portText)
-	if err != nil {
-		return fail(err)
-	}
 	link, err := readLink()
 	if err != nil {
 		return fail(err)
@@ -155,18 +157,43 @@ func cmdRun(args []string) int {
 		return fail(err)
 	}
 	summary := describe(outbound) // до buildConfig: он перезаписывает tag
-	config, err := buildConfig(
-		outbound,
-		host,
-		port,
-		os.Getenv("XRAYGRAM_SOCKS_USER"),
-		os.Getenv("XRAYGRAM_SOCKS_PASS"))
+	config, err := buildConfig(outbound)
 	if err != nil {
 		return fail(err)
 	}
-	if err := xray.RunXray(config); err != nil {
+
+	// Сначала порт (без SO_REUSEPORT): занят — сразу ошибка, xray не стартуем.
+	front, err := net.Listen("tcp", *listen)
+	if err != nil {
 		return fail(err)
 	}
+	defer front.Close()
+
+	parsed, err := core.LoadConfig("json", strings.NewReader(config))
+	if err != nil {
+		return fail(err)
+	}
+	instance, err := core.New(parsed)
+	if err != nil {
+		return fail(err)
+	}
+	if err := instance.Start(); err != nil {
+		_ = instance.Close()
+		return fail(err)
+	}
+	defer instance.Close()
+
+	user := os.Getenv("XRAYGRAM_SOCKS_USER")
+	pass := os.Getenv("XRAYGRAM_SOCKS_PASS")
+	go func() {
+		for {
+			client, err := front.Accept()
+			if err != nil {
+				return
+			}
+			go serveSocks(client, user, pass, instance)
+		}
+	}()
 	fmt.Println("READY " + summary)
 
 	signals := make(chan os.Signal, 1)
@@ -177,16 +204,141 @@ func cmdRun(args []string) int {
 	for {
 		select {
 		case <-signals:
-			_ = xray.StopXray()
 			return 0
 		case <-ticker.C:
 			// Родитель умер (крэш Телеги) → нас усыновил launchd.
 			if os.Getppid() != parent {
-				_ = xray.StopXray()
 				return 0
 			}
 		}
 	}
+}
+
+// serveSocks — SOCKS5 (RFC 1928) только CONNECT, авторизация логином/паролем (RFC 1929),
+// если они заданы. UDP ASSOCIATE и BIND не поддерживаются (ответ 7), как раньше у xray.
+func serveSocks(client net.Conn, user, pass string, instance *core.Instance) {
+	defer client.Close()
+	_ = client.SetDeadline(time.Now().Add(20 * time.Second))
+	reader := bufio.NewReader(client)
+	readN := func(n int) ([]byte, error) {
+		buffer := make([]byte, n)
+		_, err := io.ReadFull(reader, buffer)
+		return buffer, err
+	}
+
+	head, err := readN(2)
+	if err != nil || head[0] != 5 {
+		return
+	}
+	methods, err := readN(int(head[1]))
+	if err != nil {
+		return
+	}
+	want := byte(0)
+	if user != "" {
+		want = 2
+	}
+	offered := false
+	for _, method := range methods {
+		if method == want {
+			offered = true
+		}
+	}
+	if !offered {
+		_, _ = client.Write([]byte{5, 0xff})
+		return
+	}
+	_, _ = client.Write([]byte{5, want})
+	if want == 2 {
+		version, err := readN(2)
+		if err != nil || version[0] != 1 {
+			return
+		}
+		gotUser, err := readN(int(version[1]))
+		if err != nil {
+			return
+		}
+		passLength, err := readN(1)
+		if err != nil {
+			return
+		}
+		gotPass, err := readN(int(passLength[0]))
+		if err != nil {
+			return
+		}
+		userOk := subtle.ConstantTimeCompare(gotUser, []byte(user)) == 1
+		passOk := subtle.ConstantTimeCompare(gotPass, []byte(pass)) == 1
+		if !userOk || !passOk {
+			_, _ = client.Write([]byte{1, 1})
+			return
+		}
+		_, _ = client.Write([]byte{1, 0})
+	}
+
+	request, err := readN(4)
+	if err != nil || request[0] != 5 {
+		return
+	}
+	reply := func(code byte) {
+		_, _ = client.Write([]byte{5, code, 0, 1, 0, 0, 0, 0, 0, 0})
+	}
+	if request[1] != 1 {
+		reply(7)
+		return
+	}
+	var address xnet.Address
+	switch request[3] {
+	case 1:
+		ip, err := readN(4)
+		if err != nil {
+			return
+		}
+		address = xnet.IPAddress(ip)
+	case 4:
+		ip, err := readN(16)
+		if err != nil {
+			return
+		}
+		address = xnet.IPAddress(ip)
+	case 3:
+		length, err := readN(1)
+		if err != nil {
+			return
+		}
+		domain, err := readN(int(length[0]))
+		if err != nil {
+			return
+		}
+		address = xnet.DomainAddress(string(domain))
+	default:
+		reply(8)
+		return
+	}
+	portBytes, err := readN(2)
+	if err != nil {
+		return
+	}
+	port := xnet.Port(binary.BigEndian.Uint16(portBytes))
+
+	upstream, err := core.Dial(context.Background(), instance, xnet.TCPDestination(address, port))
+	if err != nil {
+		reply(5)
+		return
+	}
+	defer upstream.Close()
+	reply(0)
+	_ = client.SetDeadline(time.Time{})
+
+	done := make(chan struct{}, 2)
+	go func() {
+		_, _ = io.Copy(upstream, reader)
+		done <- struct{}{}
+	}()
+	go func() {
+		_, _ = io.Copy(client, upstream)
+		done <- struct{}{}
+	}()
+	<-done
 }
 
 func main() {

@@ -16,6 +16,8 @@
 #   swap       подменить dist/Xraygram.app собранным в staging/ (когда приложение закрыто)
 #   quick      build + подменить в dist/Xraygram.app только исполняемый файл (секунды вместо
 #              ~5 мин macdeployqt); если поменялись библиотеки/ресурсы — сам делает полный app
+#   snapshot   сохранить копию dist/Xraygram.app с ID сборки: dist/Xraygram-macos-ГГГГММДД-N.app
+#              (N — следующий свободный; свой ID: SNAPSHOT_ID=macos-... build-local.sh snapshot)
 #   dmg        упаковать dist/Xraygram.app в DMG
 #   run        запустить dist/Xraygram.app с логом в терминал
 #   run-dev    запустить приложение прямо из build-каталога (без macdeployqt), быстрее всего
@@ -37,7 +39,7 @@ for arg in "$@"; do
 	case "$arg" in
 		--debug) BUILD_TYPE="Debug" ;;
 		--release) BUILD_TYPE="Release" ;;
-		-h|--help) sed -n '2,29p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,31p' "$0"; exit 0 ;;
 		*) COMMAND="$arg" ;;
 	esac
 done
@@ -232,6 +234,11 @@ cmd_src() {
 		git -C "$XG_SRC" apply --whitespace=nowarn "$patch"
 	done
 	git -C "$XG_SRC" add -A
+	local entry
+	for entry in "${XG_SUBMODULE_PATCHES[@]}"; do
+		xg_log "патч ${entry#*|} → ${entry%%|*}"
+		git -C "$XG_SRC/${entry%%|*}" apply --whitespace=nowarn "$XG_PATCHES/${entry#*|}"
+	done
 }
 
 cmd_core() {
@@ -283,6 +290,7 @@ cmd_configure() {
 		-DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
 		"${API_ARGS[@]}" \
 		-DDESKTOP_APP_USE_PACKAGED=ON \
+		-DXRAYGRAM_ICNS="$XG_REPO/branding/macos/Xraygram.icns" \
 		-DDESKTOP_APP_DISABLE_AUTOUPDATE=ON \
 		-DDESKTOP_APP_DISABLE_CRASH_REPORTS=ON
 }
@@ -337,15 +345,16 @@ bundle_target() { # путь зависимости → путь внутри Co
 	fi
 }
 
-cmd_quick() {
-	local app="$XG_DIST/Xraygram.app" src="$XG_BUILD/Telegram.app"
+cmd_quick() { # QUICK_TARGET=<другой .app> — обновить его вместо dist/Xraygram.app
+	local app="${QUICK_TARGET:-$XG_DIST/Xraygram.app}" src="$XG_BUILD/Telegram.app"
 	cmd_build
 	if [[ ! -d "$app" ]]; then
+		[[ -n "${QUICK_TARGET:-}" ]] && xg_die "нет $app"
 		xg_warn "нет $app, делаю полный app"
 		cmd_app
 		return
 	fi
-	if app_running; then
+	if [[ -z "${QUICK_TARGET:-}" ]] && app_running; then
 		xg_die "Xraygram из $XG_DIST запущен. Закройте его (Cmd+Q) и повторите: $0 quick"
 	fi
 	if ! cmp -s "$src/Contents/Info.plist" "$app/Contents/Info.plist" \
@@ -395,6 +404,26 @@ cmd_quick() {
 	codesign --force --deep --sign - "$app"
 	codesign --verify --deep --strict "$app"
 	xg_log "быстро обновлён $app за $((SECONDS - start)) с"
+}
+
+next_build_id() {
+	local day n=1
+	day="$(date +%Y%m%d)"
+	while [[ -e "$XG_DIST/Xraygram-macos-$day-$n.app" ]]; do
+		n=$((n + 1))
+	done
+	echo "macos-$day-$n"
+}
+
+cmd_snapshot() { # [ID] — копия dist/Xraygram.app с ID сборки (регламент docs/process.md)
+	local app="$XG_DIST/Xraygram.app" id="${SNAPSHOT_ID:-}"
+	[[ -d "$app" ]] || xg_die "нет $app"
+	[[ -n "$id" ]] || id="$(next_build_id)"
+	local target="$XG_DIST/Xraygram-$id.app"
+	[[ -e "$target" ]] && xg_die "$target уже есть, сборку с этим ID не перезаписываю"
+	ditto "$app" "$target"
+	codesign --verify --deep --strict "$target"
+	xg_log "сборка $id: $target ($(stat -f '%Sm' -t '%Y-%m-%d %H:%M' "$app/Contents/MacOS/Telegram"))"
 }
 
 cmd_dmg() {
@@ -448,6 +477,7 @@ case "$COMMAND" in
 	dmg) cmd_dmg ;;
 	swap) cmd_swap ;;
 	quick) cmd_quick ;;
+	snapshot) cmd_snapshot ;;
 	run) cmd_run ;;
 	run-dev) cmd_run_dev ;;
 	status) cmd_status ;;

@@ -35,3 +35,37 @@ PASS  C12  смерть родителя → core вышел за 0.6 с
 ## G — FEAT-03: чистый профиль
 PASS  G1  QA-копия запущена в фоне (pid 54473, run-qa.sh, workdir qa/gate)
 PASS  G2  в логе: Xraygram: network BLOCKED (XRAY entries: no, direct allowed: no). 
+PASS  G3  20 с (F03-01): ни одного внешнего соединения/UDP
+PASS  G8  тестовый экземпляр не на переднем плане (front pid 54830)
+PASS  G4  core не запущен
+PASS  G5  приложение ничего не слушает
+      инфо: строк «refused» в log.txt: 0 (попытки MTP в 127.0.0.1:1)
+PASS  G6  нет попыток DoH/Firebase в логе (0)
+PASS  G7  Cmd+Q (terminate по PID) → выход за 0.7 с
+
+## S — FEAT-03: сохранённая ссылка без записи в списке прокси
+PASS  S1  экран с сохранённой ссылкой: Xraygram: network blocked, showing the XRAY gate (saved: 1).
+PASS  S2  core для неактивной ссылки не запущен
+PASS  S3  8 с: ни одного внешнего соединения
+PASS  S4  ссылка не выброшена из xraygram.json
+
+## X — подключение через XRAY (тестовый сервер 127.0.0.1:10443, Reality)
+PASS  X1  Xraygram: xray started on 127.0.0.1:51619 (vless 127.0.0.1:10443 mac-reality)
+PASS  X2  экран XRAY не показан (запись есть)
+PASS  X3  Telegram подключился к core 127.0.0.1:51619 за ≤ 20 с
+PASS  X4  15 с: Telegram только на 127.0.0.1
+PASS  X5  core ходит только на тестовый сервер 127.0.0.1:10443
+      инфо: строк accepted в access.log тестового сервера: 35
+PASS  X6  kill -9 core → новый core за 3.1 с, порт 51619 (был 51619)
+PASS  X7  после перезапуска core: Telegram только на 127.0.0.1
+PASS  X8  Cmd+Q → приложение вышло за 0.3 с
+PASS  X9  core 56182 завершился вместе с приложением
+PASS  X10  порт 51619 свободен
+PASS  X11  kill -9 приложения → core вышел за 0.4 с
+
+## Y — система
+PASS  Y1  прокси/туннели/VPN/автозапуск не изменились
+PASS  Y2  системный прокси выключен на всех службах
+PASS  Y3  не осталось наших процессов
+
+# Итог: 52 PASS, 0 FAIL, 0 SKIP

@@ -165,3 +165,72 @@
   (`No authentication method was acceptable`).
 - **Следы вне проекта**: tdesktop при старте создаёт пустой `~/Library/Application Support/Xraygram` даже с `-workdir`;
   Go писал телеметрию в `~/Library/Application Support/go` — теперь `GOTELEMETRY=off`, `GOTELEMETRYDIR` внутри проекта.
+
+## Звонки через xray (MAC-01/02), 2026-11-18
+
+### Как звонок 1:1 ходит в сеть (tdesktop 7.4.4, tgcalls `1c236c09f8d8569fead14bd68000618a52051225`)
+
+Сабмодуль `Telegram/ThirdParty/tgcalls` = `TelegramMessenger/tgcalls` на коммите `1c236c09` (2026-09-29).
+
+- `calls/calls_call.cpp`: регистрирует `InstanceImpl` (v1), `InstanceV2Impl` и `InstanceV2ReferenceImpl`; версию выбирает
+  пара клиентов. Сервер отдаёт в `phoneCall.connections` ретрансляторы Telegram: `phoneConnection` (флаг `tcp`, `peer_tag`)
+  и `phoneConnectionWebrtc` (STUN/TURN). `AppendServer` превращает каждый в `RtcServer{isTurn, isTcp, login="reflector"}`.
+- Прокси в `descriptor.proxy` upstream не передаёт: `ProxyData::supportsCalls()` = `false` (`mtproto_proxy_data.cpp`).
+- **v2, `InstanceV2Impl`** → `v2/NativeNetworkingImpl.cpp`, `resetDtlsSrtpTransport()`: `BasicPortAllocator` +
+  `ReflectorRelayPortFactory`. При `_proxy` upstream только выключал UDP/STUN — TCP к ретрансляторам шёл напрямую.
+- **v2, `InstanceV2ReferenceImpl`** → свой `PeerConnection` с тем же `ReflectorRelayPortFactory`; TCP-серверы upstream
+  пропускал вовсе (`if (server.isTcp) continue;`), прокси не использовал.
+- **`v2/ReflectorPort.cpp`**: «TURN» к ретранслятору Telegram. TCP-сокет создаётся в `CreateClientRawTcpSocket()`, аргумент
+  `proxy_info` игнорировался. SOCKS5 в tg_owt больше нет (`rtc_base/socket_adapters.h`: только `AsyncHttpsProxySocket`).
+- **v1, `InstanceImpl`** → `NetworkManager.cpp` уже делает `set_proxy(SOCKS5)`, но через стандартный `TurnPort`,
+  к ретрансляторам Telegram v1 ходит по UDP. Современные клиенты v1 почти не выбирают.
+
+### Патч tgcalls: `macos/patches/tgcalls/0001-socks5-tcp-relay.patch`
+
+Пути — от корня репозитория tgcalls, база — `1c236c09`. Тронуты 5 файлов, новых файлов нет (чтобы не править списки
+сборки на других платформах):
+
+| Файл | Что и зачем |
+|---|---|
+| `tgcalls/v2/ReflectorPort.cpp` | класс `Socks5ProxySocket` (RFC 1928 + логин/пароль RFC 1929) на `rtc::BufferedReadAdapter`; `CreateClientRawTcpSocket()` при `proxy_info.type == PROXY_SOCKS5` создаёт сокет семейства прокси, биндит на «any» и оборачивает в SOCKS5, `CONNECT` к ретранслятору |
+| `tgcalls/v2/ReflectorRelayPortFactory.{h,cpp}` | `MakeSocks5ProxyInfo(Proxy)` и `ProxiedPortAllocatorFlags()`: без UDP/STUN/host-TCP/UDP-relay, без перебора адаптеров |
+| `tgcalls/v2/NativeNetworkingImpl.cpp` | при `_proxy`: флаги выше, фильтр кандидатов `CF_RELAY`, `set_proxy(SOCKS5)`, в TURN-список только TCP-ретрансляторы; лог `SOCKS5 proxy, TCP relays only: N` |
+| `tgcalls/v2/InstanceV2ReferenceImpl.cpp` | при `_proxy`: те же флаги и `set_proxy`, `IceTransportsType::kRelay`, вместо UDP — TCP-ретрансляторы как `turn:ip:port?transport=tcp` |
+
+Итог: при прокси у звонка только relay-кандидаты через TCP-ретрансляторы Telegram, каждое TCP-соединение идёт
+`127.0.0.1:<порт XRAY> → SOCKS5 CONNECT → ретранслятор`. Ни UDP, ни прямого P2P, ни прямого TCP. Если Telegram
+не выдал TCP-ретрансляторов, звонок не соединится, но и напрямую не пойдёт.
+
+Перенос на другие платформы:
+- Android: `TMessagesProj/jni/voip/tgcalls/` соответствует каталогу `tgcalls/` репозитория →
+  `git apply -p2 --directory=TMessagesProj/jni/voip/tgcalls macos/patches/tgcalls/0001-socks5-tcp-relay.patch`
+  (версия tgcalls там другая, возможны конфликты: смысл правок — таблица выше). Плюс передать `Proxy` в descriptor и
+  проверить, что их tg_owt/libwebrtc тоже без `AsyncSocksProxySocket` (адаптер самодостаточен).
+- iOS (TgVoipWebrtc): то же по путям `tgcalls/tgcalls/v2/...`.
+
+### Патч tdesktop (в `0001-xraygram-xray-socks.patch`)
+
+- `calls/calls_call.cpp`: если выбрана и включена XRAY-запись — `descriptor.proxy` = её SOCKS5 (127.0.0.1, логин/пароль),
+  `enableP2P = false`, без галки «use proxy for calls». Для прочих прокси — поведение upstream. В лог:
+  `Call Info: N rtc servers, M TCP relays, xray proxy: yes|no`.
+
+### Групповые звонки, видеочаты, конференции (MAC-02) — не делаем, предупреждаем
+
+`tgcalls/group/GroupNetworkManager.cpp`: `BasicPortAllocator` без relay-серверов (`SetConfiguration({}, {})`), ICE с
+SFU Телеги по кандидатам из ответа `phone.joinGroupCall`. Варианты:
+1. ICE-TCP к SFU через SOCKS5: нужен свой `TCPPort`/`TCPConnection` с SOCKS-адаптером **и** TCP-кандидаты у SFU.
+   Есть ли они у Telegram — неизвестно (в tdesktop нет признаков). Оценка: 2–4 дня + риск, что сервер не даст TCP.
+2. Свой TURN рядом с xray (TURN-over-TCP через SOCKS, `turn` на VPS): работает только если SFU принимает relay-кандидаты;
+   нужна правка движка и сервер TURN. Оценка: 3–5 дней + инфраструктура.
+3. **Сделано:** окно «Без xray» перед входом в видеочат/групповой звонок/конференцию, если активна XRAY-запись
+   (`calls/calls_instance.cpp`, `ConfirmGroupCallWithoutXray`). Трансляции RTMP не предупреждаем: зритель получает поток
+   через MTProto (`upload.getFile`), то есть через xray.
+
+### MAC-04 — сделано, MAC-05/06 — нет
+
+- MAC-04 (`boxes/connection_box.cpp`): удаление активной XRAY-записи переключает на другую XRAY-запись; если это последняя,
+  сначала окно «Удалить XRAY?» (дальше соединение пойдёт напрямую). То же для «удалить все» и группового удаления.
+- MAC-05 (первый запуск напрямую) малой кровью не закрывается: в tdesktop нет режима «не подключаться, пока не выбран
+  прокси». Варианты: заглушка-прокси на первый запуск (запись `127.0.0.1:<мертвый порт>`, связь не идёт, пока не добавят
+  XRAY) или отдельный экран «Добавьте XRAY» до старта MTP. Нужна продуктовая развилка — решает владелец.
+- MAC-06 (core удалённой записи живёт до перезапуска) не трогал.

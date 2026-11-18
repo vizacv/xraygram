@@ -21,7 +21,10 @@
 - [x] Локальная сборка на MacBook Air M5: патч компилируется без ошибок и предупреждений в наших файлах,
       `Xraygram.app` запускается, `xraygram-core` стартует с приложением и умирает вместе с ним (2026-11-18)
 - [ ] Первый зелёный прогон CI
-- [ ] Тест с реальной `vless://` ссылкой и входом в аккаунт
+- [x] Тест с реальной `vless://` ссылкой и входом в аккаунт (владелец, 2026-11-18)
+- [x] Звонки 1:1 через xray: патч tgcalls (SOCKS5 + только TCP-ретрансляторы) собран, в `dist/` (2026-11-18)
+- [ ] **Ждёт живого теста:** звонок 1:1 через xray со вторым человеком (сценарий — ниже, «Проверка звонков»)
+- [x] Экран «Подключение через XRAY» (MAC-05): без XRAY-записей сеть заблокирована, выбор сохранённых серверов (2026-11-18)
 
 ## Как собрать (CI)
 
@@ -122,6 +125,25 @@ macos/scripts/build-local.sh status
 `run-dev` запускает приложение прямо из build-каталога (библиотеки берутся из `/opt/homebrew`), `xraygram-core`
 подставляется через переменную `XRAYGRAM_CORE`; это быстрее, чем пересобирать бандл.
 
+Сборки по регламенту (`docs/process.md`): после `quick`/`app` сохранить копию с ID и зарегистрировать её
+в `docs/builds.md`, затем написать QA (сессия «Xraygram тестирование»):
+
+```bash
+macos/scripts/build-local.sh snapshot   # dist/Xraygram-macos-ГГГГММДД-N.app, N — следующий свободный
+```
+
+Тестовый запуск, не мешающий владельцу (BUG-09): QA-копия с другим bundle id, без Dock и без активации окна.
+
+```bash
+macos/scripts/make-qa-app.sh upstream/xraygram-local/dist/Xraygram-macos-ГГГГММДД-N.app
+```
+
+```bash
+macos/scripts/run-qa.sh upstream/xraygram-local/dist/Xraygram-macos-ГГГГММДД-N-QA.app upstream/xraygram-local/qa-run
+```
+
+`run-qa.sh` печатает PID; остановить — `kill <PID>` (только свой процесс, проверяйте `-workdir` в `ps`).
+
 Правки патча: меняем файлы в `upstream/tdesktop`, потом
 
 ```bash
@@ -158,3 +180,22 @@ sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 ```bash
 sudo xcodebuild -license accept
 ```
+
+## Проверка звонков через xray
+
+1. Закройте Xraygram (Cmd+Q) и запустите с debug-логом:
+   ```bash
+   open ~/xraygram/upstream/xraygram-local/dist/Xraygram.app --args -debug
+   ```
+2. Во втором окне Терминала: `~/xraygram/testing/scripts/net-watch.sh`.
+3. Позвоните человеку с обычным Telegram (голос, минута; потом видео). В `net-watch` не должно быть строк
+   `UDP Telegram` и `УТЕЧКА`.
+4. После звонка:
+   ```bash
+   grep "Call Info" ~/Library/Application\ Support/Xraygram/log.txt | tail -3
+   ```
+   ```bash
+   grep -E "TCP relays only|REFLECTOR TCP via SOCKS5|SOCKS5 CONNECT" ~/Library/Application\ Support/Xraygram/DebugLogs/last_call_log.txt | head
+   ```
+   Нужно: `TCP relays` больше 0, `xray proxy: yes`, строки `REFLECTOR TCP via SOCKS5`, без `SOCKS5 CONNECT ... failed`.
+5. Видеочат в группе: перед входом должно появиться окно «Без xray».
