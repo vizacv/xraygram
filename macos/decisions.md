@@ -220,3 +220,52 @@ bundle id `io.github.xraygram.desktop`, имя в Dock/Finder «Xraygram», URL-
   ссылке конференции во время звонка) — тот же диалог «Без XRAY». Без `show` берём панель текущего звонка или главное
   окно. «Отмена» — звонок 1:1 остаётся через XRAY; при принятии приглашения — приглашение отклоняется (иначе звонок
   висел бы в «обмене ключами»).
+
+## 2026-11-19 — FEAT-19 (ребрендинг): как сделано в tdesktop
+
+**Подмена «Telegram» — по списку ключей** (PAR-20). Единая точка — `Lang::Instance::getValue`
+(`lang/lang_instance.h`): для ключа из списка значение проходит через `Xraygram::BrandValue`
+(`xraygram/xraygram_brand.cpp`): `Telegram Desktop` / `Telegram` (целое слово) / `Телеграм(м)…` → `Xraygram`.
+Так подменяются и встроенные строки, и облачные языковые пакеты (F19-12). Ключи вне списка не трогаются.
+
+Список ключей (держать в синхроне с `CollectBrandKeys()`; QA — для F19-09/10):
+
+| Группа | Ключи |
+|---|---|
+| Трей, запуск | `lng_open_from_tray`, `lng_quit_from_tray`, `lng_tray_icon_text`, `lng_error_start_minimized_passcoded`, `lng_settings_auto_start` |
+| Приложение, обновление | `lng_intro_about`, `lng_update_telegram`, `lng_new_version_wrap`, `lng_outdated_soon`, `lng_outdated_now`, `lng_sure_save_language`, `lng_proxy_unsupported` |
+| Код-пароль, блокировка | `lng_settings_passcode_lock_app`, `lng_settings_use_touchid_about`, `lng_settings_use_applewatch_about`, `lng_settings_use_systempwd_about`, `lng_passcode_about`, `lng_passcode_about2`, `lng_passcode_about3`, `lng_passcode_unlock_about`, `lng_wallet_protection_open_warning_lock` |
+| Хранилище, темы | `lng_local_storage_device_telegram`, `lng_local_storage_device_usage`, `lng_theme_no_desktop` |
+| «Не поддерживается этим приложением» | `lng_bad_photo`, `lng_bad_video`, `lng_message_unsupported`, `lng_unsupported_message_text`, `lng_unsupported_block_text`, `lng_stories_unsupported`, `lng_bot_share_location_unavailable` |
+| Звонки, доступы macOS | `lng_call_status_group_invite`, `lng_call_box_about`, `lng_confcall_join_text`, `lng_group_call_mac_access`, `lng_group_call_mac_input`, `lng_group_call_mac_accessibility`, `lng_group_call_mac_screencast_access`, `lng_group_call_mac_recording`, `lng_no_mic_permission` |
+| Экранный диктор | `lng_screen_reader_bar_text`, `lng_screen_reader_confirm_text` |
+
+Сомнительные — **не подменены**, вопрос продукту: `lng_language_not_ready_about` (перевод «для Telegram Desktop»),
+`lng_settings_passkeys_unsigned_error`, `lng_wallet_protection_open_about`, `lng_wallet_protection_hardware_unavailable`,
+`lng_mini_apps_disclaimer`, `lng_age_verify*`, `lng_intro_qr_title` («Войдите в Telegram по QR-коду»),
+`lng_settings_faq` / `lng_settings_features` / `lng_settings_ask_sure` (справка сервиса — по спеке остаются).
+
+Строки в коде (не ключи): уведомление-пример и пример в настройках уведомлений, окно сбоя, ссылка внизу главного
+меню (→ github.com/vizacv/xraygram). Водяной знак видео-кружочков (самолётик + круговая надпись, вшиваются в
+видео) — выключен (`kXraygramNoWatermark`, `round_video_recorder.cpp`), F19-18.
+
+**Картинки** (PAR-19): не в патче, а из `branding/` при сборке. Опция CMake `XRAYGRAM_BRANDING_DIR` генерирует
+`build/Telegram/xraygram_branding.qrc` (префикс `:/xraygram/`): `logo.png` ← `macos/xraygram-macos-1024.png`,
+`logo_square.png` ← `xraygram-icon-1024.png`, `tray*.png` ← `macos/tray/mac_tray_icon*.png` (альфа-маски 22/44/66,
+красятся как штатный значок — светлая/тёмная строка меню). Без опции — значки upstream. Где используется:
+иконка окна и Dock (`Window::Logo`), «О приложении»/круглая иконка в настройках, трей (`tray_mac.mm`),
+служебный чат 777000 — **остаётся** логотип Telegram (спека §2). Центр QR (вход, прокси/«Поделиться сервером»,
+профиль/группа/ссылки — `peer_qr_surface`) — пустой (`Xraygram::kPlainQr`), без знаков (спека §3: на отдаваемом наружу — ни Telegram, ни Xraygram).
+
+**Вступление** (PAR-18): один экран `Intro::StartWidget`. Обложка `Step::paintXrayCover` — иконка + луч
+(`accent` 55 % полоса и линия `#8FFBE0`, 1,2 с, один раз при показе; при `anim::Disabled()` — без луча).
+`XRAYGRAM` — системный моноширинный 28, разрядка 6 (рисуется вручную, у FlatLabel нет разрядки). «Начать».
+Внизу «Русский · English» (вместо ссылки «Продолжить на …»). Выбор (`Xraygram::SetUiLanguage`):
+экраны Xraygram — сразу (переопределение в `tdata/xraygram_ui.json`); Telegram: EN — `resetToDefault()` (без сети),
+RU — `switchToLanguage("ru")`, применяется, когда сеть есть (после XRAY). Переопределение снимается, когда язык
+Telegram догнал выбор или пользователь выбрал другой язык в настройках. Порядок: Tr → выбор на вступлении →
+язык приложения → язык системы. Цвета обложки — из текущей темы (тема «Рентген» — FEAT-20, не начата).
+
+**«О приложении»** (PAR-21): `Xraygram 0.4`, «Неофициальный клиент Telegram…», мелко «На основе Telegram Desktop
+<версия>. Исходный код: github.com/vizacv/xraygram». Ссылка на changelog и FAQ убраны. Версия Xraygram — константа
+`Xraygram::kVersion` (политика версий — вопрос оркестратору).

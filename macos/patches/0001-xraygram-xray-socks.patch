@@ -1,19 +1,22 @@
 diff --git a/Telegram/CMakeLists.txt b/Telegram/CMakeLists.txt
-index 1601b50..7640f3c 100644
+index 1601b50..5e5fbb4 100644
 --- a/Telegram/CMakeLists.txt
 +++ b/Telegram/CMakeLists.txt
-@@ -596,6 +596,10 @@ PRIVATE
+@@ -596,6 +596,13 @@ PRIVATE
      core/core_settings.h
      core/core_settings_proxy.cpp
      core/core_settings_proxy.h
++    xraygram/xraygram_brand.cpp
++    xraygram/xraygram_brand.h
 +    xraygram/xraygram_core.cpp
 +    xraygram/xraygram_core.h
 +    xraygram/xraygram_gate.cpp
 +    xraygram/xraygram_gate.h
++    xraygram/xraygram_lang.cpp
      core/crash_report_window.cpp
      core/crash_report_window.h
      core/crash_reports.cpp
-@@ -2755,7 +2759,16 @@ elseif (APPLE)
+@@ -2755,7 +2762,16 @@ elseif (APPLE)
          set(icon_path ${icons_path}/Icon.iconset)
          find_program(ICONUTIL iconutil)
          find_program(PNG2ICNS png2icns)
@@ -31,7 +34,7 @@ index 1601b50..7640f3c 100644
              add_custom_command(
                  OUTPUT Icon.icns
                  COMMAND ${ICONUTIL}
-@@ -2777,7 +2790,7 @@ elseif (APPLE)
+@@ -2777,7 +2793,7 @@ elseif (APPLE)
                      ${icon_path}/icon_512x512.png
              )
          endif()
@@ -40,7 +43,7 @@ index 1601b50..7640f3c 100644
              set_source_files_properties(Icon.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
              target_add_resource(Telegram Icon.icns)
          endif()
-@@ -2855,9 +2868,9 @@ if (build_macstore)
+@@ -2855,9 +2871,9 @@ if (build_macstore)
      )
  else()
      if (CMAKE_GENERATOR STREQUAL Xcode)
@@ -52,24 +55,191 @@ index 1601b50..7640f3c 100644
      endif()
      set(bundle_entitlements "Telegram.entitlements")
      set(output_name "Telegram")
+@@ -2992,6 +3008,39 @@ if (MSVC)
+     endif()
+ endif()
+ 
++# Xraygram (FEAT-19): brand images from the repository branding/ folder,
++# compiled into the app resources as :/xraygram/*. No binaries in the patch.
++set(XRAYGRAM_BRANDING_DIR "" CACHE PATH "Xraygram: branding/ folder with logos and tray masks.")
++if (XRAYGRAM_BRANDING_DIR)
++    set(xraygram_brand_files
++        "logo.png=macos/xraygram-macos-1024.png"
++        "logo_square.png=xraygram-icon-1024.png"
++        "tray.png=macos/tray/mac_tray_icon.png"
++        "tray@2x.png=macos/tray/mac_tray_icon@2x.png"
++        "tray@3x.png=macos/tray/mac_tray_icon@3x.png"
++    )
++    set(xraygram_brand_entries "")
++    set(xraygram_brand_sources)
++    foreach (pair ${xraygram_brand_files})
++        string(REPLACE "=" ";" pair_list "${pair}")
++        list(GET pair_list 0 brand_alias)
++        list(GET pair_list 1 brand_path)
++        set(brand_source "${XRAYGRAM_BRANDING_DIR}/${brand_path}")
++        if (NOT EXISTS "${brand_source}")
++            message(FATAL_ERROR "Xraygram: missing branding file ${brand_source}")
++        endif()
++        file(RELATIVE_PATH brand_relative "${CMAKE_CURRENT_BINARY_DIR}" "${brand_source}")
++        string(APPEND xraygram_brand_entries "    <file alias=\"${brand_alias}\">${brand_relative}</file>\n")
++        list(APPEND xraygram_brand_sources "${brand_source}")
++    endforeach()
++    set(xraygram_brand_qrc "${CMAKE_CURRENT_BINARY_DIR}/xraygram_branding.qrc")
++    file(CONFIGURE OUTPUT "${xraygram_brand_qrc}" CONTENT
++"<RCC>\n  <qresource prefix=\"/xraygram\">\n${xraygram_brand_entries}  </qresource>\n</RCC>\n" @ONLY)
++    set_source_files_properties("${xraygram_brand_qrc}" PROPERTIES
++        QRC_GENERATED_FROM "${xraygram_brand_sources}")
++    target_sources(Telegram PRIVATE "${xraygram_brand_qrc}")
++endif()
++
+ target_prepare_qrc(Telegram)
+ 
+ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_winstore)
 diff --git a/Telegram/SourceFiles/boxes/about_box.cpp b/Telegram/SourceFiles/boxes/about_box.cpp
-index 31c60aa..99bc1a3 100644
+index 31c60aa..56f630e 100644
 --- a/Telegram/SourceFiles/boxes/about_box.cpp
 +++ b/Telegram/SourceFiles/boxes/about_box.cpp
-@@ -65,7 +65,7 @@ rpl::producer<TextWithEntities> Text3() {
+@@ -13,6 +13,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ #include "core/update_channel.h"
+ #include "core/update_checker.h"
+ #include "core/version.h"
++#include "xraygram/xraygram_brand.h"
++#include "xraygram/xraygram_core.h"
+ #include "lang/lang_keys.h"
+ #include "ui/boxes/confirm_box.h"
+ #include "ui/painter.h"
+@@ -36,97 +38,44 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ namespace {
+ 
+ rpl::producer<TextWithEntities> Text1() {
+-	return tr::lng_about_text1(
+-		lt_api_link,
+-		tr::lng_about_text1_api(tr::url(u"https://core.telegram.org/api"_q)),
+-		tr::marked);
++	return rpl::single(TextWithEntities{ Xraygram::Tr(
++		u"Неофициальный клиент Telegram, который подключается через ваш "
++		"сервер XRAY."_q,
++		u"An unofficial Telegram client that connects through your own "
++		"XRAY server."_q) });
+ }
+ 
+ rpl::producer<TextWithEntities> Text2() {
+-	return tr::lng_about_text2(
+-		lt_gpl_link,
+-		rpl::single(tr::link(
+-			"GNU GPL",
+-			"https://github.com/telegramdesktop/tdesktop/blob/master/LICENSE")),
+-		lt_github_link,
+-		rpl::single(tr::link(
+-			"GitHub",
+-			"https://github.com/telegramdesktop/tdesktop")),
+-		tr::marked);
+-}
+-
+-rpl::producer<TextWithEntities> Text3() {
+-	return tr::lng_about_text3(
+-		lt_faq_link,
+-		tr::lng_about_text3_faq(tr::url(telegramFaqLink())),
+-		tr::marked);
++	auto result = TextWithEntities{ Xraygram::Tr(
++		u"На основе Telegram Desktop %1. Исходный код: "_q,
++		u"Based on Telegram Desktop %1. Source code: "_q
++	).arg(QString::fromLatin1(AppVersionStr)) };
++	result.append(tr::link(
++		u"github.com/vizacv/xraygram"_q,
++		QString::fromLatin1(Xraygram::kSourceUrl)));
++	return rpl::single(result);
+ }
+ 
  } // namespace
  
  void AboutBox(not_null<Ui::GenericBox*> box) {
 -	box->setTitle(u"Telegram Desktop"_q);
-+	box->setTitle(u"Xraygram"_q);
++	box->setTitle(u"Xraygram "_q + QString::fromLatin1(Xraygram::kVersion));
  
  	auto layout = box->verticalLayout();
+-
+-	const auto version = layout->add(
+-		object_ptr<Ui::LinkButton>(
+-			box,
+-			tr::lng_about_version(
+-				tr::now,
+-				lt_version,
+-				currentVersionText()),
+-			st::aboutVersionLink),
+-		QMargins(
+-			st::boxRowPadding.left(),
+-			-st::lineWidth * 3,
+-			st::boxRowPadding.right(),
+-			st::boxRowPadding.bottom()));
+-	version->setClickedCallback([=] {
+-		if (cRealAlphaVersion()) {
+-			auto url = u"https://tdesktop.com/"_q;
+-			if (Platform::IsWindows32Bit()) {
+-				url += u"win/%1.zip"_q;
+-			} else if (Platform::IsWindows64Bit()) {
+-				url += u"win64/%1.zip"_q;
+-			} else if (Platform::IsWindowsARM64()) {
+-				url += u"winarm/%1.zip"_q;
+-			} else if (Platform::IsMac()) {
+-				url += u"mac/%1.zip"_q;
+-			} else if (Platform::IsLinux()) {
+-				url += u"linux/%1.tar.xz"_q;
+-			} else {
+-				Unexpected("Platform value.");
+-			}
+-			url = url.arg(u"talpha%1_%2"_q
+-				.arg(cRealAlphaVersion())
+-				.arg(Core::countAlphaVersionSignature(cRealAlphaVersion())));
+-
+-			QGuiApplication::clipboard()->setText(url);
+-
+-			box->getDelegate()->show(
+-				Ui::MakeInformBox(
+-					"The link to the current private alpha "
+-					"version of Telegram Desktop was copied "
+-					"to the clipboard."));
+-		} else {
+-			File::OpenUrl(Core::App().changelogLink());
+-		}
+-	});
+-
+ 	Ui::AddSkip(layout, st::aboutTopSkip);
+ 
+-	const auto addText = [&](rpl::producer<TextWithEntities> text) {
++	const auto addText = [&](
++			rpl::producer<TextWithEntities> text,
++			const style::FlatLabel &st) {
+ 		const auto label = layout->add(
+-			object_ptr<Ui::FlatLabel>(box, std::move(text), st::aboutLabel),
++			object_ptr<Ui::FlatLabel>(box, std::move(text), st),
+ 			st::boxRowPadding);
+ 		label->setLinksTrusted();
+ 		Ui::AddSkip(layout, st::aboutSkip);
+ 	};
+ 
+-	addText(Text1());
+-	addText(Text2());
+-	addText(Text3());
++	addText(Text1(), st::aboutLabel);
++	addText(Text2(), st::boxDividerLabel);
+ 
+ 	box->addButton(tr::lng_close(), [=] { box->closeBox(); });
  
 diff --git a/Telegram/SourceFiles/boxes/connection_box.cpp b/Telegram/SourceFiles/boxes/connection_box.cpp
-index 43f8a2a..a992187 100644
+index 43f8a2a..27ed554 100644
 --- a/Telegram/SourceFiles/boxes/connection_box.cpp
 +++ b/Telegram/SourceFiles/boxes/connection_box.cpp
-@@ -55,6 +55,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #include "boxes/connection_box.h"
+ 
++#include "xraygram/xraygram_brand.h"
++
+ #include "base/call_delayed.h"
+ #include "base/qt/qt_key_modifiers.h"
+ #include "base/qthelp_regex.h"
+@@ -55,6 +57,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
  #include "ui/ui_utility.h"
  #include "boxes/abstract_box.h" // Ui::show().
  #include "window/window_session_controller.h"
@@ -78,7 +248,7 @@ index 43f8a2a..a992187 100644
  #include "styles/style_boxes.h"
  #include "styles/style_chat_helpers.h"
  #include "styles/style_connection_box.h"
-@@ -74,6 +76,14 @@ constexpr auto kSaveSettingsDelayedTimeout = crl::time(1000);
+@@ -74,6 +78,14 @@ constexpr auto kSaveSettingsDelayedTimeout = crl::time(1000);
  
  using ProxyData = MTP::ProxyData;
  
@@ -93,7 +263,7 @@ index 43f8a2a..a992187 100644
  struct TopButtonMenuState {
  	~TopButtonMenuState() {
  		closing = true;
-@@ -113,6 +123,9 @@ struct TopButtonMenuState {
+@@ -113,6 +125,9 @@ struct TopButtonMenuState {
  
  [[nodiscard]] bool ProxyDataIsShareable(const ProxyData &proxy) {
  	using Type = ProxyData::Type;
@@ -103,7 +273,18 @@ index 43f8a2a..a992187 100644
  	return (proxy.type == Type::Socks5)
  		|| (proxy.type == Type::Mtproto)
  		|| (proxy.type == Type::Web);
-@@ -297,6 +310,87 @@ void ShowProxyQrBox(std::shared_ptr<Ui::Show> show, const QString &link) {
+@@ -204,6 +219,10 @@ struct TopButtonMenuState {
+ 		QImage::Format_ARGB32_Premultiplied);
+ 	result.fill(Qt::transparent);
+ 	result.setDevicePixelRatio(style::DevicePixelRatio());
++	if (Xraygram::kPlainQr) {
++		// FEAT-19 §3: no Telegram and no Xraygram sign in QR centers.
++		return result;
++	}
+ 	{
+ 		auto p = QPainter(&result);
+ 		auto hq = PainterHighQualityEnabler(p);
+@@ -297,6 +316,87 @@ void ShowProxyQrBox(std::shared_ptr<Ui::Show> show, const QString &link) {
  	}));
  }
  
@@ -191,7 +372,7 @@ index 43f8a2a..a992187 100644
  void ShareProxy(
  		std::shared_ptr<Ui::Show> show,
  		not_null<Main::Account*> account,
-@@ -423,6 +517,10 @@ void ShareProxy(
+@@ -423,6 +523,10 @@ void ShareProxy(
  void AddProxyFromClipboard(
  		not_null<ProxiesBoxController*> controller,
  		std::shared_ptr<Ui::Show> show) {
@@ -202,7 +383,7 @@ index 43f8a2a..a992187 100644
  	const auto proxyString = u"proxy"_q;
  	const auto socksString = u"socks"_q;
  	const auto webproxyString = u"webproxy"_q;
-@@ -756,7 +854,9 @@ private:
+@@ -756,7 +860,9 @@ private:
  
  	void prepare() override;
  	void setInnerFocus() override {
@@ -213,7 +394,7 @@ index 43f8a2a..a992187 100644
  			_webHost->setFocusFast();
  		} else {
  			_host->setFocusFast();
-@@ -773,6 +873,9 @@ private:
+@@ -773,6 +879,9 @@ private:
  	void setupWebAddress(const ProxyData &data);
  	void setupCredentials(const ProxyData &data);
  	void setupMtprotoCredentials(const ProxyData &data);
@@ -223,7 +404,7 @@ index 43f8a2a..a992187 100644
  
  	void addLabel(
  		not_null<Ui::VerticalLayout*> parent,
-@@ -799,6 +902,13 @@ private:
+@@ -799,6 +908,13 @@ private:
  	QPointer<Ui::SlideWrap<Ui::VerticalLayout>> _credentials;
  	QPointer<Ui::SlideWrap<Ui::VerticalLayout>> _mtprotoCredentials;
  
@@ -237,7 +418,7 @@ index 43f8a2a..a992187 100644
  };
  
  ProxyRow::ProxyRow(QWidget *parent, View &&view)
-@@ -985,6 +1095,9 @@ void ProxyRow::paintEvent(QPaintEvent *e) {
+@@ -985,6 +1101,9 @@ void ProxyRow::paintEvent(QPaintEvent *e) {
  	top += st::semiboldFont->height + st::proxyRowSkip;
  
  	const auto statusFg = [&] {
@@ -247,7 +428,7 @@ index 43f8a2a..a992187 100644
  		switch (_view.state) {
  		case State::Online:
  			return st::proxyRowStatusFgOnline;
-@@ -999,6 +1112,9 @@ void ProxyRow::paintEvent(QPaintEvent *e) {
+@@ -999,6 +1118,9 @@ void ProxyRow::paintEvent(QPaintEvent *e) {
  		}
  	}();
  	const auto status = [&] {
@@ -257,7 +438,7 @@ index 43f8a2a..a992187 100644
  		switch (_view.state) {
  		case State::Available:
  			return tr::lng_proxy_available(
-@@ -1211,6 +1327,13 @@ void ProxyRow::fillMenu(const AddAction &addAction) {
+@@ -1211,6 +1333,13 @@ void ProxyRow::fillMenu(const AddAction &addAction) {
  			_openBrowserClicks.fire({});
  		}, &st::menuIconLink);
  	}
@@ -271,7 +452,7 @@ index 43f8a2a..a992187 100644
  	if (_view.supportsShare) {
  		addAction(tr::lng_proxy_edit_share(tr::now), [=] {
  			_shareClicks.fire({});
-@@ -1436,6 +1559,14 @@ void ProxiesBox::setupContent() {
+@@ -1436,6 +1565,14 @@ void ProxiesBox::setupContent() {
  		st::proxyRowPadding.bottom()));
  
  	_proxySettings->setChangedCallback([=](ProxyData::Settings value) {
@@ -286,7 +467,7 @@ index 43f8a2a..a992187 100644
  		if (!_controller->setProxySettings(value)) {
  			_proxySettings->setValue(_settings.settings());
  			addNewProxy();
-@@ -1853,7 +1984,8 @@ ProxyBox::ProxyBox(
+@@ -1853,7 +1990,8 @@ ProxyBox::ProxyBox(
  : _allowShare(data.type != Type::None)
  , _callback(std::move(callback))
  , _shareCallback(std::move(shareCallback))
@@ -296,7 +477,7 @@ index 43f8a2a..a992187 100644
  	setupControls(data);
  }
  
-@@ -1912,6 +2044,8 @@ void ProxyBox::prepare() {
+@@ -1912,6 +2050,8 @@ void ProxyBox::prepare() {
  	) | rpl::on_next(submit, _user->lifetime());
  	_webHost->submits(
  	) | rpl::on_next(submit, _webHost->lifetime());
@@ -305,7 +486,7 @@ index 43f8a2a..a992187 100644
  	connect(_password.data(), &Ui::MaskedInputField::submitted, submit);
  	connect(_secret.data(), &Ui::MaskedInputField::submitted, submit);
  
-@@ -1930,6 +2064,12 @@ void ProxyBox::refreshButtons() {
+@@ -1930,6 +2070,12 @@ void ProxyBox::refreshButtons() {
  			|| type == Type::Mtproto
  			|| type == Type::Web)) {
  		addLeftButton(tr::lng_proxy_share(), [=] { share(); });
@@ -318,7 +499,7 @@ index 43f8a2a..a992187 100644
  	}
  }
  
-@@ -1947,6 +2087,9 @@ void ProxyBox::share() {
+@@ -1947,6 +2093,9 @@ void ProxyBox::share() {
  }
  
  ProxyData ProxyBox::collectData() {
@@ -328,7 +509,7 @@ index 43f8a2a..a992187 100644
  	auto result = ProxyData();
  	result.type = _type->current();
  	const auto web = (result.type == Type::Web);
-@@ -1992,6 +2135,7 @@ ProxyData ProxyBox::collectData() {
+@@ -1992,6 +2141,7 @@ ProxyData ProxyBox::collectData() {
  
  void ProxyBox::setupTypes() {
  	const auto types = std::vector<std::pair<Type, QString>>{
@@ -336,7 +517,7 @@ index 43f8a2a..a992187 100644
  		{ Type::Mtproto, u"MTPROTO"_q },
  		{ Type::Socks5, u"SOCKS5"_q },
  		{ Type::Http, u"HTTP"_q },
-@@ -2140,10 +2284,107 @@ void ProxyBox::setupMtprotoCredentials(const ProxyData &data) {
+@@ -2140,10 +2290,107 @@ void ProxyBox::setupMtprotoCredentials(const ProxyData &data) {
  	mtproto->add(std::move(secretWrap), st::proxyEditInputPadding);
  }
  
@@ -446,7 +627,7 @@ index 43f8a2a..a992187 100644
  			: data.type));
  	_content.create(this);
  	_content->resizeToWidth(st::boxWideWidth);
-@@ -2154,13 +2395,18 @@ void ProxyBox::setupControls(const ProxyData &data) {
+@@ -2154,13 +2401,18 @@ void ProxyBox::setupControls(const ProxyData &data) {
  	setupWebAddress(data);
  	setupCredentials(data);
  	setupMtprotoCredentials(data);
@@ -466,7 +647,7 @@ index 43f8a2a..a992187 100644
  		_webAddress->toggle(web, anim::type::instant);
  		_credentials->toggle(credentialsShown, anim::type::instant);
  		_mtprotoCredentials->toggle(mtprotoShown, anim::type::instant);
-@@ -2216,6 +2462,15 @@ ProxiesBoxController::ProxiesBoxController(not_null<Main::Account*> account)
+@@ -2216,6 +2468,15 @@ ProxiesBoxController::ProxiesBoxController(not_null<Main::Account*> account)
  		}
  	}, _lifetime);
  
@@ -482,7 +663,7 @@ index 43f8a2a..a992187 100644
  	MTP::WebProxy::Transport::StateChanges(
  	) | rpl::on_next([=](const MTP::WebProxy::Transport::StateChange &change) {
  		const auto i = findByProxy(change.proxy);
-@@ -2611,20 +2866,74 @@ auto ProxiesBoxController::findByProxy(const ProxyData &proxy)
+@@ -2611,20 +2872,74 @@ auto ProxiesBoxController::findByProxy(const ProxyData &proxy)
  		[](const Item &item) { return item.data; });
  }
  
@@ -562,7 +743,7 @@ index 43f8a2a..a992187 100644
  }
  
  void ProxiesBoxController::restoreItem(int id) {
-@@ -2632,7 +2941,12 @@ void ProxiesBoxController::restoreItem(int id) {
+@@ -2632,7 +2947,12 @@ void ProxiesBoxController::restoreItem(int id) {
  }
  
  void ProxiesBoxController::shareItem(int id, bool qr) {
@@ -576,7 +757,7 @@ index 43f8a2a..a992187 100644
  }
  
  void ProxiesBoxController::shareItems() {
-@@ -2702,12 +3016,39 @@ void ProxiesBoxController::setDeleted(int id, bool deleted) {
+@@ -2702,12 +3022,39 @@ void ProxiesBoxController::setDeleted(int id, bool deleted) {
  		return;
  	}
  	item->deleted = deleted;
@@ -617,7 +798,7 @@ index 43f8a2a..a992187 100644
  			_lastSelectedProxy = _settings.selected();
  			_settings.setSelected(MTP::ProxyData());
  			if (_settings.isEnabled()) {
-@@ -2735,6 +3076,9 @@ void ProxiesBoxController::setDeleted(int id, bool deleted) {
+@@ -2735,6 +3082,9 @@ void ProxiesBoxController::setDeleted(int id, bool deleted) {
  				: int(proxies.size());
  			_settings.insertToList(insertIndex, item->data);
  		}
@@ -627,7 +808,7 @@ index 43f8a2a..a992187 100644
  
  		if (!_settings.selected() && _lastSelectedProxy == item->data) {
  			Assert(!_settings.isEnabled());
-@@ -2848,6 +3192,16 @@ void ProxiesBoxController::addNewItem(const ProxyData &proxy) {
+@@ -2848,6 +3198,16 @@ void ProxiesBoxController::addNewItem(const ProxyData &proxy) {
  	applyItem(_list.back().id);
  }
  
@@ -644,7 +825,7 @@ index 43f8a2a..a992187 100644
  bool ProxiesBoxController::setProxySettings(ProxyData::Settings value) {
  	if (_settings.settings() == value) {
  		return true;
-@@ -2916,7 +3270,11 @@ rpl::producer<bool> ProxiesBoxController::listShareableChanges() const {
+@@ -2916,7 +3276,11 @@ rpl::producer<bool> ProxiesBoxController::listShareableChanges() const {
  void ProxiesBoxController::updateView(const Item &item) {
  	const auto selected = (_settings.selected() == item.data);
  	const auto deleted = item.deleted;
@@ -656,7 +837,7 @@ index 43f8a2a..a992187 100644
  		switch (item.data.type) {
  		case Type::Http: return u"HTTP"_q;
  		case Type::Socks5: return u"SOCKS5"_q;
-@@ -2948,10 +3306,12 @@ void ProxiesBoxController::updateView(const Item &item) {
+@@ -2948,10 +3312,12 @@ void ProxiesBoxController::updateView(const Item &item) {
  		return ItemState::Connecting;
  	}();
  	const auto supportsShare = ProxyDataIsShareable(item.data);
@@ -671,7 +852,7 @@ index 43f8a2a..a992187 100644
  			? item.data.webAddress()
  			: item.data.host),
  		item.data.port,
-@@ -2959,7 +3319,7 @@ void ProxiesBoxController::updateView(const Item &item) {
+@@ -2959,7 +3325,7 @@ void ProxiesBoxController::updateView(const Item &item) {
  		!deleted && selected,
  		deleted,
  		!deleted && supportsShare,
@@ -680,7 +861,7 @@ index 43f8a2a..a992187 100644
  		!deleted
  			&& selected
  			&& _settings.isEnabled()
-@@ -2967,7 +3327,12 @@ void ProxiesBoxController::updateView(const Item &item) {
+@@ -2967,7 +3333,12 @@ void ProxiesBoxController::updateView(const Item &item) {
  			&& (state == ItemState::WaitingForBrowser
  				|| state == ItemState::Unavailable),
  		state,
@@ -1018,6 +1199,19 @@ index 94b64dc..a41d0a7 100644
  	Sandbox::Instance().refreshGlobalProxy();
  }
  
+diff --git a/Telegram/SourceFiles/core/crash_report_window.cpp b/Telegram/SourceFiles/core/crash_report_window.cpp
+index 845bcf0..af845af 100644
+--- a/Telegram/SourceFiles/core/crash_report_window.cpp
++++ b/Telegram/SourceFiles/core/crash_report_window.cpp
+@@ -40,7 +40,7 @@ PreLaunchWindow::PreLaunchWindow(QString title) {
+ 	setWindowIcon(Window::CreateIcon());
+ 	setWindowFlags(Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
+ 
+-	setWindowTitle(title.isEmpty() ? u"Telegram"_q : title);
++	setWindowTitle(title.isEmpty() ? u"Xraygram"_q : title);
+ 
+ 	QPalette p(palette());
+ 	p.setColor(QPalette::Window, QColor(255, 255, 255));
 diff --git a/Telegram/SourceFiles/core/launcher.cpp b/Telegram/SourceFiles/core/launcher.cpp
 index 3e436f7..402453b 100644
 --- a/Telegram/SourceFiles/core/launcher.cpp
@@ -1066,8 +1260,47 @@ index a1a1aaf..0c5da0b 100644
  constexpr auto AppFile = "Telegram"_cs;
  constexpr auto AppVersion = 7004004;
  constexpr auto AppVersionStr = "7.4.4";
+diff --git a/Telegram/SourceFiles/data/data_peer.cpp b/Telegram/SourceFiles/data/data_peer.cpp
+index 33a0313..e6d7f15 100644
+--- a/Telegram/SourceFiles/data/data_peer.cpp
++++ b/Telegram/SourceFiles/data/data_peer.cpp
+@@ -427,7 +427,9 @@ QImage *PeerData::userpicCloudImage(Ui::PeerUserpicView &view) const {
+ 		_userpicEmpty = nullptr;
+ 		return image;
+ 	} else if (isNotificationsUser()) {
+-		static auto result = Window::LogoNoMargin().scaledToWidth(
++		// Service notifications chat keeps the Telegram logo (FEAT-19).
++		static auto result = QImage(
++			u":/gui/art/logo_256_no_margin.png"_q).scaledToWidth(
+ 			kUserpicSize,
+ 			Qt::SmoothTransformation);
+ 		return &result;
+diff --git a/Telegram/SourceFiles/intro/intro_qr.cpp b/Telegram/SourceFiles/intro/intro_qr.cpp
+index f5b68e7..063726e 100644
+--- a/Telegram/SourceFiles/intro/intro_qr.cpp
++++ b/Telegram/SourceFiles/intro/intro_qr.cpp
+@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #include "intro/intro_qr.h"
+ 
++#include "xraygram/xraygram_brand.h"
++
+ #include "boxes/abstract_box.h"
+ #include "data/components/passkeys.h"
+ #include "data/data_passkey_deserialize.h"
+@@ -569,6 +571,10 @@ QImage TelegramLogoImage() {
+ 		QImage::Format_ARGB32_Premultiplied);
+ 	result.fill(Qt::transparent);
+ 	result.setDevicePixelRatio(style::DevicePixelRatio());
++	if (Xraygram::kPlainQr) {
++		// FEAT-19 §3: no Telegram and no Xraygram sign in QR centers.
++		return result;
++	}
+ 	{
+ 		auto p = QPainter(&result);
+ 		auto hq = PainterHighQualityEnabler(p);
 diff --git a/Telegram/SourceFiles/intro/intro_start.cpp b/Telegram/SourceFiles/intro/intro_start.cpp
-index d1b835a..2c0c7c9 100644
+index d1b835a..f8ce723 100644
 --- a/Telegram/SourceFiles/intro/intro_start.cpp
 +++ b/Telegram/SourceFiles/intro/intro_start.cpp
 @@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
@@ -1079,21 +1312,407 @@ index d1b835a..2c0c7c9 100644
  #include "lang/lang_keys.h"
  #include "intro/intro_qr.h"
  #include "intro/intro_phone.h"
-@@ -24,8 +26,12 @@ StartWidget::StartWidget(
+@@ -14,28 +16,85 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ #include "ui/widgets/labels.h"
+ #include "main/main_account.h"
+ #include "main/main_app_config.h"
++#include "styles/style_intro.h"
++
++#include <QtGui/QFontDatabase>
+ 
+ namespace Intro {
+ namespace details {
+ 
++namespace {
++
++// FEAT-19: "XRAYGRAM" in a monospace font 28 with letter spacing 6.
++[[nodiscard]] QFont BrandFont() {
++	auto result = QFontDatabase::systemFont(QFontDatabase::FixedFont);
++	result.setPixelSize(style::ConvertScale(28));
++	result.setWeight(QFont::DemiBold);
++	result.setLetterSpacing(QFont::AbsoluteSpacing, style::ConvertScale(6));
++	return result;
++}
++
++} // namespace
++
+ StartWidget::StartWidget(
+ 	QWidget *parent,
+ 	not_null<Main::Account*> account,
  	not_null<Data*> data)
- : Step(parent, account, data, true) {
+-: Step(parent, account, data, true) {
++: Step(parent, account, data, true)
++, _brand(this) {
  	setMouseTracking(true);
 -	setTitleText(rpl::single(u"Telegram Desktop"_q));
 -	setDescriptionText(tr::lng_intro_about());
-+	setTitleText(rpl::single(u"Xraygram"_q));
-+	setDescriptionText(Xraygram::Tr(
++	setTitleText(rpl::single(QString()));
++	setDescriptionText(Xraygram::TrValue(
 +		u"Неофициальный клиент Telegram, который подключается через ваш "
 +		"сервер XRAY."_q,
 +		u"An unofficial Telegram client that connects through your own "
 +		"XRAY server."_q));
++
++	const auto font = BrandFont();
++	const auto text = u"XRAYGRAM"_q;
++	const auto metrics = QFontMetrics(font);
++	_brand->resize(
++		metrics.horizontalAdvance(text) + 1,
++		metrics.height());
++	_brand->setAttribute(Qt::WA_TransparentForMouseEvents);
++	_brand->paintRequest() | rpl::on_next([=] {
++		auto p = QPainter(_brand.data());
++		p.setFont(font);
++		p.setPen(st::introTitleFg->p);
++		// Letter spacing adds a trailing gap, center the glyphs only.
++		const auto shift = style::ConvertScale(6) / 2;
++		p.drawText(
++			_brand->rect().translated(shift, 0),
++			Qt::AlignCenter,
++			text);
++	}, _brand->lifetime());
++	_brand->setAccessibleName(u"Xraygram"_q);
++	updateBrandGeometry();
  	show();
  }
  
++void StartWidget::resizeEvent(QResizeEvent *e) {
++	Step::resizeEvent(e);
++	updateBrandGeometry();
++}
++
++void StartWidget::updateBrandGeometry() {
++	// Same baseline area as the upstream cover title (22px semibold).
++	const auto titleHeight = st::introCoverTitle.style.font->height;
++	_brand->moveToLeft(
++		(width() - _brand->width()) / 2,
++		contentTop()
++			+ st::introCoverTitleTop
++			+ (titleHeight - _brand->height()) / 2);
++}
++
+ void StartWidget::submit() {
+ 	account().destroyStaleAuthorizationKeys();
+ 	goNext<QrWidget>();
+ }
+ 
+ rpl::producer<QString> StartWidget::nextButtonText() const {
+-	return tr::lng_start_msgs();
++	return Xraygram::TrValue(u"Начать"_q, u"Start"_q);
+ }
+ 
+ rpl::producer<> StartWidget::nextButtonFocusRequests() const {
+@@ -44,6 +103,7 @@ rpl::producer<> StartWidget::nextButtonFocusRequests() const {
+ 
+ void StartWidget::activate() {
+ 	Step::activate();
++	startXrayBeam();
+ 	setInnerFocus();
+ }
+ 
+diff --git a/Telegram/SourceFiles/intro/intro_start.h b/Telegram/SourceFiles/intro/intro_start.h
+index 7a3fa1e..c84d66a 100644
+--- a/Telegram/SourceFiles/intro/intro_start.h
++++ b/Telegram/SourceFiles/intro/intro_start.h
+@@ -31,8 +31,14 @@ public:
+ 	void activate() override;
+ 	void setInnerFocus() override;
+ 
++protected:
++	void resizeEvent(QResizeEvent *e) override;
++
+ private:
++	void updateBrandGeometry();
++
+ 	rpl::event_stream<> _nextButtonFocusRequests;
++	object_ptr<Ui::RpWidget> _brand;
+ 
+ };
+ 
+diff --git a/Telegram/SourceFiles/intro/intro_step.cpp b/Telegram/SourceFiles/intro/intro_step.cpp
+index 7738e3f..6a81908 100644
+--- a/Telegram/SourceFiles/intro/intro_step.cpp
++++ b/Telegram/SourceFiles/intro/intro_step.cpp
+@@ -7,6 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #include "intro/intro_step.h"
+ 
++#include "xraygram/xraygram_brand.h"
++#include "ui/painter.h"
++
+ #include "intro/intro_widget.h"
+ #include "intro/intro_signup.h"
+ #include "storage/localstorage.h"
+@@ -432,7 +435,89 @@ void Step::prepareCoverMask() {
+ 	_coverMask = Ui::PixmapFromImage(std::move(mask));
+ }
+ 
++void Step::startXrayBeam() {
++	if (anim::Disabled() || _xrayBeam.animating()) {
++		return;
++	}
++	constexpr auto kBeamDuration = crl::time(1200);
++	_xrayBeam.start([=] {
++		update(0, 0, width(), st::introCoverHeight);
++	}, 0., 1., kBeamDuration, anim::linear);
++}
++
++bool Step::paintXrayCover(QPainter &p, int top) {
++	if (!_xrayIconLoaded) {
++		_xrayIconLoaded = true;
++		_xrayIcon = Xraygram::BrandImage(u"logo.png"_q);
++	}
++	if (_xrayIcon.isNull()) {
++		return false;
++	}
++	auto coverHeight = top + st::introCoverHeight;
++	if (coverHeight > 0) {
++		p.drawPixmap(
++			QRect(0, 0, width(), coverHeight),
++			_coverMask,
++			QRect(
++				0,
++				-top * style::DevicePixelRatio(),
++				_coverMask.width(),
++				coverHeight * style::DevicePixelRatio()));
++	}
++
++	// logo.png is the macOS icon: a rounded square of 824/1024 with a
++	// transparent margin; the beam stays inside that square.
++	const auto size = st::introCoverHeight - 2 * st::introCoverIconTop
++		+ st::introCoverIconTop / 2;
++	const auto iconRect = QRect(
++		(width() - size) / 2,
++		top + (st::introCoverHeight - size) / 2,
++		size,
++		size);
++	{
++		auto hq = PainterHighQualityEnabler(p);
++		p.drawImage(iconRect, _xrayIcon);
++	}
++	if (!_xrayBeam.animating()) {
++		return true;
++	}
++	const auto margin = iconRect.width() * 100. / 1024.;
++	const auto inner = QRectF(iconRect).marginsRemoved(
++		{ margin, margin, margin, margin });
++	const auto radius = inner.width() * 185.4 / 824.;
++	const auto progress = _xrayBeam.value(1.);
++	const auto band = inner.height() * 0.22;
++	const auto y = inner.top() - band
++		+ (inner.height() + 2 * band) * progress;
++
++	auto clip = QPainterPath();
++	clip.addRoundedRect(inner, radius, radius);
++	p.save();
++	auto hq = PainterHighQualityEnabler(p);
++	p.setClipPath(clip);
++	auto accent = QColor(0x3E, 0xF2, 0xC8);
++	auto gradient = QLinearGradient(0., y - band, 0., y + band);
++	accent.setAlphaF(0.);
++	gradient.setColorAt(0., accent);
++	accent.setAlphaF(0.55);
++	gradient.setColorAt(0.5, accent);
++	accent.setAlphaF(0.);
++	gradient.setColorAt(1., accent);
++	p.fillRect(
++		QRectF(inner.left(), y - band, inner.width(), 2 * band),
++		gradient);
++	const auto line = std::max(1., inner.height() / 96.);
++	p.fillRect(
++		QRectF(inner.left(), y - line / 2., inner.width(), line),
++		QColor(0x8F, 0xFB, 0xE0));
++	p.restore();
++	return true;
++}
++
+ void Step::paintCover(QPainter &p, int top) {
++	if (paintXrayCover(p, top)) {
++		return;
++	}
+ 	auto coverHeight = top + st::introCoverHeight;
+ 	if (coverHeight > 0) {
+ 		p.drawPixmap(
+diff --git a/Telegram/SourceFiles/intro/intro_step.h b/Telegram/SourceFiles/intro/intro_step.h
+index 2f5cc21..4daec31 100644
+--- a/Telegram/SourceFiles/intro/intro_step.h
++++ b/Telegram/SourceFiles/intro/intro_step.h
+@@ -165,6 +165,10 @@ protected:
+ 
+ 	virtual int errorTop() const;
+ 
++	// Xraygram (FEAT-19, PAR-18): the cover is the app icon with a scanner
++	// beam passing over it once.
++	void startXrayBeam();
++
+ private:
+ 	struct CoverAnimation {
+ 		CoverAnimation() = default;
+@@ -200,12 +204,16 @@ private:
+ 
+ 	void prepareCoverMask();
+ 	void paintCover(QPainter &p, int top);
++	bool paintXrayCover(QPainter &p, int top);
+ 
+ 	const not_null<Main::Account*> _account;
+ 	const not_null<Data*> _data;
+ 	mutable std::optional<MTP::Sender> _api;
+ 
+ 	bool _hasCover = false;
++	QImage _xrayIcon;
++	bool _xrayIconLoaded = false;
++	Ui::Animations::Simple _xrayBeam;
+ 	Fn<void(Step *step, StackAction action, Animate animate)> _goCallback;
+ 	Fn<Step*()> _stepBelowCallback;
+ 	Fn<void()> _showResetCallback;
+diff --git a/Telegram/SourceFiles/intro/intro_widget.cpp b/Telegram/SourceFiles/intro/intro_widget.cpp
+index f19fce5..d450e44 100644
+--- a/Telegram/SourceFiles/intro/intro_widget.cpp
++++ b/Telegram/SourceFiles/intro/intro_widget.cpp
+@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #include "intro/intro_widget.h"
+ 
++#include "xraygram/xraygram_core.h"
++
+ #include "intro/intro_start.h"
+ #include "intro/intro_phone.h"
+ #include "intro/intro_qr.h"
+@@ -270,42 +272,64 @@ void Widget::createLanguageLink() {
+ 		return;
+ 	}
+ 
+-	const auto createLink = [=](
+-			const QString &text,
+-			const QString &languageId) {
+-		_changeLanguage.create(
+-			this,
+-			object_ptr<Ui::LinkButton>(this, text));
+-		_changeLanguage->hide(anim::type::instant);
+-		_changeLanguage->entity()->setClickedCallback([=] {
+-			Lang::CurrentCloudManager().switchToLanguage(languageId);
++	// Xraygram (FEAT-19, PAR-18): "Русский · English" instead of the
++	// suggested-language link. Xraygram texts switch at once, the Telegram
++	// language pack follows when the network (XRAY) is up.
++	Xraygram::ResumeUiLanguage();
++
++	_changeLanguage.create(this, object_ptr<Ui::RpWidget>(this));
++	const auto box = _changeLanguage->entity();
++	const auto russian = Ui::CreateChild<Ui::LinkButton>(
++		box,
++		u"Русский"_q);
++	const auto dot = Ui::CreateChild<Ui::FlatLabel>(
++		box,
++		u" \u00B7 "_q,
++		st::defaultFlatLabel);
++	const auto english = Ui::CreateChild<Ui::LinkButton>(
++		box,
++		u"English"_q);
++	dot->setTextColorOverride(st::windowSubTextFg->c);
++	const auto layout = [=] {
++		const auto height = std::max({
++			russian->height(),
++			dot->height(),
++			english->height(),
+ 		});
+-		_changeLanguage->toggle(
+-			!_resetAccount && !_terms && _nextShown,
+-			anim::type::normal);
+-		updateControlsGeometry();
++		russian->moveToLeft(0, (height - russian->height()) / 2);
++		dot->moveToLeft(
++			russian->width(),
++			(height - dot->height()) / 2);
++		english->moveToLeft(
++			russian->width() + dot->width(),
++			(height - english->height()) / 2);
++		box->resize(
++			russian->width() + dot->width() + english->width(),
++			height);
+ 	};
++	layout();
++	_changeLanguage->resize(box->size());
++	rpl::single(rpl::empty) | rpl::then(
++		Xraygram::UiLanguageChanges()
++	) | rpl::on_next([=] {
++		const auto ru = Xraygram::UiRussian();
++		const auto active = st::windowActiveTextFg->c;
++		const auto passive = st::windowSubTextFg->c;
++		russian->setColorOverride(ru ? active : passive);
++		english->setColorOverride(ru ? passive : active);
++	}, box->lifetime());
++	russian->setClickedCallback([] {
++		Xraygram::SetUiLanguage(true);
++	});
++	english->setClickedCallback([] {
++		Xraygram::SetUiLanguage(false);
++	});
+ 
+-	const auto currentId = Lang::LanguageIdOrDefault(Lang::Id());
+-	const auto defaultId = Lang::DefaultLanguageId();
+-	const auto suggested = Lang::CurrentCloudManager().suggestedLanguage();
+-	if (currentId != defaultId) {
+-		createLink(
+-			Lang::GetOriginalValue(tr::lng_switch_to_this.base),
+-			defaultId);
+-	} else if (!suggested.isEmpty() && suggested != currentId && _api) {
+-		_api->request(MTPlangpack_GetStrings(
+-			MTP_string(Lang::CloudLangPackName()),
+-			MTP_string(suggested),
+-			MTP_vector<MTPstring>(1, MTP_string("lng_switch_to_this"))
+-		)).done([=](const MTPVector<MTPLangPackString> &result) {
+-			const auto strings = Lang::Instance::ParseStrings(result);
+-			const auto i = strings.find(tr::lng_switch_to_this.base);
+-			if (i != strings.end()) {
+-				createLink(i->second, suggested);
+-			}
+-		}).send();
+-	}
++	_changeLanguage->hide(anim::type::instant);
++	_changeLanguage->toggle(
++		!_resetAccount && !_terms && _nextShown,
++		anim::type::normal);
++	updateControlsGeometry();
+ }
+ 
+ void Widget::checkUpdateStatus() {
+diff --git a/Telegram/SourceFiles/intro/intro_widget.h b/Telegram/SourceFiles/intro/intro_widget.h
+index 76c455c..6ba34f6 100644
+--- a/Telegram/SourceFiles/intro/intro_widget.h
++++ b/Telegram/SourceFiles/intro/intro_widget.h
+@@ -207,7 +207,7 @@ private:
+ 	object_ptr<Ui::FadeWrap<Ui::FlatLabel>> _testModeLabel = { nullptr };
+ 
+ 	object_ptr<Ui::FadeWrap<Ui::RoundButton>> _next;
+-	object_ptr<Ui::FadeWrap<Ui::LinkButton>> _changeLanguage = { nullptr };
++	object_ptr<Ui::FadeWrap<Ui::RpWidget>> _changeLanguage = { nullptr };
+ 	object_ptr<Ui::FadeWrap<Ui::RoundButton>> _resetAccount = { nullptr };
+ 	object_ptr<Ui::FadeWrap<Ui::FlatLabel>> _terms = { nullptr };
+ 
+diff --git a/Telegram/SourceFiles/lang/lang_instance.h b/Telegram/SourceFiles/lang/lang_instance.h
+index 1ca396c..73fd3f7 100644
+--- a/Telegram/SourceFiles/lang/lang_instance.h
++++ b/Telegram/SourceFiles/lang/lang_instance.h
+@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #pragma once
+ 
++#include "xraygram/xraygram_brand.h"
++
+ #include "lang_auto.h"
+ #include "base/const_string.h"
+ #include "base/weak_ptr.h"
+@@ -90,7 +92,9 @@ public:
+ 	QString getValue(ushort key) const {
+ 		Expects(key < _values.size());
+ 
+-		return _values[key];
++		return Xraygram::IsBrandKey(key)
++			? Xraygram::BrandValue(_values[key])
++			: _values[key];
+ 	}
+ 	QString getNonDefaultValue(const QByteArray &key) const;
+ 	bool isNonDefaultPlural(ushort key) const {
 diff --git a/Telegram/SourceFiles/mtproto/mtp_instance.cpp b/Telegram/SourceFiles/mtproto/mtp_instance.cpp
 index 7745223..bb8fdcb 100644
 --- a/Telegram/SourceFiles/mtproto/mtp_instance.cpp
@@ -1153,6 +1772,45 @@ index e515ad2..eb38027 100644
  	const auto proxyType = (isEnabled ? proxy.type : ProxyData::Type::None);
  	const auto useTcp = (proxyType != ProxyData::Type::Http);
  	const auto useHttp = (proxyType != ProxyData::Type::Mtproto)
+diff --git a/Telegram/SourceFiles/platform/mac/tray_mac.mm b/Telegram/SourceFiles/platform/mac/tray_mac.mm
+index d81ca0a..652ab3e 100644
+--- a/Telegram/SourceFiles/platform/mac/tray_mac.mm
++++ b/Telegram/SourceFiles/platform/mac/tray_mac.mm
+@@ -7,6 +7,8 @@
+ */
+ #include "platform/mac/tray_mac.h"
+ 
++#include "xraygram/xraygram_brand.h"
++
+ #include "base/platform/mac/base_utilities_mac.h"
+ #include "core/application.h"
+ #include "core/sandbox.h"
+@@ -96,7 +98,24 @@ - (void) observeValueForKeyPath:(NSString *)keyPath
+ 
+ [[nodiscard]] QImage TrayIconBack(bool darkMode) {
+ 	static const auto WithColor = [](QColor color) {
+-		return st::macTrayIcon.instance(color, 100);
++		const auto ratio = style::DevicePixelRatio();
++		const auto mask = Xraygram::BrandImage((ratio >= 3)
++			? u"tray@3x.png"_q
++			: (ratio == 2)
++			? u"tray@2x.png"_q
++			: u"tray.png"_q);
++		if (mask.isNull()) {
++			return st::macTrayIcon.instance(color, 100);
++		}
++		auto result = mask.convertToFormat(
++			QImage::Format_ARGB32_Premultiplied);
++		{
++			auto p = QPainter(&result);
++			p.setCompositionMode(QPainter::CompositionMode_SourceIn);
++			p.fillRect(result.rect(), color);
++		}
++		result.setDevicePixelRatio(ratio);
++		return result;
+ 	};
+ 	static const auto DarkModeResult = WithColor({ 255, 255, 255 });
+ 	static const auto LightModeResult = WithColor({ 0, 0, 0, 180 });
 diff --git a/Telegram/SourceFiles/platform/mac/window_title_mac.mm b/Telegram/SourceFiles/platform/mac/window_title_mac.mm
 index 0a30447..bce6949 100644
 --- a/Telegram/SourceFiles/platform/mac/window_title_mac.mm
@@ -1170,11 +1828,153 @@ index 0a30447..bce6949 100644
  	}
  
  	auto isGraphite = ([NSColor currentControlTint] == NSGraphiteControlTint);
+diff --git a/Telegram/SourceFiles/settings/sections/settings_advanced.cpp b/Telegram/SourceFiles/settings/sections/settings_advanced.cpp
+index 9e853d8..dcadc08 100644
+--- a/Telegram/SourceFiles/settings/sections/settings_advanced.cpp
++++ b/Telegram/SourceFiles/settings/sections/settings_advanced.cpp
+@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #include "settings/sections/settings_advanced.h"
+ 
++#include "xraygram/xraygram_brand.h"
++
+ #include "settings/settings_common_session.h"
+ 
+ #include "api/api_global_privacy.h"
+@@ -91,7 +93,12 @@ using namespace Builder;
+ 
+ #if defined Q_OS_MAC && !defined OS_MAC_STORE
+ [[nodiscard]] const QImage &IconMacRound() {
+-	static const auto result = QImage(u":/gui/art/icon_round512@2x.png"_q);
++	static const auto result = [] {
++		const auto brand = Xraygram::BrandImage(u"logo.png"_q);
++		return brand.isNull()
++			? QImage(u":/gui/art/icon_round512@2x.png"_q)
++			: brand;
++	}();
+ 	return result;
+ }
+ #endif // Q_OS_MAC && !OS_MAC_STORE
+diff --git a/Telegram/SourceFiles/settings/sections/settings_notifications.cpp b/Telegram/SourceFiles/settings/sections/settings_notifications.cpp
+index 75eacd6..ec11d67 100644
+--- a/Telegram/SourceFiles/settings/sections/settings_notifications.cpp
++++ b/Telegram/SourceFiles/settings/sections/settings_notifications.cpp
+@@ -496,7 +496,7 @@ void NotificationsCount::prepareNotificationSampleLarge() {
+ 		p.setPen(st::dialogsNameFg);
+ 		p.setFont(st::msgNameFont);
+ 
+-		auto notifyTitle = st::msgNameFont->elided(u"Telegram Desktop"_q, rectForName.width());
++		auto notifyTitle = st::msgNameFont->elided(u"Xraygram"_q, rectForName.width());
+ 		p.drawText(rectForName.left(), rectForName.top() + st::msgNameFont->ascent, notifyTitle);
+ 
+ 		st::notifyClose.icon.paint(p, w - st::notifyClosePos.x() - st::notifyClose.width + st::notifyClose.iconPosition.x(), st::notifyClosePos.y() + st::notifyClose.iconPosition.y(), w);
+diff --git a/Telegram/SourceFiles/ui/controls/round_video_recorder.cpp b/Telegram/SourceFiles/ui/controls/round_video_recorder.cpp
+index f7d3308..414dc01 100644
+--- a/Telegram/SourceFiles/ui/controls/round_video_recorder.cpp
++++ b/Telegram/SourceFiles/ui/controls/round_video_recorder.cpp
+@@ -45,6 +45,9 @@ constexpr auto &kPlainLogoFrames = RoundVideoData::kLogoFrames;
+ constexpr auto kLogoSize = RoundVideoData::kLogoSize;
+ constexpr auto kLogoXShift = -10;
+ constexpr auto kLogoYShift = 10;
++
++// Xraygram (FEAT-19 §3): no plane and no text burned into sent videos.
++constexpr auto kXraygramNoWatermark = true;
+ constexpr auto kOverlayOpacity = 0.1;
+ constexpr auto kOverlayOpaque = 1. - kOverlayOpacity;
+ constexpr auto kOverlayUVOpaque = 128 * kOverlayOpaque;
+@@ -855,11 +858,15 @@ void RoundVideoRecorder::Private::initCircleMask() {
+ }
+ 
+ void RoundVideoRecorder::Private::initCircularTextAdd() {
++	if (kXraygramNoWatermark) {
++		_circularTextAdd.assign(kSide * kSide, 0);
++		return;
++	}
+ 	constexpr auto kCircularTextRadius = kSide / 2 + 17;
+ 	constexpr auto kCircularTextStartAngle = 125;
+ 	constexpr auto kCircularTextEndAngle = 145;
+ 	const auto image = CircularTextImage(
+-		u"Telegram"_q.toUpper(),
++		u"Xraygram"_q.toUpper(),
+ 		kSide,
+ 		kSide,
+ 		kCircularTextRadius,
+@@ -935,7 +942,7 @@ void RoundVideoRecorder::Private::drawLogoOnYUV420P(
+ 					+ 16 * kOverlayOpaque);
+ 			}
+ 		}
+-		if (y >= logoStartY && y < logoEndY) {
++		if (!kXraygramNoWatermark && y >= logoStartY && y < logoEndY) {
+ 			const auto logoY = y - logoBottom;
+ 			for (auto x = logoStartX; x < logoEndX; ++x) {
+ 				const auto blendedValue = currentLogo[x - kLogoXShift][logoY];
+diff --git a/Telegram/SourceFiles/ui/effects/peer_qr_surface.cpp b/Telegram/SourceFiles/ui/effects/peer_qr_surface.cpp
+index 43146cb..1937c9b 100644
+--- a/Telegram/SourceFiles/ui/effects/peer_qr_surface.cpp
++++ b/Telegram/SourceFiles/ui/effects/peer_qr_surface.cpp
+@@ -28,6 +28,7 @@ constexpr auto kCardRadiusRatio = 0.125;
+ constexpr auto kQrSideRatio = 0.70;
+ constexpr auto kQrTopRatio = 0.12;
+ constexpr auto kLogoRatio = 0.175;
++constexpr auto kXraygramPlainQr = true;
+ constexpr auto kInkContrast = 4.4;
+ constexpr auto kForegroundContrast = 4.5;
+ constexpr auto kInkChromaScale = 1.25;
+@@ -931,9 +932,12 @@ void PaintCard(
+ 		} else {
+ 			PaintBloom(p, layout.qr, content, frame.bloom);
+ 		}
+-		p.setBrush(content.ink);
+-		p.drawEllipse(layout.logo);
+-		PaintPlane(p, layout.logo, content.plane, frame.plane);
++		// Xraygram (FEAT-19 §3): no Telegram and no Xraygram sign in QR.
++		if (!kXraygramPlainQr) {
++			p.setBrush(content.ink);
++			p.drawEllipse(layout.logo);
++			PaintPlane(p, layout.logo, content.plane, frame.plane);
++		}
+ 	}
+ 	if (paintUsername && !content.username.lines.isEmpty()) {
+ 		PaintUsername(p, layout.band, content.username, content.ink);
 diff --git a/Telegram/SourceFiles/window/main_window.cpp b/Telegram/SourceFiles/window/main_window.cpp
-index 62f8c79..c91fc19 100644
+index 62f8c79..0c709a2 100644
 --- a/Telegram/SourceFiles/window/main_window.cpp
 +++ b/Telegram/SourceFiles/window/main_window.cpp
-@@ -935,7 +935,7 @@ void MainWindow::updateTitle() {
+@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #include "window/main_window.h"
+ 
++#include "xraygram/xraygram_brand.h"
++
+ #include "api/api_updates.h"
+ #include "storage/localstorage.h"
+ #include "platform/platform_specific.h"
+@@ -141,12 +143,22 @@ const char kOptionNewWindowsSizeAsFirst[] = "new-windows-size-as-first";
+ const char kOptionDisableTouchbar[] = "touchbar-disabled";
+ 
+ const QImage &Logo() {
+-	static const auto result = QImage(u":/gui/art/logo_256.png"_q);
++	static const auto result = [] {
++		const auto brand = Xraygram::BrandImage(u"logo.png"_q);
++		return brand.isNull()
++			? QImage(u":/gui/art/logo_256.png"_q)
++			: brand;
++	}();
+ 	return result;
+ }
+ 
+ const QImage &LogoNoMargin() {
+-	static const auto result = QImage(u":/gui/art/logo_256_no_margin.png"_q);
++	static const auto result = [] {
++		const auto brand = Xraygram::BrandImage(u"logo_square.png"_q);
++		return brand.isNull()
++			? QImage(u":/gui/art/logo_256_no_margin.png"_q)
++			: brand;
++	}();
+ 	return result;
+ }
+ 
+@@ -935,7 +947,7 @@ void MainWindow::updateTitle() {
  		: Dialogs::Key();
  	const auto thread = key ? key.thread() : nullptr;
  	if (!thread) {
@@ -1183,6 +1983,19 @@ index 62f8c79..c91fc19 100644
  		return;
  	}
  	const auto history = thread->owningHistory();
+diff --git a/Telegram/SourceFiles/window/notifications_manager_default.cpp b/Telegram/SourceFiles/window/notifications_manager_default.cpp
+index e50548f..1a1442c 100644
+--- a/Telegram/SourceFiles/window/notifications_manager_default.cpp
++++ b/Telegram/SourceFiles/window/notifications_manager_default.cpp
+@@ -1035,7 +1035,7 @@ void Notification::updateNotifyDisplay() {
+ 				: TextWithEntities{ name };
+ 		};
+ 		auto title = options.hideNameAndPhoto
+-			? TextWithEntities{ u"Telegram Desktop"_q }
++			? TextWithEntities{ u"Xraygram"_q }
+ 			: reminder
+ 			? tr::lng_notification_reminder(tr::now, tr::marked)
+ 			: topicWithChat();
 diff --git a/Telegram/SourceFiles/window/window_connecting_widget.cpp b/Telegram/SourceFiles/window/window_connecting_widget.cpp
 index e921eb7..00a7993 100644
 --- a/Telegram/SourceFiles/window/window_connecting_widget.cpp
@@ -1195,6 +2008,30 @@ index e921eb7..00a7993 100644
  			|| state.type == State::Type::Connecting
  			|| state.type == State::Type::Waiting);
  	switch (state.type) {
+diff --git a/Telegram/SourceFiles/window/window_main_menu.cpp b/Telegram/SourceFiles/window/window_main_menu.cpp
+index 5611217..fb4cfe9 100644
+--- a/Telegram/SourceFiles/window/window_main_menu.cpp
++++ b/Telegram/SourceFiles/window/window_main_menu.cpp
+@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #include "window/window_main_menu.h"
+ 
++#include "xraygram/xraygram_brand.h"
++
+ #include "apiwrap.h"
+ #include "base/event_filter.h"
+ #include "base/qt_signal_producer.h"
+@@ -388,8 +390,8 @@ MainMenu::MainMenu(
+ 	parentResized();
+ 
+ 	_telegram->setMarkedText(tr::link(
+-		u"Telegram Desktop"_q,
+-		u"https://desktop.telegram.org"_q));
++		u"Xraygram"_q,
++		QString::fromLatin1(Xraygram::kSourceUrl)));
+ 	_telegram->setLinksTrusted();
+ 	// The canary version is too long for the "Version {version}" form.
+ 	_version->setMarkedText(
 diff --git a/Telegram/SourceFiles/window/window_restore_shell.cpp b/Telegram/SourceFiles/window/window_restore_shell.cpp
 index 3e49f93..fbb0883 100644
 --- a/Telegram/SourceFiles/window/window_restore_shell.cpp
@@ -1221,12 +2058,137 @@ index d32b252..58ca539 100644
  		: user.isEmpty()
  		? name
  		: (name + u" @ "_q + user);
+diff --git a/Telegram/SourceFiles/xraygram/xraygram_brand.cpp b/Telegram/SourceFiles/xraygram/xraygram_brand.cpp
+new file mode 100644
+index 0000000..2b1ee36
+--- /dev/null
++++ b/Telegram/SourceFiles/xraygram/xraygram_brand.cpp
+@@ -0,0 +1,84 @@
++/*
++This file is part of Xraygram, a fork of Telegram Desktop.
++
++For license and copyright information please follow this link:
++https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
++*/
++#include "xraygram/xraygram_brand.h"
++
++#include "lang/lang_keys.h"
++
++namespace Xraygram {
++namespace {
++
++// Keep in sync with the list in macos/decisions.md (FEAT-19, PAR-20).
++[[nodiscard]] base::flat_set<ushort> CollectBrandKeys() {
++	return {
++		tr::lng_open_from_tray.base,
++		tr::lng_quit_from_tray.base,
++		tr::lng_tray_icon_text.base,
++		tr::lng_error_start_minimized_passcoded.base,
++		tr::lng_proxy_unsupported.base,
++		tr::lng_intro_about.base,
++		tr::lng_update_telegram.base,
++		tr::lng_sure_save_language.base,
++		tr::lng_settings_auto_start.base,
++		tr::lng_settings_passcode_lock_app.base,
++		tr::lng_settings_use_touchid_about.base,
++		tr::lng_settings_use_applewatch_about.base,
++		tr::lng_settings_use_systempwd_about.base,
++		tr::lng_theme_no_desktop.base,
++		tr::lng_local_storage_device_telegram.base,
++		tr::lng_local_storage_device_usage.base,
++		tr::lng_passcode_about.base,
++		tr::lng_passcode_about2.base,
++		tr::lng_passcode_about3.base,
++		tr::lng_passcode_unlock_about.base,
++		tr::lng_bad_photo.base,
++		tr::lng_bad_video.base,
++		tr::lng_message_unsupported.base,
++		tr::lng_unsupported_message_text.base,
++		tr::lng_unsupported_block_text.base,
++		tr::lng_stories_unsupported.base,
++		tr::lng_new_version_wrap.base,
++		tr::lng_bot_share_location_unavailable.base,
++		tr::lng_call_status_group_invite.base,
++		tr::lng_call_box_about.base,
++		tr::lng_confcall_join_text.base,
++		tr::lng_group_call_mac_access.base,
++		tr::lng_group_call_mac_input.base,
++		tr::lng_group_call_mac_accessibility.base,
++		tr::lng_group_call_mac_screencast_access.base,
++		tr::lng_group_call_mac_recording.base,
++		tr::lng_no_mic_permission.base,
++		tr::lng_screen_reader_bar_text.base,
++		tr::lng_screen_reader_confirm_text.base,
++		tr::lng_outdated_soon.base,
++		tr::lng_outdated_now.base,
++		tr::lng_wallet_protection_open_warning_lock.base,
++	};
++}
++
++} // namespace
++
++bool IsBrandKey(ushort key) {
++	static const auto keys = CollectBrandKeys();
++	return keys.contains(key);
++}
++
++QString BrandValue(const QString &value) {
++	if (!value.contains(u"Telegram"_q) && !value.contains(u"Телеграм"_q)) {
++		return value;
++	}
++	static const auto expression = QRegularExpression(
++		u"Telegram Desktop|\\bTelegram\\b|Телеграмм?[а-яё]*"_q);
++	auto result = value;
++	result.replace(expression, u"Xraygram"_q);
++	return result;
++}
++
++QImage BrandImage(const QString &name) {
++	return QImage(u":/xraygram/"_q + name);
++}
++
++} // namespace Xraygram
+diff --git a/Telegram/SourceFiles/xraygram/xraygram_brand.h b/Telegram/SourceFiles/xraygram/xraygram_brand.h
+new file mode 100644
+index 0000000..b5d4792
+--- /dev/null
++++ b/Telegram/SourceFiles/xraygram/xraygram_brand.h
+@@ -0,0 +1,29 @@
++/*
++This file is part of Xraygram, a fork of Telegram Desktop.
++
++For license and copyright information please follow this link:
++https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
++*/
++#pragma once
++
++namespace Xraygram {
++
++// Version of Xraygram itself (the upstream version is AppVersionStr).
++inline constexpr auto kVersion = "0.4";
++inline constexpr auto kSourceUrl = "https://github.com/vizacv/xraygram";
++
++// FEAT-19: language keys where "Telegram" means this app, not the service.
++[[nodiscard]] bool IsBrandKey(ushort key);
++
++// "Telegram Desktop" / "Telegram" / "Телеграм(м)" -> "Xraygram".
++[[nodiscard]] QString BrandValue(const QString &value);
++
++// Image from the generated :/xraygram/ resources (XRAYGRAM_BRANDING_DIR),
++// null if the build has no branding resources.
++[[nodiscard]] QImage BrandImage(const QString &name);
++
++// FEAT-19 §3: whatever goes to other people (QR images, round videos)
++// carries neither the Telegram nor the Xraygram sign.
++inline constexpr auto kPlainQr = true;
++
++} // namespace Xraygram
 diff --git a/Telegram/SourceFiles/xraygram/xraygram_core.cpp b/Telegram/SourceFiles/xraygram/xraygram_core.cpp
 new file mode 100644
-index 0000000..051f9ed
+index 0000000..e3c1a73
 --- /dev/null
 +++ b/Telegram/SourceFiles/xraygram/xraygram_core.cpp
-@@ -0,0 +1,1078 @@
+@@ -0,0 +1,1066 @@
 +/*
 +This file is part of Xraygram, a fork of Telegram Desktop.
 +
@@ -2273,18 +3235,6 @@ index 0000000..051f9ed
 +	Get().checkLink(link, std::move(done));
 +}
 +
-+QString Tr(const QString &ru, const QString &en) {
-+	const auto russian = [](const QString &id) {
-+		return id.startsWith(u"ru"_q, Qt::CaseInsensitive);
-+	};
-+	// Lang::Instance keeps an empty id until the user picks a language.
-+	const auto &lang = Lang::GetInstance();
-+	if (lang.id().isEmpty()) {
-+		return russian(lang.systemLangCode()) ? ru : en;
-+	}
-+	return (russian(lang.id()) || russian(lang.baseId())) ? ru : en;
-+}
-+
 +bool LooksLikeShareLink(const QString &text) {
 +	const auto schemes = std::array{
 +		u"vless://"_q,
@@ -2307,10 +3257,10 @@ index 0000000..051f9ed
 +} // namespace Xraygram
 diff --git a/Telegram/SourceFiles/xraygram/xraygram_core.h b/Telegram/SourceFiles/xraygram/xraygram_core.h
 new file mode 100644
-index 0000000..2bf22f2
+index 0000000..eac298e
 --- /dev/null
 +++ b/Telegram/SourceFiles/xraygram/xraygram_core.h
-@@ -0,0 +1,92 @@
+@@ -0,0 +1,103 @@
 +/*
 +This file is part of Xraygram, a fork of Telegram Desktop.
 +
@@ -2395,9 +3345,20 @@ index 0000000..2bf22f2
 +// Asynchronous validation, `done` is called on the main thread.
 +void CheckLink(const QString &link, Fn<void(CheckResult)> done);
 +
-+// Russian or English: the app language if the user picked one, otherwise
-+// the system language.
++// Russian or English: the language picked on the intro screen until the
++// app language catches up, then the app language if the user picked one,
++// otherwise the system language. See xraygram_lang.cpp.
 +[[nodiscard]] QString Tr(const QString &ru, const QString &en);
++[[nodiscard]] rpl::producer<QString> TrValue(QString ru, QString en);
++[[nodiscard]] bool UiRussian();
++[[nodiscard]] rpl::producer<> UiLanguageChanges();
++
++// FEAT-19 intro "Русский · English": Xraygram texts switch at once, the
++// Telegram language pack follows (RU needs the network, i.e. XRAY).
++void SetUiLanguage(bool russian);
++
++// Repeats a pending RU switch lost by a restart (intro screen only).
++void ResumeUiLanguage();
 +
 +// True for vless://, vmess://, trojan://, ss://, hysteria2:// and the like.
 +[[nodiscard]] bool LooksLikeShareLink(const QString &text);
@@ -2765,6 +3726,185 @@ index 0000000..f2734d7
 +// Re-applies the current proxy settings so that MTP and Qt pick up a change
 +// of the gate state, then shows the gate if the network got blocked.
 +void RefreshGate();
++
++} // namespace Xraygram
+diff --git a/Telegram/SourceFiles/xraygram/xraygram_lang.cpp b/Telegram/SourceFiles/xraygram/xraygram_lang.cpp
+new file mode 100644
+index 0000000..666814c
+--- /dev/null
++++ b/Telegram/SourceFiles/xraygram/xraygram_lang.cpp
+@@ -0,0 +1,173 @@
++/*
++This file is part of Xraygram, a fork of Telegram Desktop.
++
++For license and copyright information please follow this link:
++https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
++*/
++#include "xraygram/xraygram_core.h"
++
++#include "lang/lang_keys.h"
++#include "lang/lang_instance.h"
++#include "lang/lang_cloud_manager.h"
++#include "settings.h"
++
++#include <QtCore/QJsonDocument>
++#include <QtCore/QJsonObject>
++
++namespace Xraygram {
++namespace {
++
++// The intro choice is kept apart from xraygram.json (servers) on purpose.
++[[nodiscard]] QString UiConfigPath() {
++	return cWorkingDir() + u"tdata/xraygram_ui.json"_q;
++}
++
++[[nodiscard]] bool IsRussianId(const QString &id) {
++	return id.startsWith(u"ru"_q, Qt::CaseInsensitive);
++}
++
++struct Override {
++	std::optional<bool> russian;
++	QString setForId; // Lang::Instance id when the choice was made.
++	bool loaded = false;
++	rpl::event_stream<> changes;
++	rpl::lifetime lifetime;
++};
++
++[[nodiscard]] Override &State() {
++	static auto result = Override();
++	return result;
++}
++
++void Save() {
++	auto &state = State();
++	if (!state.russian) {
++		QFile::remove(UiConfigPath());
++		return;
++	}
++	QDir().mkpath(cWorkingDir() + u"tdata"_q);
++	auto root = QJsonObject();
++	root.insert(u"language"_q, *state.russian ? u"ru"_q : u"en"_q);
++	root.insert(u"setFor"_q, state.setForId);
++	auto file = QFile(UiConfigPath());
++	if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
++		file.write(QJsonDocument(root).toJson(QJsonDocument::Compact));
++	}
++}
++
++[[nodiscard]] bool AppRussian(const Lang::Instance &lang) {
++	// Lang::Instance keeps an empty id until the user picks a language.
++	return lang.id().isEmpty()
++		? IsRussianId(lang.systemLangCode())
++		: (IsRussianId(lang.id()) || IsRussianId(lang.baseId()));
++}
++
++void Watch() {
++	auto &state = State();
++	if (state.lifetime) {
++		return;
++	}
++	// The override ends when the app language caught up with it or the user
++	// picked another language later (in Settings).
++	Lang::GetInstance().updated() | rpl::on_next([] {
++		auto &state = State();
++		const auto &lang = Lang::GetInstance();
++		const auto id = lang.id();
++		if (!state.russian || id.isEmpty()) {
++			return;
++		}
++		const auto caughtUp = (IsRussianId(id) == *state.russian);
++		if (caughtUp || id != state.setForId) {
++			state.russian = std::nullopt;
++			state.setForId = QString();
++			Save();
++		}
++		state.changes.fire({});
++	}, state.lifetime);
++}
++
++void Load() {
++	auto &state = State();
++	if (state.loaded) {
++		return;
++	}
++	state.loaded = true;
++	auto file = QFile(UiConfigPath());
++	if (!file.open(QIODevice::ReadOnly)) {
++		return;
++	}
++	const auto root = QJsonDocument::fromJson(file.readAll()).object();
++	const auto language = root.value(u"language"_q).toString();
++	if (language == u"ru"_q || language == u"en"_q) {
++		state.russian = (language == u"ru"_q);
++		state.setForId = root.value(u"setFor"_q).toString();
++	}
++}
++
++} // namespace
++
++bool UiRussian() {
++	Load();
++	const auto &state = State();
++	return state.russian
++		? *state.russian
++		: AppRussian(Lang::GetInstance());
++}
++
++QString Tr(const QString &ru, const QString &en) {
++	return UiRussian() ? ru : en;
++}
++
++rpl::producer<> UiLanguageChanges() {
++	Watch();
++	return rpl::merge(
++		State().changes.events(),
++		Lang::GetInstance().updated());
++}
++
++rpl::producer<QString> TrValue(QString ru, QString en) {
++	return rpl::single(rpl::empty) | rpl::then(
++		UiLanguageChanges()
++	) | rpl::map([=] {
++		return Tr(ru, en);
++	});
++}
++
++void SetUiLanguage(bool russian) {
++	Load();
++	Watch();
++	auto &state = State();
++	auto &lang = Lang::GetInstance();
++	auto &cloud = Lang::CurrentCloudManager();
++	const auto current = Lang::LanguageIdOrDefault(lang.id());
++	if (russian) {
++		if (!IsRussianId(current)) {
++			// Waits for the network (XRAY), then applies without restart
++			// while no account is authorized.
++			cloud.switchToLanguage(u"ru"_q);
++		}
++	} else if (current != Lang::DefaultLanguageId()) {
++		cloud.resetToDefault();
++	}
++	if (AppRussian(lang) == russian) {
++		state.russian = std::nullopt;
++		state.setForId = QString();
++	} else {
++		state.russian = russian;
++		state.setForId = lang.id();
++	}
++	Save();
++	state.changes.fire({});
++}
++
++void ResumeUiLanguage() {
++	Load();
++	Watch();
++	const auto &state = State();
++	const auto current = Lang::LanguageIdOrDefault(Lang::GetInstance().id());
++	if (state.russian && *state.russian && !IsRussianId(current)) {
++		Lang::CurrentCloudManager().switchToLanguage(u"ru"_q);
++	}
++}
 +
 +} // namespace Xraygram
 diff --git a/Telegram/Telegram.plist b/Telegram/Telegram.plist

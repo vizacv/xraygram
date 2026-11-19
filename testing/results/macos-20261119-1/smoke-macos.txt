@@ -1,0 +1,71 @@
+# Смоук Xraygram macOS: macos-20261119-1
+# 2026-11-19 09:30:44, 26.7.1, бандл: upstream/xraygram-local/dist/Xraygram-macos-20261119-1.app
+# бинарник: Nov 19 09:28:34 2026, 246915344 байт, core: xray 26.11.9
+
+## B — бандл
+PASS  B1  подпись бандла валидна
+PASS  B2  bundle id/имя: io.github.xraygram.desktop / Xraygram
+PASS  B3  нет URL-схем tg:// в Info.plist
+PASS  B4  нет ссылок на /opt/homebrew и build-каталоги
+PASS  B5  нет Contents/Library (LoginItems/LaunchAgents) в бандле
+PASS  B6  entitlements пустые (нет Network Extension), ключей: 0
+PASS  B7  FEAT-03: маркер «network blocked, showing the XRAY gate» в бинарнике
+PASS  B7  FEAT-04: маркер «TCP relays, xray proxy» в бинарнике
+PASS  B7  FEAT-04: маркер «REFLECTOR TCP via SOCKS5» в бинарнике
+PASS  B8  строка UI «Подключение через XRAY» есть
+PASS  B8  строка UI «Подключиться без XRAY» есть
+PASS  B8  строка UI «Подключиться напрямую?» есть
+PASS  B8  строка UI «Поделиться сервером» есть
+PASS  B8  строка UI «Сохранённые серверы» есть
+
+## C — xraygram-core отдельно (фиктивный сервер 192.0.2.1)
+PASS  C1  пустая ссылка → ошибка (ERROR empty link)
+PASS  C2  мусор → ошибка (ERROR unsupported share format)
+PASS  C3  обрезанная vless → ошибка (ERROR no valid outbound found)
+PASS  C4  Reality-ссылка → OK vless 192.0.2.1:443 fake
+PASS  C5  run → READY (READY vless 192.0.2.1:443 fake)
+PASS  C6  слушает только 127.0.0.1 (127.0.0.1:39101 )
+PASS  C7  ссылки нет в аргументах процесса
+PASS  C8  SOCKS: без пароля 05ff, неверный 01xx≠00, верный 0100 (noauth 05ff badpass 0101 goodpass 0100 udp 7 )
+PASS  C9  UDP ASSOCIATE отклонён (REP 7, udp:false)
+PASS  C10  занятый порт → ошибка bind (BUG-11)
+PASS  C11  SIGTERM → выход за 0.0 с
+PASS  C12  смерть родителя → core вышел за 0.6 с
+
+## G — FEAT-03: чистый профиль
+PASS  G1  QA-копия запущена в фоне (pid 5414, run-qa.sh, workdir qa/gate)
+PASS  G2  в логе: Xraygram: network BLOCKED (XRAY entries: no, direct allowed: no). 
+PASS  G3  120 с (F03-01): ни одного внешнего соединения/UDP
+PASS  G8  тестовый экземпляр не на переднем плане (front pid 172)
+PASS  G4  core не запущен
+PASS  G5  приложение ничего не слушает
+      инфо: строк «refused» в log.txt: 0 (попытки MTP в 127.0.0.1:1)
+PASS  G6  нет попыток DoH/Firebase в логе (0)
+PASS  G7  Cmd+Q (terminate по PID) → выход за 0.4 с
+
+## S — FEAT-03: сохранённая ссылка без записи в списке прокси
+PASS  S1  экран с сохранённой ссылкой: Xraygram: network blocked, showing the XRAY gate (saved: 1).
+PASS  S2  core для неактивной ссылки не запущен
+PASS  S3  8 с: ни одного внешнего соединения
+PASS  S4  ссылка не выброшена из xraygram.json
+
+## X — подключение через XRAY (тестовый сервер 127.0.0.1:10443, Reality)
+PASS  X1  Xraygram: xray started on 127.0.0.1:51619 (vless 127.0.0.1:10443 mac-reality)
+PASS  X2  экран XRAY не показан (запись есть)
+PASS  X3  Telegram подключился к core 127.0.0.1:51619 за ≤ 20 с
+PASS  X4  15 с: Telegram только на 127.0.0.1
+PASS  X5  core ходит только на тестовый сервер 127.0.0.1:10443
+      инфо: строк accepted в access.log тестового сервера: 29
+PASS  X6  kill -9 core → новый core за 3.2 с, порт 51619 (был 51619)
+PASS  X7  после перезапуска core: Telegram только на 127.0.0.1
+PASS  X8  Cmd+Q → приложение вышло за 0.3 с
+PASS  X9  core 9928 завершился вместе с приложением
+PASS  X10  порт 51619 свободен
+PASS  X11  kill -9 приложения → core вышел за 0.5 с
+
+## Y — система
+PASS  Y1  прокси/туннели/VPN/автозапуск не изменились
+PASS  Y2  системный прокси выключен на всех службах
+PASS  Y3  не осталось наших процессов
+
+# Итог: 52 PASS, 0 FAIL, 0 SKIP

@@ -291,6 +291,7 @@ cmd_configure() {
 		"${API_ARGS[@]}" \
 		-DDESKTOP_APP_USE_PACKAGED=ON \
 		-DXRAYGRAM_ICNS="$XG_REPO/branding/macos/Xraygram.icns" \
+		-DXRAYGRAM_BRANDING_DIR="$XG_REPO/branding" \
 		-DDESKTOP_APP_DISABLE_AUTOUPDATE=ON \
 		-DDESKTOP_APP_DISABLE_CRASH_REPORTS=ON
 }
@@ -318,7 +319,7 @@ cmd_swap() {
 	xg_log "готово: $app"
 }
 
-cmd_app() {
+cmd_app() { # APP_OUT=<путь.app> — положить туда вместо подмены dist/Xraygram.app
 	local src="$XG_BUILD/Telegram.app" staged="$XG_WORK/staging/Xraygram.app"
 	[[ -d "$src" ]] || xg_die "нет $src, сначала: $0 build"
 	[[ -x "$XG_CORE_BIN" ]] || cmd_core
@@ -332,6 +333,12 @@ cmd_app() {
 	codesign --verify --deep --strict "$staged"
 	if find "$staged" -type f -perm +111 -print0 | xargs -0 otool -L 2>/dev/null | grep -q '/opt/homebrew'; then
 		xg_warn "в бандле остались ссылки на /opt/homebrew (на этом Маке работает, на чужом — нет)"
+	fi
+	if [[ -n "${APP_OUT:-}" ]]; then # APP_OUT=dist/Xraygram-<ID>.app — собрать рядом, dist/Xraygram.app не трогать
+		[[ -e "$APP_OUT" ]] && xg_die "уже есть $APP_OUT"
+		mv "$staged" "$APP_OUT"
+		xg_log "готово: $APP_OUT"
+		return
 	fi
 	cmd_swap || true
 }
