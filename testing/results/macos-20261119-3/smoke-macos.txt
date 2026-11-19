@@ -35,3 +35,47 @@ PASS  C12  смерть родителя → core вышел за 0.6 с
 ## G — FEAT-03: чистый профиль
 PASS  G1  QA-копия запущена в фоне (pid 65806, run-qa.sh, workdir qa/gate)
 PASS  G2  в логе: Xraygram: network BLOCKED (XRAY entries: no, direct allowed: no). 
+PASS  G3  120 с (F03-01): ни одного внешнего соединения/UDP
+PASS  G8  тестовый экземпляр не на переднем плане (front pid 172)
+PASS  G4  core не запущен
+PASS  G5  приложение ничего не слушает
+      инфо: строк «refused» в log.txt: 0 (попытки MTP в 127.0.0.1:1)
+PASS  G6  нет попыток DoH/Firebase в логе (0)
+PASS  G7  Cmd+Q (terminate по PID) → выход за 0.2 с
+
+## S — FEAT-03: сохранённая ссылка без записи в списке прокси
+PASS  S1  экран с сохранённой ссылкой: Xraygram: network blocked, showing the XRAY gate (saved: 1).
+PASS  S2  core для неактивной ссылки не запущен
+PASS  S3  8 с: ни одного внешнего соединения
+PASS  S4  ссылка не выброшена из xraygram.json
+
+## X — подключение через XRAY (тестовый сервер 127.0.0.1:10443, Reality)
+PASS  X1  Xraygram: xray started on 127.0.0.1:51619 (vless 127.0.0.1:10443 mac-reality)
+PASS  X2  экран XRAY не показан (запись есть)
+PASS  X3  Telegram подключился к core 127.0.0.1:51619 за ≤ 20 с
+PASS  X4  15 с: Telegram только на 127.0.0.1
+PASS  X5  core ходит только на тестовый сервер 127.0.0.1:10443
+      инфо: строк accepted в access.log тестового сервера: 35
+PASS  X6  kill -9 core → новый core за 3.0 с, порт 51619 (был 51619)
+PASS  X7  после перезапуска core: Telegram только на 127.0.0.1
+PASS  X8  Cmd+Q → приложение вышло за 0.2 с
+PASS  X9  core 69249 завершился вместе с приложением
+PASS  X10  порт 51619 свободен
+PASS  X11  kill -9 приложения → core вышел за 0.3 с
+
+## Y — система
+FAIL  Y1  прокси/туннели/VPN/автозапуск не изменились: 34,35c34,35
+< ## фоновые объекты/автозапуск (sfltool dumpbtm)
+< упоминаний xraygram: 0
+---
+> ## автозапуск (без прав администратора): объекты входа пользователя
+> LaunchAgents с xray: 0
+PASS  Y2  системный прокси выключен на всех службах
+PASS  Y3  не осталось наших процессов
+# данные оставлены в upstream/xraygram-local/qa/macos-20261119-3, логи приложения — testing/results/macos-20261119-3/app-log-*.txt
+
+# Итог: 51 PASS, 1 FAIL, 0 SKIP
+
+## Примечание QA
+FAIL Y1 — артефакт: во время прогона я убрал из sys-check.sh вызов `sfltool dumpbtm` (он показывал окно пароля администратора), поэтому снимки «до» и «после» различаются заголовком этого раздела (строки 34–35). Прокси, туннели и VPN совпали.
+G8 подтверждён системным журналом: с 11:02:30 — 4 запуска QA-копии (CHECKEDIN), 0 строк SETFRONT для Xraygram → BUG-09 исправлен.

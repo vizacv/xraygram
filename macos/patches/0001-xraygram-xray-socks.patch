@@ -1,8 +1,8 @@
 diff --git a/Telegram/CMakeLists.txt b/Telegram/CMakeLists.txt
-index 1601b50..5e5fbb4 100644
+index 1601b50..e4037fe 100644
 --- a/Telegram/CMakeLists.txt
 +++ b/Telegram/CMakeLists.txt
-@@ -596,6 +596,13 @@ PRIVATE
+@@ -596,6 +596,15 @@ PRIVATE
      core/core_settings.h
      core/core_settings_proxy.cpp
      core/core_settings_proxy.h
@@ -13,10 +13,12 @@ index 1601b50..5e5fbb4 100644
 +    xraygram/xraygram_gate.cpp
 +    xraygram/xraygram_gate.h
 +    xraygram/xraygram_lang.cpp
++    xraygram/xraygram_status.cpp
++    xraygram/xraygram_status.h
      core/crash_report_window.cpp
      core/crash_report_window.h
      core/crash_reports.cpp
-@@ -2755,7 +2762,16 @@ elseif (APPLE)
+@@ -2755,7 +2764,16 @@ elseif (APPLE)
          set(icon_path ${icons_path}/Icon.iconset)
          find_program(ICONUTIL iconutil)
          find_program(PNG2ICNS png2icns)
@@ -34,7 +36,7 @@ index 1601b50..5e5fbb4 100644
              add_custom_command(
                  OUTPUT Icon.icns
                  COMMAND ${ICONUTIL}
-@@ -2777,7 +2793,7 @@ elseif (APPLE)
+@@ -2777,7 +2795,7 @@ elseif (APPLE)
                      ${icon_path}/icon_512x512.png
              )
          endif()
@@ -43,7 +45,7 @@ index 1601b50..5e5fbb4 100644
              set_source_files_properties(Icon.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
              target_add_resource(Telegram Icon.icns)
          endif()
-@@ -2855,9 +2871,9 @@ if (build_macstore)
+@@ -2855,12 +2873,14 @@ if (build_macstore)
      )
  else()
      if (CMAKE_GENERATOR STREQUAL Xcode)
@@ -54,29 +56,44 @@ index 1601b50..5e5fbb4 100644
 +        set(bundle_identifier "io.github.xraygram.desktop")
      endif()
      set(bundle_entitlements "Telegram.entitlements")
-     set(output_name "Telegram")
-@@ -2992,6 +3008,39 @@ if (MSVC)
+-    set(output_name "Telegram")
++    # Xraygram (FEAT-19): Xraygram.app/Contents/MacOS/Xraygram, the name
++    # shown in Activity Monitor, Force Quit and crash reports.
++    set(output_name "Xraygram")
+ endif()
+ 
+ if (CMAKE_GENERATOR STREQUAL Xcode)
+@@ -2992,6 +3012,48 @@ if (MSVC)
      endif()
  endif()
  
 +# Xraygram (FEAT-19): brand images from the repository branding/ folder,
 +# compiled into the app resources as :/xraygram/*. No binaries in the patch.
++# FEAT-20: the "Rentgen" theme (macos/theme/rentgen.tdesktop-theme, made by
++# macos/theme/make_rentgen.py) as :/xraygram/rentgen.tdesktop-theme.
 +set(XRAYGRAM_BRANDING_DIR "" CACHE PATH "Xraygram: branding/ folder with logos and tray masks.")
-+if (XRAYGRAM_BRANDING_DIR)
-+    set(xraygram_brand_files
-+        "logo.png=macos/xraygram-macos-1024.png"
-+        "logo_square.png=xraygram-icon-1024.png"
-+        "tray.png=macos/tray/mac_tray_icon.png"
-+        "tray@2x.png=macos/tray/mac_tray_icon@2x.png"
-+        "tray@3x.png=macos/tray/mac_tray_icon@3x.png"
-+    )
++set(XRAYGRAM_THEME_FILE "" CACHE FILEPATH "Xraygram: rentgen.tdesktop-theme.")
++if (XRAYGRAM_BRANDING_DIR OR XRAYGRAM_THEME_FILE)
++    set(xraygram_brand_files)
++    if (XRAYGRAM_BRANDING_DIR)
++        list(APPEND xraygram_brand_files
++            "logo.png=${XRAYGRAM_BRANDING_DIR}/macos/xraygram-macos-1024.png"
++            "logo_square.png=${XRAYGRAM_BRANDING_DIR}/xraygram-icon-1024.png"
++            "tray.png=${XRAYGRAM_BRANDING_DIR}/macos/tray/mac_tray_icon.png"
++            "tray@2x.png=${XRAYGRAM_BRANDING_DIR}/macos/tray/mac_tray_icon@2x.png"
++            "tray@3x.png=${XRAYGRAM_BRANDING_DIR}/macos/tray/mac_tray_icon@3x.png"
++        )
++    endif()
++    if (XRAYGRAM_THEME_FILE)
++        list(APPEND xraygram_brand_files
++            "rentgen.tdesktop-theme=${XRAYGRAM_THEME_FILE}")
++    endif()
 +    set(xraygram_brand_entries "")
 +    set(xraygram_brand_sources)
 +    foreach (pair ${xraygram_brand_files})
 +        string(REPLACE "=" ";" pair_list "${pair}")
 +        list(GET pair_list 0 brand_alias)
-+        list(GET pair_list 1 brand_path)
-+        set(brand_source "${XRAYGRAM_BRANDING_DIR}/${brand_path}")
++        list(GET pair_list 1 brand_source)
 +        if (NOT EXISTS "${brand_source}")
 +            message(FATAL_ERROR "Xraygram: missing branding file ${brand_source}")
 +        endif()
@@ -1152,7 +1169,7 @@ index 5498e39..a2ac79b 100644
  
  struct ConferencePanelMigration {
 diff --git a/Telegram/SourceFiles/core/application.cpp b/Telegram/SourceFiles/core/application.cpp
-index 94b64dc..a41d0a7 100644
+index 94b64dc..027fb9d 100644
 --- a/Telegram/SourceFiles/core/application.cpp
 +++ b/Telegram/SourceFiles/core/application.cpp
 @@ -7,6 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
@@ -1191,7 +1208,15 @@ index 94b64dc..a41d0a7 100644
  
  	startMediaView();
  
-@@ -2066,6 +2074,7 @@ void Application::refreshGlobalProxy() {
+@@ -563,6 +571,7 @@ void Application::startSettingsAndBackground() {
+ 	Local::rewriteSettingsIfNeeded();
+ 	Window::Theme::Background()->start();
+ 	checkSystemDarkMode();
++	Local::ApplyXraygramDefaultTheme();
+ 	Ui::SetScreenReaderModeDisabled(
+ 		settings().readPref<bool>(kScreenReaderModeDisabledKey));
+ }
+@@ -2066,6 +2075,7 @@ void Application::refreshGlobalProxy() {
  	} else {
  		MTP::WebProxy::Transport::Deactivate();
  	}
@@ -1199,6 +1224,19 @@ index 94b64dc..a41d0a7 100644
  	Sandbox::Instance().refreshGlobalProxy();
  }
  
+diff --git a/Telegram/SourceFiles/core/core_settings.h b/Telegram/SourceFiles/core/core_settings.h
+index 695ab31..20be9c1 100644
+--- a/Telegram/SourceFiles/core/core_settings.h
++++ b/Telegram/SourceFiles/core/core_settings.h
+@@ -1148,7 +1148,7 @@ private:
+ 	bool _notifyFromAll = true;
+ 	rpl::variable<bool> _nativeWindowFrame = false;
+ 	rpl::variable<std::optional<bool>> _systemDarkMode = std::nullopt;
+-	rpl::variable<bool> _systemDarkModeEnabled = true;
++	rpl::variable<bool> _systemDarkModeEnabled = false; // Xraygram (FEAT-20)
+ 	bool _systemAccentColorEnabled = false;
+ 	rpl::variable<WindowTitleContent> _windowTitleContent;
+ 	WindowPosition _windowPosition; // per-window
 diff --git a/Telegram/SourceFiles/core/crash_report_window.cpp b/Telegram/SourceFiles/core/crash_report_window.cpp
 index 845bcf0..af845af 100644
 --- a/Telegram/SourceFiles/core/crash_report_window.cpp
@@ -1213,7 +1251,7 @@ index 845bcf0..af845af 100644
  	QPalette p(palette());
  	p.setColor(QPalette::Window, QColor(255, 255, 255));
 diff --git a/Telegram/SourceFiles/core/launcher.cpp b/Telegram/SourceFiles/core/launcher.cpp
-index 3e436f7..402453b 100644
+index 3e436f7..ac84fcc 100644
 --- a/Telegram/SourceFiles/core/launcher.cpp
 +++ b/Telegram/SourceFiles/core/launcher.cpp
 @@ -343,7 +343,7 @@ void Launcher::init() {
@@ -1225,6 +1263,21 @@ index 3e436f7..402453b 100644
  
  #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
  	// fallback session management is useless for tdesktop since it doesn't have
+@@ -654,6 +654,14 @@ void Launcher::processArguments() {
+ 	gNoStartUpdate = parseResult.contains("-noupdate");
+ 	gStartToSettings = parseResult.contains("-tosettings");
+ 	gStartInTray = parseResult.contains("-startintray");
++#ifdef Q_OS_MAC
++	if (gStartInTray) {
++		// Xraygram (BUG-09): Qt activates an app started from a terminal
++		// (not via LaunchServices) when it finishes launching. Started in
++		// the tray it must not take the focus from the app in front.
++		qputenv("QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM", "1");
++	}
++#endif // Q_OS_MAC
+ 	gQuit = parseResult.contains("-quit");
+ 	_customWorkingDir = parseResult.value("-workdir", {}).join(QString());
+ 	if (!_customWorkingDir.isEmpty()) {
 diff --git a/Telegram/SourceFiles/core/sandbox.cpp b/Telegram/SourceFiles/core/sandbox.cpp
 index bdbb662..58fa8b8 100644
 --- a/Telegram/SourceFiles/core/sandbox.cpp
@@ -1275,6 +1328,149 @@ index 33a0313..e6d7f15 100644
  			kUserpicSize,
  			Qt::SmoothTransformation);
  		return &result;
+diff --git a/Telegram/SourceFiles/dialogs/dialogs_widget.cpp b/Telegram/SourceFiles/dialogs/dialogs_widget.cpp
+index 46fd8e2..535cd2d 100644
+--- a/Telegram/SourceFiles/dialogs/dialogs_widget.cpp
++++ b/Telegram/SourceFiles/dialogs/dialogs_widget.cpp
+@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #include "dialogs/dialogs_widget.h"
+ 
++#include "xraygram/xraygram_status.h"
++
+ #include "base/call_delayed.h"
+ #include "base/qt/qt_key_modifiers.h"
+ #include "base/options.h"
+@@ -1122,6 +1124,14 @@ void Widget::setupTopBarSuggestions() {
+ }
+ 
+ void Widget::updateFrozenAccountBar() {
++	if (!_xrayStatus && _layout != Layout::Child) {
++		_xrayStatus.create(this, controller());
++		_xrayStatus->hide();
++		_xrayStatus->stateChanges(
++		) | rpl::on_next([=] {
++			updateControlsGeometry();
++		}, _xrayStatus->lifetime());
++	}
+ 	if (_layout == Layout::Child
+ 		|| _openedForum
+ 		|| _openedFolder
+@@ -1764,8 +1774,30 @@ void Widget::fullSearchRefreshOn(rpl::producer<> events) {
+ 	}, lifetime());
+ }
+ 
++bool Widget::xrayStatusShouldShow() const {
++	// FEAT-20: under the search field of the main chats list, hidden while
++	// searching, in forums / folders / communities and in the narrow column.
++	return _xrayStatus
++		&& _xrayStatus->hasState()
++		&& (_layout != Layout::Child)
++		&& !_childList
++		&& !_openedForum
++		&& !_openedFolder
++		&& !_openedCommunity
++		&& !_showAnimation
++		&& _widthAnimationCache.isNull()
++		&& !_searchHasFocus
++		&& _searchState.query.isEmpty()
++		&& !_searchState.inChat
++		&& !suggestionsCoverList()
++		&& (width() > _narrowWidth);
++}
++
+ void Widget::updateControlsVisibility(bool fast) {
+ 	updateLoadMoreChatsVisibility();
++	if (_xrayStatus && _updateScrollGeometryCached) {
++		_updateScrollGeometryCached();
++	}
+ 	_scroll->setVisible(!suggestionsCoverList() && _hidingSuggestions.empty());
+ 	updateStoriesVisibility();
+ 	if ((_openedFolder || _openedForum || _openedCommunity)
+@@ -2689,6 +2721,9 @@ void Widget::startWidthAnimation() {
+ 	if (_frozenAccountBar) {
+ 		_frozenAccountBar->hide();
+ 	}
++	if (_xrayStatus) {
++		_xrayStatus->hide();
++	}
+ 	if (_chatFilters) {
+ 		_chatFilters->hide();
+ 	}
+@@ -2697,6 +2732,9 @@ void Widget::startWidthAnimation() {
+ 
+ void Widget::stopWidthAnimation() {
+ 	_widthAnimationCache = QPixmap();
++	if (_xrayStatus) {
++		crl::on_main(this, [=] { updateControlsGeometry(); });
++	}
+ 	if (!_showAnimation) {
+ 		_scroll->setVisible(!suggestionsCoverList());
+ 		if (_frozenAccountBar) {
+@@ -2833,6 +2871,9 @@ void Widget::startSlideAnimation(
+ 	if (_frozenAccountBar) {
+ 		_frozenAccountBar->hide();
+ 	}
++	if (_xrayStatus) {
++		_xrayStatus->hide();
++	}
+ 	if (_chatFilters) {
+ 		_chatFilters->hide();
+ 	}
+@@ -4582,8 +4623,21 @@ void Widget::updateControlsGeometry() {
+ 		_frozenAccountBar->resize(barw, _frozenAccountBar->height());
+ 	}
+ 	_updateScrollGeometryCached = [=] {
+-		const auto frozenBarTop = expandedStoriesTop
++		const auto xrayStatusTop = expandedStoriesTop
+ 			+ ((!_stories || _stories->isHidden()) ? 0 : _aboveScrollAdded);
++		const auto xrayStatusShown = xrayStatusShouldShow();
++		if (_xrayStatus) {
++			if (xrayStatusShown) {
++				_xrayStatus->setGeometry(
++					0,
++					xrayStatusTop,
++					barw,
++					Xraygram::StatusBar::DesiredHeight());
++			}
++			_xrayStatus->setVisible(xrayStatusShown);
++		}
++		const auto frozenBarTop = xrayStatusTop
++			+ (xrayStatusShown ? Xraygram::StatusBar::DesiredHeight() : 0);
+ 		if (_frozenAccountBar) {
+ 			_frozenAccountBar->move(0, frozenBarTop);
+ 		}
+diff --git a/Telegram/SourceFiles/dialogs/dialogs_widget.h b/Telegram/SourceFiles/dialogs/dialogs_widget.h
+index 49037af..1e0cd89 100644
+--- a/Telegram/SourceFiles/dialogs/dialogs_widget.h
++++ b/Telegram/SourceFiles/dialogs/dialogs_widget.h
+@@ -73,6 +73,10 @@ class List;
+ struct Content;
+ } // namespace Dialogs::Stories
+ 
++namespace Xraygram {
++class StatusBar;
++} // namespace Xraygram
++
+ namespace Dialogs {
+ 
+ extern const char kOptionForumHideChatsList[];
+@@ -259,6 +263,7 @@ private:
+ 	void updateJumpToDateVisibility(bool fast = false);
+ 	void updateSearchFromVisibility(bool fast = false);
+ 	void updateControlsGeometry();
++	[[nodiscard]] bool xrayStatusShouldShow() const;
+ 	void refreshTopBars();
+ 	void showSearchInTopBar(anim::type animated);
+ 	void checkUpdateStatus();
+@@ -336,6 +341,7 @@ private:
+ 	const int _narrowWidth = 0;
+ 
+ 	std::unique_ptr<Ui::AbstractButton> _frozenAccountBar;
++	object_ptr<Xraygram::StatusBar> _xrayStatus = { nullptr }; // FEAT-20
+ 
+ 	object_ptr<Ui::RpWidget> _searchControls;
+ 	object_ptr<HistoryView::TopBarWidget> _subsectionTopBar = { nullptr };
 diff --git a/Telegram/SourceFiles/intro/intro_qr.cpp b/Telegram/SourceFiles/intro/intro_qr.cpp
 index f5b68e7..063726e 100644
 --- a/Telegram/SourceFiles/intro/intro_qr.cpp
@@ -1772,6 +1968,28 @@ index e515ad2..eb38027 100644
  	const auto proxyType = (isEnabled ? proxy.type : ProxyData::Type::None);
  	const auto useTcp = (proxyType != ProxyData::Type::Http);
  	const auto useHttp = (proxyType != ProxyData::Type::Mtproto)
+diff --git a/Telegram/SourceFiles/platform/mac/global_menu_mac.mm b/Telegram/SourceFiles/platform/mac/global_menu_mac.mm
+index 761e823..ecd9310 100644
+--- a/Telegram/SourceFiles/platform/mac/global_menu_mac.mm
++++ b/Telegram/SourceFiles/platform/mac/global_menu_mac.mm
+@@ -166,7 +166,7 @@ void SendKeySequence(
+ 		objectForInfoDictionaryKey:@"CFBundleName"];
+ 	return [name isKindOfClass:[NSString class]]
+ 		? QString::fromNSString(name)
+-		: u"Telegram"_q;
++		: u"Xraygram"_q;
+ }
+ 
+ void ForceDisabled(QAction *action, bool disabled) {
+@@ -672,7 +672,7 @@ void ForceDisabled(QAction *action, bool disabled) {
+ }
+ 
+ void Manager::buildMenu() {
+-	buildAppleMenu(_menuBar->addMenu(u"Telegram"_q));
++	buildAppleMenu(_menuBar->addMenu(u"Xraygram"_q));
+ 	_file = _menuBar->addMenu(u"File"_q);
+ 	buildFileMenu(_file);
+ 	_edit = _menuBar->addMenu(u"Edit"_q);
 diff --git a/Telegram/SourceFiles/platform/mac/tray_mac.mm b/Telegram/SourceFiles/platform/mac/tray_mac.mm
 index d81ca0a..652ab3e 100644
 --- a/Telegram/SourceFiles/platform/mac/tray_mac.mm
@@ -1868,6 +2086,75 @@ index 75eacd6..ec11d67 100644
  		p.drawText(rectForName.left(), rectForName.top() + st::msgNameFont->ascent, notifyTitle);
  
  		st::notifyClose.icon.paint(p, w - st::notifyClosePos.x() - st::notifyClose.width + st::notifyClose.iconPosition.x(), st::notifyClosePos.y() + st::notifyClose.iconPosition.y(), w);
+diff --git a/Telegram/SourceFiles/storage/localstorage.cpp b/Telegram/SourceFiles/storage/localstorage.cpp
+index 5b56d7c..8dd6802 100644
+--- a/Telegram/SourceFiles/storage/localstorage.cpp
++++ b/Telegram/SourceFiles/storage/localstorage.cpp
+@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #include "storage/localstorage.h"
+ 
++#include "xraygram/xraygram_brand.h"
++
+ #include "storage/serialize_common.h"
+ #include "storage/storage_account.h"
+ #include "storage/details/storage_file_utilities.h"
+@@ -1247,6 +1249,43 @@ bool ApplyDefaultNightMode() {
+ 	return true;
+ }
+ 
++void ApplyXraygramDefaultTheme() {
++	// Xraygram (FEAT-20): night mode is the Rentgen theme and it is on by
++	// default, decided once per data folder: on a clean install and on an
++	// update where the upstream default theme is on. A theme the user picked
++	// is kept, and so are all later choices.
++	if (!Xraygram::HasRentgenTheme() || Xraygram::RentgenDefaultDecided()) {
++		return;
++	}
++	Xraygram::MarkRentgenDefaultDecided();
++	const auto night = Window::Theme::IsNightMode();
++	const auto &object = Window::Theme::Background()->themeObject();
++	const auto upstreamNight = night
++		&& !object.cloud.id
++		&& (object.pathAbsolute == u":/gui/night.tdesktop-theme"_q);
++	const auto upstreamDay = !night
++		&& !_themeKeyDay
++		&& !_themeKeyNight
++		&& !_themeKeyLegacy;
++	DEBUG_LOG(("Xraygram: default theme check (night: %1, path: %2, "
++		"upstream default: %3)."
++		).arg(Logs::b(night)
++		).arg(object.pathAbsolute
++		).arg(Logs::b(upstreamNight || upstreamDay)));
++	if (!upstreamNight && !upstreamDay) {
++		return;
++	}
++	// Rentgen stays dark whatever the system appearance is.
++	Core::App().settings().setSystemDarkModeEnabled(false);
++	if (upstreamNight) {
++		Window::Theme::ApplyDefaultWithPath(Window::Theme::NightThemePath());
++	} else {
++		Window::Theme::ToggleNightMode();
++	}
++	Window::Theme::KeepApplied();
++	writeSettings();
++}
++
+ Window::Theme::Saved readThemeAfterSwitch() {
+ 	const auto key = Window::Theme::IsNightMode()
+ 		? _themeKeyNight
+diff --git a/Telegram/SourceFiles/storage/localstorage.h b/Telegram/SourceFiles/storage/localstorage.h
+index ca847ab..178b219 100644
+--- a/Telegram/SourceFiles/storage/localstorage.h
++++ b/Telegram/SourceFiles/storage/localstorage.h
+@@ -53,6 +53,7 @@ void sync();
+ void finish();
+ 
+ void writeSettings();
++void ApplyXraygramDefaultTheme(); // Xraygram (FEAT-20)
+ void rewriteSettingsIfNeeded();
+ 
+ void writeAutoupdatePrefix(const QString &prefix);
 diff --git a/Telegram/SourceFiles/ui/controls/round_video_recorder.cpp b/Telegram/SourceFiles/ui/controls/round_video_recorder.cpp
 index f7d3308..414dc01 100644
 --- a/Telegram/SourceFiles/ui/controls/round_video_recorder.cpp
@@ -1996,11 +2283,153 @@ index e50548f..1a1442c 100644
  			: reminder
  			? tr::lng_notification_reminder(tr::now, tr::marked)
  			: topicWithChat();
+diff --git a/Telegram/SourceFiles/window/themes/window_theme.cpp b/Telegram/SourceFiles/window/themes/window_theme.cpp
+index 30746d2..4948c75 100644
+--- a/Telegram/SourceFiles/window/themes/window_theme.cpp
++++ b/Telegram/SourceFiles/window/themes/window_theme.cpp
+@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #include "window/themes/window_theme.h"
+ 
++#include "xraygram/xraygram_brand.h"
++
+ #include "window/themes/window_theme_preview.h"
+ #include "window/themes/window_themes_chat.h"
+ #include "window/themes/window_themes_embedded.h"
+@@ -1481,6 +1483,10 @@ void Revert() {
+ }
+ 
+ QString NightThemePath() {
++	// Xraygram (FEAT-20): "night mode" is the Rentgen theme.
++	if (Xraygram::HasRentgenTheme()) {
++		return QString::fromLatin1(Xraygram::kRentgenThemePath);
++	}
+ 	return kNightThemeFile.utf16();
+ }
+ 
+diff --git a/Telegram/SourceFiles/window/themes/window_themes_embedded.cpp b/Telegram/SourceFiles/window/themes/window_themes_embedded.cpp
+index 2be03d2..30b0590 100644
+--- a/Telegram/SourceFiles/window/themes/window_themes_embedded.cpp
++++ b/Telegram/SourceFiles/window/themes/window_themes_embedded.cpp
+@@ -16,6 +16,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ #include "ui/chat/chat_theme.h"
+ #include "ui/style/style_palette_colorizer.h"
+ #include "window/themes/window_theme.h"
++#include "xraygram/xraygram_brand.h"
++#include "xraygram/xraygram_core.h"
+ 
+ #include <QtGui/QGuiApplication>
+ #include <QtGui/QPalette>
+@@ -266,6 +268,12 @@ style::colorizer ColorizerFrom(
+ 		} };
+ 		result.lightnessMin = 64;
+ 		break;
++	case EmbeddedType::Rentgen:
++		result.keepContrast = base::flat_map<QLatin1String, Pair>{ {
++			{ qstr("activeButtonFg"), Pair{ cColor("3ef2c8"), cColor("0b1220") } }, // activeButtonBg, windowBg
++		} };
++		result.lightnessMin = 64;
++		break;
+ 	}
+ 	ApplyColorizerAccent(result, color);
+ 	return result;
+@@ -350,6 +358,20 @@ std::vector<EmbeddedScheme> EmbeddedThemes() {
+ 		return rpl::deferred([=] { return key(); });
+ 	};
+ 	return {
++		// Xraygram (FEAT-20): the default theme, first in the list.
++		EmbeddedScheme{
++			EmbeddedType::Rentgen,
++			qColor("0b1220"),
++			qColor("10403a"),
++			qColor("18233a"),
++			qColor("5f7391"),
++			qColor("3ef2c8"),
++			rpl::deferred([] {
++				return Xraygram::TrValue(u"Рентген"_q, u"X-ray"_q);
++			}),
++			QString::fromLatin1(Xraygram::kRentgenThemePath),
++			qColor("3ef2c8")
++		},
+ 		EmbeddedScheme{
+ 			EmbeddedType::Default,
+ 			qColor("9bd494"),
+@@ -402,6 +424,17 @@ std::vector<QColor> DefaultAccentColors(EmbeddedType type) {
+ 		return style::ColorFromHex(hex);
+ 	};
+ 	switch (type) {
++	case EmbeddedType::Rentgen:
++		return {
++			qColor("3ef2c8"),
++			qColor("7fb2ff"),
++			qColor("b49cff"),
++			qColor("f28cb1"),
++			qColor("f2b33e"),
++			qColor("8ee07a"),
++			qColor("8fd3ff"),
++			qColor("8ea3bf"),
++		};
+ 	case EmbeddedType::DayBlue:
+ 		return {
+ 			qColor("45bce7"),
+@@ -751,6 +784,7 @@ bool AccentColors::setFromSerialized(const QByteArray &serialized) {
+ 		case EmbeddedType::DayBlue:
+ 		case EmbeddedType::Night:
+ 		case EmbeddedType::NightGreen:
++		case EmbeddedType::Rentgen:
+ 			data.emplace(uncheckedType, color);
+ 			break;
+ 		default:
+diff --git a/Telegram/SourceFiles/window/themes/window_themes_embedded.h b/Telegram/SourceFiles/window/themes/window_themes_embedded.h
+index 85b2813..b302ee3 100644
+--- a/Telegram/SourceFiles/window/themes/window_themes_embedded.h
++++ b/Telegram/SourceFiles/window/themes/window_themes_embedded.h
+@@ -24,6 +24,7 @@ enum class EmbeddedType {
+ 	Default,
+ 	Night,
+ 	NightGreen,
++	Rentgen, // Xraygram (FEAT-20), keep last: stored as int.
+ };
+ 
+ struct EmbeddedScheme {
 diff --git a/Telegram/SourceFiles/window/window_connecting_widget.cpp b/Telegram/SourceFiles/window/window_connecting_widget.cpp
-index e921eb7..00a7993 100644
+index e921eb7..50dae2d 100644
 --- a/Telegram/SourceFiles/window/window_connecting_widget.cpp
 +++ b/Telegram/SourceFiles/window/window_connecting_widget.cpp
-@@ -451,6 +451,7 @@ auto ConnectionState::computeLayout(const State &state) const -> Layout {
+@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ */
+ #include "window/window_connecting_widget.h"
+ 
++#include "xraygram/xraygram_status.h"
++
+ #include "ui/widgets/buttons.h"
+ #include "ui/effects/radial_animation.h"
+ #include "ui/painter.h"
+@@ -258,6 +260,11 @@ ConnectionState::ConnectionState(
+ 	) | rpl::on_next([=] {
+ 		refreshState();
+ 	}, _lifetime);
++
++	Xraygram::StatusPillShownChanges(
++	) | rpl::on_next([=] {
++		refreshState();
++	}, _lifetime);
+ }
+ 
+ void ConnectionState::createWidget() {
+@@ -320,7 +327,10 @@ void ConnectionState::refreshState() {
+ 		const auto ready = !Core::UpdaterDisabled()
+ 			&& (Checker().state() == Checker::State::Ready);
+ 		const auto state = _account->mtp().dcstate();
+-		const auto proxy = Core::App().settings().proxy().isEnabled();
++		// Xraygram (FEAT-20): no proxy shield while the XRAY status pill
++		// is shown, the pill is the one entry to the proxy settings.
++		const auto proxy = Core::App().settings().proxy().isEnabled()
++			&& !Xraygram::StatusPillShown();
+ 		if (state == MTP::ConnectingState
+ 			|| state == MTP::DisconnectedState
+ 			|| (state < 0 && state > -600)) {
+@@ -451,6 +461,7 @@ auto ConnectionState::computeLayout(const State &state) const -> Layout {
  	result.visible = state.exposed
  		&& !state.updateReady
  		&& (state.useProxy
@@ -2060,10 +2489,10 @@ index d32b252..58ca539 100644
  		: (name + u" @ "_q + user);
 diff --git a/Telegram/SourceFiles/xraygram/xraygram_brand.cpp b/Telegram/SourceFiles/xraygram/xraygram_brand.cpp
 new file mode 100644
-index 0000000..2b1ee36
+index 0000000..f840549
 --- /dev/null
 +++ b/Telegram/SourceFiles/xraygram/xraygram_brand.cpp
-@@ -0,0 +1,84 @@
+@@ -0,0 +1,111 @@
 +/*
 +This file is part of Xraygram, a fork of Telegram Desktop.
 +
@@ -2073,6 +2502,7 @@ index 0000000..2b1ee36
 +#include "xraygram/xraygram_brand.h"
 +
 +#include "lang/lang_keys.h"
++#include "settings.h"
 +
 +namespace Xraygram {
 +namespace {
@@ -2143,6 +2573,32 @@ index 0000000..2b1ee36
 +	return result;
 +}
 +
++bool HasRentgenTheme() {
++	static const auto result = QFile::exists(
++		QString::fromLatin1(kRentgenThemePath));
++	return result;
++}
++
++namespace {
++
++[[nodiscard]] QString RentgenMarkerPath() {
++	return cWorkingDir() + u"tdata/xraygram_theme_default"_q;
++}
++
++} // namespace
++
++bool RentgenDefaultDecided() {
++	return QFile::exists(RentgenMarkerPath());
++}
++
++void MarkRentgenDefaultDecided() {
++	QDir().mkpath(cWorkingDir() + u"tdata"_q);
++	auto file = QFile(RentgenMarkerPath());
++	if (file.open(QIODevice::WriteOnly)) {
++		file.write("FEAT-20\n");
++	}
++}
++
 +QImage BrandImage(const QString &name) {
 +	return QImage(u":/xraygram/"_q + name);
 +}
@@ -2150,10 +2606,10 @@ index 0000000..2b1ee36
 +} // namespace Xraygram
 diff --git a/Telegram/SourceFiles/xraygram/xraygram_brand.h b/Telegram/SourceFiles/xraygram/xraygram_brand.h
 new file mode 100644
-index 0000000..b5d4792
+index 0000000..a6eeaad
 --- /dev/null
 +++ b/Telegram/SourceFiles/xraygram/xraygram_brand.h
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,38 @@
 +/*
 +This file is part of Xraygram, a fork of Telegram Desktop.
 +
@@ -2181,6 +2637,15 @@ index 0000000..b5d4792
 +// FEAT-19 §3: whatever goes to other people (QR images, round videos)
 +// carries neither the Telegram nor the Xraygram sign.
 +inline constexpr auto kPlainQr = true;
++
++// FEAT-20: the "Rentgen" theme, built from macos/theme (XRAYGRAM_THEME_FILE).
++inline constexpr auto kRentgenThemePath = ":/xraygram/rentgen.tdesktop-theme";
++[[nodiscard]] bool HasRentgenTheme();
++
++// Rentgen becomes the default night theme once, on the first start of a
++// build that has it: later choices of the user are kept.
++[[nodiscard]] bool RentgenDefaultDecided();
++void MarkRentgenDefaultDecided();
 +
 +} // namespace Xraygram
 diff --git a/Telegram/SourceFiles/xraygram/xraygram_core.cpp b/Telegram/SourceFiles/xraygram/xraygram_core.cpp
@@ -3366,10 +3831,10 @@ index 0000000..eac298e
 +} // namespace Xraygram
 diff --git a/Telegram/SourceFiles/xraygram/xraygram_gate.cpp b/Telegram/SourceFiles/xraygram/xraygram_gate.cpp
 new file mode 100644
-index 0000000..5b83a69
+index 0000000..81b619a
 --- /dev/null
 +++ b/Telegram/SourceFiles/xraygram/xraygram_gate.cpp
-@@ -0,0 +1,324 @@
+@@ -0,0 +1,368 @@
 +/*
 +This file is part of Xraygram, a fork of Telegram Desktop.
 +
@@ -3377,6 +3842,8 @@ index 0000000..5b83a69
 +https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 +*/
 +#include "xraygram/xraygram_gate.h"
++
++#include <QtGui/QFontDatabase>
 +
 +#include "xraygram/xraygram_core.h"
 +#include "base/timer.h"
@@ -3404,6 +3871,18 @@ index 0000000..5b83a69
 +
 +namespace Xraygram {
 +namespace {
++
++// FEAT-20 (PAR-24): the link field in a monospace font on `surface`.
++[[nodiscard]] const style::InputField &LinkFieldStyle() {
++	static const auto result = [] {
++		auto copy = st::connectionXrayLinkField;
++		copy.style.font = copy.style.font->monospace();
++		copy.placeholderFont = copy.placeholderFont->monospace();
++		copy.textBg = st::historyComposeAreaBg;
++		return copy;
++	}();
++	return result;
++}
 +
 +base::weak_qptr<Ui::GenericBox> CurrentGate;
 +
@@ -3457,6 +3936,27 @@ index 0000000..5b83a69
 +		: QString();
 +	constexpr auto kNewLink = -1;
 +
++	// FEAT-20 (PAR-24): "XRAY · VLESS" overline, monospace, accent, spacing 2.
++	{
++		const auto overline = box->addRow(object_ptr<Ui::RpWidget>(box));
++		auto font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
++		font.setPixelSize(style::ConvertScale(12));
++		font.setLetterSpacing(
++			QFont::AbsoluteSpacing,
++			style::ConvertScale(2));
++		overline->resize(
++			overline->width(),
++			QFontMetrics(font).height() + style::ConvertScale(6));
++		overline->paintRequest() | rpl::on_next([=] {
++			auto p = QPainter(overline);
++			p.setFont(font);
++			p.setPen(st::windowActiveTextFg);
++			p.drawText(
++				overline->rect(),
++				Qt::AlignLeft | Qt::AlignTop,
++				u"XRAY \u00B7 VLESS"_q);
++		}, overline->lifetime());
++	}
 +	box->addRow(object_ptr<Ui::FlatLabel>(
 +		box,
 +		(saved.empty()
@@ -3511,7 +4011,7 @@ index 0000000..5b83a69
 +	const auto field = linkContent->add(
 +		object_ptr<Ui::InputField>(
 +			linkContent,
-+			st::connectionXrayLinkField,
++			LinkFieldStyle(),
 +			Ui::InputField::Mode::MultiLine,
 +			rpl::single(u"vless://…"_q),
 +			clipboardLink),
@@ -3553,12 +4053,18 @@ index 0000000..5b83a69
 +			return;
 +		}
 +		status->setText(Tr(u"Проверяю ссылку…"_q, u"Checking link…"_q));
++		status->setTextColorOverride(std::nullopt);
 +		CheckLink(link, crl::guard(box.get(), [=](CheckResult result) {
 +			if (id != state->checkId) {
 +				return;
 +			}
-+			status->setText(result.error.isEmpty()
-+				? (Tr(u"Сервер: "_q, u"Server: "_q)
++			const auto ok = result.error.isEmpty();
++			status->setTextColorOverride(ok
++				? st::windowActiveTextFg->c
++				: st::boxTextFgError->c);
++			status->setText(ok
++				? (u"\u2713 "_q
++					+ Tr(u"Сервер: "_q, u"Server: "_q)
 +					+ FormatSummary(result.summary))
 +				: (Tr(u"Ошибка: "_q, u"Error: "_q) + result.error));
 +		}));
@@ -3577,6 +4083,7 @@ index 0000000..5b83a69
 +		const auto link = field->getLastText().trimmed();
 +		if (!useSaved && link.isEmpty()) {
 +			++state->checkId;
++			status->setTextColorOverride(st::boxTextFgError->c);
 +			status->setText(Tr(
 +				u"Ошибка: Вставьте ссылку на сервер"_q,
 +				u"Error: Paste the server link"_q));
@@ -3593,6 +4100,7 @@ index 0000000..5b83a69
 +				return;
 +			}
 +			++state->checkId;
++			status->setTextColorOverride(st::boxTextFgError->c);
 +			status->setText(
 +				Tr(u"Ошибка: "_q, u"Error: "_q) + result.error);
 +			field->showError();
@@ -3636,6 +4144,7 @@ index 0000000..5b83a69
 +				u"Connect without XRAY (direct)"_q),
 +			st::boxLinkButton),
 +		style::al_left);
++	direct->setColorOverride(st::placeholderFg->c); // text-3, no accent
 +	direct->setClickedCallback([=] {
 +		ConfirmDirectImpl(show, [=] {
 +			AllowDirect();
@@ -3905,6 +4414,532 @@ index 0000000..666814c
 +		Lang::CurrentCloudManager().switchToLanguage(u"ru"_q);
 +	}
 +}
++
++} // namespace Xraygram
+diff --git a/Telegram/SourceFiles/xraygram/xraygram_status.cpp b/Telegram/SourceFiles/xraygram/xraygram_status.cpp
+new file mode 100644
+index 0000000..f050280
+--- /dev/null
++++ b/Telegram/SourceFiles/xraygram/xraygram_status.cpp
+@@ -0,0 +1,415 @@
++/*
++This file is part of Xraygram, a fork of Telegram Desktop.
++
++For license and copyright information please follow this link:
++https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
++*/
++#include "xraygram/xraygram_status.h"
++
++#include "xraygram/xraygram_core.h"
++
++#include "base/network_reachability.h"
++#include "boxes/connection_box.h"
++#include "core/application.h"
++#include "core/core_settings.h"
++#include "main/main_account.h"
++#include "main/main_session.h"
++#include "mtproto/mtp_instance.h"
++#include "mtproto/facade.h"
++#include "ui/painter.h"
++#include "ui/ui_utility.h"
++#include "window/window_session_controller.h"
++
++#include <QtGui/QFontDatabase>
++
++namespace Xraygram {
++namespace {
++
++constexpr auto kRefreshTimeout = crl::time(1000);
++constexpr auto kPingTimeout = crl::time(60 * 1000);
++constexpr auto kNoConnectionAfter = crl::time(20 * 1000);
++constexpr auto kNameLimit = 16;
++
++// Colors of the "Rentgen" theme tokens (branding/theme-rentgen.md): the pill
++// keeps them in any theme, they mean states, not decoration.
++const auto kAccent = QColor(0x3E, 0xF2, 0xC8);
++const auto kWarn = QColor(0xF2, 0xB3, 0x3E);
++const auto kError = QColor(0xFF, 0x6B, 0x6B);
++const auto kText2 = QColor(0x8E, 0xA3, 0xBF);
++
++struct PillShown {
++	int count = 0;
++	rpl::event_stream<> changes;
++};
++
++[[nodiscard]] PillShown &Shown() {
++	static auto result = PillShown();
++	return result;
++}
++
++[[nodiscard]] QFont PillFont() {
++	auto result = QFontDatabase::systemFont(QFontDatabase::FixedFont);
++	result.setPixelSize(style::ConvertScale(12));
++	return result;
++}
++
++[[nodiscard]] QString ShortName(QString name) {
++	name = name.trimmed();
++	return (name.size() > kNameLimit)
++		? (name.left(kNameLimit - 1) + QChar(0x2026))
++		: name;
++}
++
++[[nodiscard]] int PillHeight() {
++	return style::ConvertScale(22);
++}
++
++[[nodiscard]] int BarPadding() {
++	return style::ConvertScale(5);
++}
++
++[[nodiscard]] int DotSize() {
++	return style::ConvertScale(6);
++}
++
++} // namespace
++
++StatusBar::StatusBar(
++	QWidget *parent,
++	not_null<Window::SessionController*> controller)
++: AbstractButton(parent)
++, _controller(controller)
++, _refreshTimer([=] { refresh(); })
++, _pingTimer([=] { ping(); }) {
++	resize(width(), DesiredHeight());
++	setClickedCallback([=] {
++		ProxiesBoxController::Show(_controller);
++	});
++
++	const auto reachability = base::NetworkReachability::Instance();
++	reachability->availableValue(
++	) | rpl::on_next([=](bool available) {
++		_networkAvailable = available;
++		refresh();
++	}, lifetime());
++
++	rpl::merge(
++		Core::App().settings().proxy().connectionTypeChanges(),
++		StateChanges(),
++		UiLanguageChanges()
++	) | rpl::on_next([=] {
++		refresh();
++	}, lifetime());
++
++	shownValue() | rpl::on_next([=](bool shown) {
++		auto &state = Shown();
++		state.count += shown ? 1 : -1;
++		state.changes.fire({});
++		if (shown) {
++			refresh();
++		}
++	}, lifetime());
++
++	_refreshTimer.callEach(kRefreshTimeout);
++	refresh();
++}
++
++StatusBar::~StatusBar() {
++	MTP::ResetProxyCheckers(_checker, _checkerv6);
++	if (isVisible()) {
++		auto &state = Shown();
++		--state.count;
++		state.changes.fire({});
++	}
++}
++
++int StatusBar::DesiredHeight() {
++	return PillHeight() + 2 * BarPadding();
++}
++
++bool StatusBar::hasState() const {
++	return _state.kind != StatusKind::Hidden;
++}
++
++rpl::producer<> StatusBar::stateChanges() const {
++	return _stateChanges.events();
++}
++
++void StatusBar::setShownInList(bool shown) {
++	_shownInList = shown;
++}
++
++auto StatusBar::computeState() -> State {
++	if (NetworkBlocked()) {
++		return {};
++	}
++	const auto &proxy = Core::App().settings().proxy();
++	if (!_networkAvailable) {
++		return {
++			StatusKind::NoNetwork,
++			Tr(u"Нет сети"_q, u"No network"_q),
++		};
++	} else if (proxy.isDisabled()) {
++		return {
++			StatusKind::Direct,
++			Tr(u"Напрямую, без XRAY"_q, u"Direct, without XRAY"_q),
++		};
++	}
++	const auto selected = proxy.selected();
++	if (proxy.isSystem() || !IsXrayProxy(selected)) {
++		return {
++			StatusKind::OtherProxy,
++			Tr(u"Прокси без XRAY"_q, u"Proxy without XRAY"_q),
++		};
++	}
++	if (_pinged != selected) {
++		resetPing();
++		_pinged = selected;
++	}
++	const auto name = ShortName(TitleFor(selected));
++	const auto prefix = u"XRAY · "_q + name;
++	const auto noConnection = State{
++		StatusKind::NoConnection,
++		prefix + Tr(u" · нет связи"_q, u" · no connection"_q),
++	};
++	if (!StatusFor(selected).isEmpty()) {
++		_connectingSince = 0;
++		return noConnection;
++	}
++	const auto dc = _controller->session().account().mtp().dcstate();
++	const auto connecting = (dc == MTP::ConnectingState)
++		|| (dc == MTP::DisconnectedState)
++		|| (dc < 0);
++	if (connecting) {
++		const auto now = crl::now();
++		if (!_connectingSince) {
++			_connectingSince = now;
++		} else if (now - _connectingSince > kNoConnectionAfter) {
++			return noConnection;
++		}
++		return {
++			StatusKind::Connecting,
++			prefix + Tr(
++				u" · подключение…"_q,
++				u" · connecting…"_q),
++		};
++	}
++	_connectingSince = 0;
++	return {
++		StatusKind::Connected,
++		_ping
++			? (prefix + u" · "_q + Tr(u"%1 мс"_q, u"%1 ms"_q).arg(_ping))
++			: prefix,
++	};
++}
++
++void StatusBar::refresh() {
++	auto state = computeState();
++	if (state.kind == StatusKind::Connected && isVisible()) {
++		schedulePing();
++	}
++	if (state == _state) {
++		return;
++	}
++	const auto kindChanged = (state.kind != _state.kind);
++	_state = std::move(state);
++	accessibilityNameChanged();
++	update();
++	if (kindChanged) {
++		_stateChanges.fire({});
++	}
++}
++
++void StatusBar::resetPing() {
++	MTP::ResetProxyCheckers(_checker, _checkerv6);
++	_ping = 0;
++	_pingedAt = 0;
++	_pingTimer.cancel();
++}
++
++void StatusBar::schedulePing() {
++	if (MTP::HasProxyCheckers(_checker, _checkerv6)
++		|| _pingTimer.isActive()) {
++		return;
++	}
++	const auto now = crl::now();
++	const auto next = _pingedAt ? (_pingedAt + kPingTimeout) : now;
++	if (next <= now) {
++		ping();
++	} else {
++		_pingTimer.callOnce(next - now);
++	}
++}
++
++void StatusBar::ping() {
++	if (!isVisible() || _state.kind != StatusKind::Connected) {
++		return;
++	}
++	using Connection = MTP::details::AbstractConnection;
++	_pingedAt = crl::now();
++	const auto weak = base::make_weak(this);
++	MTP::StartProxyCheck(
++		&_controller->session().account().mtp(),
++		_pinged,
++		Core::App().settings().proxy().tryIPv6(),
++		_checker,
++		_checkerv6,
++		[=](Connection *raw, int ping) {
++			if (!weak) {
++				return;
++			}
++			MTP::DropProxyChecker(_checker, _checkerv6, raw);
++			MTP::ResetProxyCheckers(_checker, _checkerv6);
++			DEBUG_LOG(("Xraygram: status ping %1 ms.").arg(ping));
++			_ping = ping;
++			refresh();
++		},
++		[=](Connection *raw) {
++			if (!weak) {
++				return;
++			}
++			MTP::DropProxyChecker(_checker, _checkerv6, raw);
++			if (!MTP::HasProxyCheckers(_checker, _checkerv6)) {
++				_ping = 0;
++				refresh();
++			}
++		});
++}
++
++QColor StatusBar::color() const {
++	switch (_state.kind) {
++	case StatusKind::NoNetwork: return kText2;
++	case StatusKind::Direct:
++	case StatusKind::OtherProxy:
++	case StatusKind::Connecting: return kWarn;
++	case StatusKind::NoConnection: return kError;
++	case StatusKind::Connected: return kAccent;
++	case StatusKind::Hidden: break;
++	}
++	return kText2;
++}
++
++bool StatusBar::narrow() const {
++	const auto metrics = QFontMetrics(PillFont());
++	const auto needed = metrics.horizontalAdvance(_state.text)
++		+ DotSize()
++		+ style::ConvertScale(30);
++	return width() < needed;
++}
++
++void StatusBar::paintEvent(QPaintEvent *e) {
++	auto p = QPainter(this);
++	p.fillRect(e->rect(), st::dialogsBg);
++	if (_state.kind == StatusKind::Hidden) {
++		return;
++	}
++	auto hq = PainterHighQualityEnabler(p);
++	const auto color = this->color();
++	auto fill = color;
++	fill.setAlphaF(isOver() ? 0.16 : 0.10);
++	auto border = color;
++	border.setAlphaF(0.35);
++
++	const auto font = PillFont();
++	const auto metrics = QFontMetrics(font);
++	const auto height = PillHeight();
++	const auto dot = DotSize();
++	const auto padding = style::ConvertScale(10);
++	const auto gap = style::ConvertScale(6);
++	const auto top = BarPadding();
++	if (narrow()) {
++		const auto side = height;
++		const auto rect = QRect((width() - side) / 2, top, side, side);
++		p.setPen(QPen(border, style::ConvertScale(1)));
++		p.setBrush(fill);
++		p.drawEllipse(rect);
++		p.setPen(Qt::NoPen);
++		p.setBrush(color);
++		p.drawEllipse(QRect(
++			rect.x() + (side - dot) / 2,
++			rect.y() + (side - dot) / 2,
++			dot,
++			dot));
++		return;
++	}
++	const auto maxText = width() - 2 * padding - dot - gap
++		- style::ConvertScale(16);
++	const auto text = metrics.elidedText(_state.text, Qt::ElideRight, maxText);
++	const auto textWidth = metrics.horizontalAdvance(text);
++	const auto pillWidth = padding + dot + gap + textWidth + padding;
++	const auto rect = QRectF(
++		(width() - pillWidth) / 2.,
++		top + 0.5,
++		pillWidth,
++		height - 1.);
++	p.setPen(QPen(border, style::ConvertScale(1)));
++	p.setBrush(fill);
++	p.drawRoundedRect(rect, rect.height() / 2., rect.height() / 2.);
++
++	p.setPen(Qt::NoPen);
++	p.setBrush(color);
++	const auto dotLeft = rect.x() + padding;
++	p.drawEllipse(QRectF(
++		dotLeft,
++		top + (height - dot) / 2.,
++		dot,
++		dot));
++
++	p.setFont(font);
++	p.setPen(color);
++	p.drawText(
++		QRectF(dotLeft + dot + gap, top, textWidth + 1, height),
++		Qt::AlignLeft | Qt::AlignVCenter,
++		text);
++}
++
++void StatusBar::enterEventHook(QEnterEvent *e) {
++	AbstractButton::enterEventHook(e);
++	update();
++	if (narrow()) {
++		Ui::Tooltip::Show(500, this);
++	}
++}
++
++void StatusBar::leaveEventHook(QEvent *e) {
++	AbstractButton::leaveEventHook(e);
++	update();
++	Ui::Tooltip::Hide();
++}
++
++void StatusBar::mouseMoveEvent(QMouseEvent *e) {
++	AbstractButton::mouseMoveEvent(e);
++	if (narrow()) {
++		Ui::Tooltip::Show(500, this);
++	}
++}
++
++QString StatusBar::tooltipText() const {
++	return _state.text;
++}
++
++QPoint StatusBar::tooltipPos() const {
++	return QCursor::pos();
++}
++
++bool StatusBar::tooltipWindowActive() const {
++	return Ui::AppInFocus() && Ui::InFocusChain(window());
++}
++
++QString StatusBar::accessibilityName() {
++	return _state.text.isEmpty()
++		? QString()
++		: (_state.text + u". "_q + Tr(
++			u"Открыть настройки прокси"_q,
++			u"Open proxy settings"_q));
++}
++
++bool StatusPillShown() {
++	return Shown().count > 0;
++}
++
++rpl::producer<> StatusPillShownChanges() {
++	return Shown().changes.events();
++}
++
++} // namespace Xraygram
+diff --git a/Telegram/SourceFiles/xraygram/xraygram_status.h b/Telegram/SourceFiles/xraygram/xraygram_status.h
+new file mode 100644
+index 0000000..9ee5e45
+--- /dev/null
++++ b/Telegram/SourceFiles/xraygram/xraygram_status.h
+@@ -0,0 +1,99 @@
++/*
++This file is part of Xraygram, a fork of Telegram Desktop.
++
++For license and copyright information please follow this link:
++https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
++*/
++#pragma once
++
++#include "ui/abstract_button.h"
++#include "ui/widgets/tooltip.h"
++#include "base/timer.h"
++#include "mtproto/proxy_check.h"
++
++namespace Window {
++class SessionController;
++} // namespace Window
++
++namespace Xraygram {
++
++// FEAT-20 (PAR-23): "XRAY · <name> · <N> ms" pill above the chats list.
++enum class StatusKind {
++	Hidden, // The gate blocks the network, the chats list is not shown.
++	NoNetwork,
++	Direct,
++	OtherProxy,
++	NoConnection,
++	Connecting,
++	Connected,
++};
++
++class StatusBar final
++	: public Ui::AbstractButton
++	, public Ui::AbstractTooltipShower {
++public:
++	StatusBar(
++		QWidget *parent,
++		not_null<Window::SessionController*> controller);
++	~StatusBar();
++
++	// Nothing to show (gate on): the owner hides the bar.
++	[[nodiscard]] bool hasState() const;
++	[[nodiscard]] rpl::producer<> stateChanges() const;
++
++	// Search open, forum, child list: the owner hides the bar.
++	void setShownInList(bool shown);
++
++	[[nodiscard]] static int DesiredHeight();
++
++	QString tooltipText() const override;
++	QPoint tooltipPos() const override;
++	bool tooltipWindowActive() const override;
++	QString accessibilityName() override;
++
++protected:
++	void paintEvent(QPaintEvent *e) override;
++	void enterEventHook(QEnterEvent *e) override;
++	void leaveEventHook(QEvent *e) override;
++	void mouseMoveEvent(QMouseEvent *e) override;
++
++private:
++	struct State {
++		StatusKind kind = StatusKind::Hidden;
++		QString text;
++
++		friend inline bool operator==(
++			const State &,
++			const State &) = default;
++	};
++
++	void refresh();
++	[[nodiscard]] State computeState();
++	[[nodiscard]] QColor color() const;
++	[[nodiscard]] bool narrow() const;
++	void schedulePing();
++	void ping();
++	void resetPing();
++
++	const not_null<Window::SessionController*> _controller;
++	State _state;
++	base::Timer _refreshTimer;
++	base::Timer _pingTimer;
++	MTP::ProxyCheckConnection _checker;
++	MTP::ProxyCheckConnection _checkerv6;
++	MTP::ProxyData _pinged;
++	crl::time _pingedAt = 0;
++	int _ping = 0;
++	crl::time _connectingSince = 0;
++	bool _networkAvailable = true;
++	bool _shownInList = true;
++	rpl::event_stream<> _stateChanges;
++
++};
++
++// True while a StatusBar is on screen: the upstream proxy shield in the
++// connecting widget is hidden then (one entry to the proxy settings).
++[[nodiscard]] bool StatusPillShown();
++[[nodiscard]] rpl::producer<> StatusPillShownChanges();
 +
 +} // namespace Xraygram
 diff --git a/Telegram/Telegram.plist b/Telegram/Telegram.plist

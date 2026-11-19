@@ -44,3 +44,10 @@ XG_APPDATA="${XRAYGRAM_APPDATA:-$XG_WORK/appdata}"
 xg_log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 xg_warn() { printf '\033[1;33mWARN:\033[0m %s\n' "$*" >&2; }
 xg_die() { printf '\033[1;31mERROR:\033[0m %s\n' "$*" >&2; exit 1; }
+
+# Имя исполняемого файла бандла (CFBundleExecutable): Xraygram с FEAT-19, Telegram в старых сборках.
+xg_bundle_exe() { /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$1/Contents/Info.plist"; }
+# Бандл в каталоге сборки: Xraygram.app (output_name с FEAT-19), иначе старый Telegram.app.
+xg_build_app() {
+	if [[ -d "$XG_BUILD/Xraygram.app" ]]; then echo "$XG_BUILD/Xraygram.app"; else echo "$XG_BUILD/Telegram.app"; fi
+}

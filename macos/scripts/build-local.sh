@@ -292,6 +292,7 @@ cmd_configure() {
 		-DDESKTOP_APP_USE_PACKAGED=ON \
 		-DXRAYGRAM_ICNS="$XG_REPO/branding/macos/Xraygram.icns" \
 		-DXRAYGRAM_BRANDING_DIR="$XG_REPO/branding" \
+		-DXRAYGRAM_THEME_FILE="$XG_REPO/macos/theme/rentgen.tdesktop-theme" \
 		-DDESKTOP_APP_DISABLE_AUTOUPDATE=ON \
 		-DDESKTOP_APP_DISABLE_CRASH_REPORTS=ON
 }
@@ -320,7 +321,7 @@ cmd_swap() {
 }
 
 cmd_app() { # APP_OUT=<путь.app> — положить туда вместо подмены dist/Xraygram.app
-	local src="$XG_BUILD/Telegram.app" staged="$XG_WORK/staging/Xraygram.app"
+	local src; src="$(xg_build_app)"; local staged="$XG_WORK/staging/Xraygram.app"
 	[[ -d "$src" ]] || xg_die "нет $src, сначала: $0 build"
 	[[ -x "$XG_CORE_BIN" ]] || cmd_core
 	rm -rf "$staged"
@@ -353,8 +354,9 @@ bundle_target() { # путь зависимости → путь внутри Co
 }
 
 cmd_quick() { # QUICK_TARGET=<другой .app> — обновить его вместо dist/Xraygram.app
-	local app="${QUICK_TARGET:-$XG_DIST/Xraygram.app}" src="$XG_BUILD/Telegram.app"
+	local app="${QUICK_TARGET:-$XG_DIST/Xraygram.app}" src
 	cmd_build
+	src="$(xg_build_app)"
 	if [[ ! -d "$app" ]]; then
 		[[ -n "${QUICK_TARGET:-}" ]] && xg_die "нет $app"
 		xg_warn "нет $app, делаю полный app"
@@ -371,8 +373,9 @@ cmd_quick() { # QUICK_TARGET=<другой .app> — обновить его в�
 		return
 	fi
 	local start=$SECONDS
-	local exe="$app/Contents/MacOS/Telegram" tmp="$app/Contents/MacOS/Telegram.new"
-	cp "$src/Contents/MacOS/Telegram" "$tmp"
+	local name; name="$(xg_bundle_exe "$src")"
+	local exe="$app/Contents/MacOS/$name" tmp="$app/Contents/MacOS/$name.new"
+	cp "$src/Contents/MacOS/$name" "$tmp"
 
 	local args=() dep rel missing=()
 	while read -r dep; do
@@ -430,7 +433,7 @@ cmd_snapshot() { # [ID] — копия dist/Xraygram.app с ID сборки (р�
 	[[ -e "$target" ]] && xg_die "$target уже есть, сборку с этим ID не перезаписываю"
 	ditto "$app" "$target"
 	codesign --verify --deep --strict "$target"
-	xg_log "сборка $id: $target ($(stat -f '%Sm' -t '%Y-%m-%d %H:%M' "$app/Contents/MacOS/Telegram"))"
+	xg_log "сборка $id: $target ($(stat -f '%Sm' -t '%Y-%m-%d %H:%M' "$app/Contents/MacOS/$(xg_bundle_exe "$app")"))"
 }
 
 cmd_dmg() {
@@ -446,13 +449,14 @@ cmd_dmg() {
 
 cmd_run() {
 	mkdir -p "$XG_APPDATA"
-	exec "$XG_DIST/Xraygram.app/Contents/MacOS/Telegram" -workdir "$XG_APPDATA/"
+	exec "$XG_DIST/Xraygram.app/Contents/MacOS/$(xg_bundle_exe "$XG_DIST/Xraygram.app")" -workdir "$XG_APPDATA/"
 }
 
 cmd_run_dev() {
 	[[ -x "$XG_CORE_BIN" ]] || cmd_core
 	mkdir -p "$XG_APPDATA"
-	XRAYGRAM_CORE="$XG_CORE_BIN" exec "$XG_BUILD/Telegram.app/Contents/MacOS/Telegram" -workdir "$XG_APPDATA/"
+	local app; app="$(xg_build_app)"
+	XRAYGRAM_CORE="$XG_CORE_BIN" exec "$app/Contents/MacOS/$(xg_bundle_exe "$app")" -workdir "$XG_APPDATA/"
 }
 
 cmd_status() {
