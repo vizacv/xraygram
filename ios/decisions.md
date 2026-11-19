@@ -179,3 +179,41 @@ iCloud, Siri и Associated Domains. Ещё ограничения: 10 App ID з�
 - **Заголовок списка чатов** — «Чаты» (на iOS нет надписи-логотипа «Telegram»; продукт: платформенное исключение F19-17).
 - **Не трогаем** (продукт): альбом «Telegram» в «Фото», метку «Telegram» в «Контактах», сеанс «Telegram iOS».
   Письмо в поддержку — «Xraygram: <версия>». BUG-21 (ar/ko `CFBundleDisplayName`) — исправлен.
+
+## 2026-11-19 — Тема «Рентген» и значок статуса (FEAT-20, PAR-22…24)
+
+- **Тема** — новый встроенный `PresentationBuiltinThemeReference.rentgen = 6` (как `.neutral`/`.neutralNight` в форке),
+  `baseTheme = .tinted` (для сервера), имя для `PresentationThemeName` — `.nightAccent`. Генератор
+  `TelegramPresentationData/Sources/RentgenPresentationTheme.swift` — копия «Tinted Night» upstream, где все цвета,
+  выведенные из акцента, заменены токенами. Кастомизация акцента для «Рентгена» не применяется (палитра фиксирована;
+  обои пользователя — отдельно, `chatWallpaper`). Название в выборе: «Рентген» / «X-Ray», значок карусели 🩻.
+- **По умолчанию** — `PresentationThemeSettings.defaultSettings`: `theme = .rentgen`, автоночь `trigger = .explicitNone`
+  (от темы системы не зависит). Обновление поверх старой сборки — один раз (`xg.rentgenDefaultApplied`): если стоит
+  upstream-умолчание (Classic, автоночь «система → Night», без своих цветов и обоев) — «Рентген». Выбор пользователя
+  не трогаем. Обои — `.color(0x0B1220)` (узор с сервера до подключения не скачать). Тест upstream
+  `PresentationThemeSettingsStorageTests` (байты умолчания) теперь не совпадает — в сборку приложения не входит.
+- **Таблица «ключ темы → роль»** (основное; остальное — `RentgenPresentationTheme.swift`):
+
+| Ключи PresentationTheme | Роль / токен |
+|---|---|
+| `list.plainBackgroundColor`, `blocksBackgroundColor`, `chatList.backgroundColor/itemBackgroundColor`, обои | `bg` #0B1220 |
+| `rootController.navigationBar/tabBar.backgroundColor`, `list.itemBlocksBackgroundColor`, `chat.inputPanel.panelBackgroundColor`, `actionSheet`, `inAppNotification`, `chatList.pinnedItemBackgroundColor` | `surface` #121B2E |
+| входящий пузырь `fill/stroke`, выделение строк, поля ввода (`inputBackgroundColor`, `itemInputField`) | `surface-2` #18233A |
+| исходящий пузырь `fill` / `stroke` / `secondaryTextColor` | `bubble-out` #10403A / accent 30 % / #7FD9C2 |
+| `chatList.itemSeparatorColor` / прочие разделители | `separator` #16213A / #1C2840 |
+| основной текст (`itemPrimaryTextColor`, `titleColor`, `primaryTextColor`…) | `text` #E6F1FF |
+| вторичный (`itemSecondaryTextColor`, `dateTextColor`, `messageTextColor`, `freeTextColor`) | `text-2` #8EA3BF |
+| подсказки, иконки поиска, `muteIconColor`, неактивный бейдж | `text-3` #5F7391 |
+| `accentColor` (кнопки, ссылки, `unreadBadgeActive`, `onlineDotColor`, галочки, переключатели, бейджи вкладок) | `accent` #3EF2C8; текст на нём `on-accent` #04211B |
+| `itemDestructiveColor`, `failedFillColor`, ошибки, черновик | `error` #FF6B6B |
+| заглушки аватаров (`calculateAvatarColors` при `theme.isRentgen`) | 6 цветов палитры по местам upstream, буквы `bg` |
+
+- **Значок статуса** — `XrayStatusPillComponent` (ChatListHeaderComponent) в новом слоте `ChatListNavigationBar.xrayStatus`
+  (высота 30 pt) между строкой заголовка и поиском: стоит под заголовком, при раскрытых историях едет вниз вместе с
+  поиском, при прокрутке вверх остаётся (иначе прятался бы со свёрнутым поиском — список открывается с ним свёрнутым).
+  Состояние — `ChatListUI/Sources/XraygramChatListStatus.swift` (сеть, `ProxySettings`, ошибка ядра, «подключение > 20 с»,
+  пинг `ProxyServersStatuses` раз в 60 с, только пока список на экране; в логе «status ping N ms»). Только корневой
+  список (не превью, не боковой); щит прокси upstream там скрыт. Тексты и обрезка имени до 16 — `XrayStrings`.
+- **Экран и окно XRAY (PAR-24, частично)** — «XRAY · VLESS» подзаголовком под заголовком (ItemList не умеет надзаголовок),
+  поле ссылки моноширинным (`ItemListMultilineInputItem.monospaced`), превью «✓ Сервер: …». Не сделано (ограничения
+  ItemList): цвет превью `accent`/`error`, обводка поля `accent`, «напрямую» цветом `text-3`.

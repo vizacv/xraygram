@@ -32,8 +32,10 @@ echo "## LaunchAgents/Daemons с xray/xraygram"
 ls ~/Library/LaunchAgents /Library/LaunchAgents /Library/LaunchDaemons 2>/dev/null | grep -i -E 'xray' || echo "нет"
 echo "## launchctl (кроме обычной GUI-записи приложения application.io.github.xraygram...)"
 launchctl list | grep -i xray | grep -v 'application\.io\.github\.xraygram' || echo "нет"
-echo "## фоновые объекты/автозапуск (sfltool dumpbtm)"
-n="$(sfltool dumpbtm 2>/dev/null | grep -ci xraygram)"; echo "упоминаний xraygram: ${n:-0}"
+# sfltool dumpbtm НЕ вызываем: он просит пароль администратора (окно SecurityAgent на экране владельца).
+echo "## автозапуск (без прав администратора): объекты входа пользователя"
+ls ~/Library/LaunchAgents 2>/dev/null | grep -ci xray | sed 's/^/LaunchAgents с xray: /'
+launchctl print "gui/$(id -u)" 2>/dev/null | grep -i xraygram | grep -v 'application\.io\.github\.xraygram' | head -3 || true
 
 echo "## процессы"
 ps -axo pid=,ppid=,command= | grep -E 'Xraygram\.app/|xraygram-core' | grep -v grep \

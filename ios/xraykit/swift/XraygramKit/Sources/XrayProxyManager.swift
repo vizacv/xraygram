@@ -108,6 +108,30 @@ public struct XrayStrings {
     public var introSubtitle: String { return self.t("Неофициальный клиент Telegram, который подключается через ваш сервер XRAY.", "An unofficial Telegram client that connects through your own XRAY server.") }
     public var introStart: String { return self.t("Начать", "Start") }
 
+    // FEAT-20: значок статуса XRAY над списком чатов.
+    public var statusNoNetwork: String { return self.t("Нет сети", "No network") }
+    public var statusDirect: String { return self.t("Напрямую, без XRAY", "Direct, without XRAY") }
+    public var statusOtherProxy: String { return self.t("Прокси без XRAY", "Proxy without XRAY") }
+    public func statusNoConnection(_ name: String) -> String { return "XRAY · \(XrayStrings.statusName(name)) · " + self.t("нет связи", "no connection") }
+    public func statusConnecting(_ name: String) -> String { return "XRAY · \(XrayStrings.statusName(name)) · " + self.t("подключение…", "connecting…") }
+    public func statusConnected(_ name: String, pingMs: Int?) -> String {
+        if let pingMs {
+            return "XRAY · \(XrayStrings.statusName(name)) · \(pingMs) " + self.t("мс", "ms")
+        }
+        return "XRAY · \(XrayStrings.statusName(name))"
+    }
+    public var statusOpenProxySettings: String { return self.t("Открыть настройки прокси", "Open proxy settings") }
+    /// Имя записи в значке: длиннее 16 символов — обрезать с «…» (F20-12).
+    public static func statusName(_ name: String) -> String {
+        if name.count > 16 {
+            return String(name.prefix(15)) + "…"
+        }
+        return name
+    }
+
+    // FEAT-20 п. 13: экран и окно XRAY.
+    public var gateOverline: String { return "XRAY · VLESS" }
+
     // FEAT-19 §4: строка версии внизу настроек и диалог.
     public func versionRow(version: String) -> String { return self.t("Xraygram для iOS \(version) · неофициальный клиент Telegram", "Xraygram for iOS \(version) · unofficial Telegram client") }
     public func aboutTitle(version: String) -> String { return "Xraygram \(version)" }
@@ -125,7 +149,7 @@ public struct XrayStrings {
     public var linkPlaceholder: String { return "vless://…" }
     public var linkHint: String { return self.t("Ссылка на ваш сервер: vless://, vmess://, trojan://, ss:// или hysteria2://. Вставьте её кнопкой «Вставить» выше или долгим нажатием в поле.", "Link to your server: vless://, vmess://, trojan://, ss:// or hysteria2://. Paste it with the Paste button above or by long-pressing the field.") }
     public var pasteButton: String { return self.t("Вставить ссылку из буфера", "Paste link from clipboard") }
-    public func serverPreview(_ info: XrayLinkInfo) -> String { return self.t("Сервер: ", "Server: ") + info.summary }
+    public func serverPreview(_ info: XrayLinkInfo) -> String { return "✓ " + self.t("Сервер: ", "Server: ") + info.summary }
     public func errorPreview(_ error: XrayError) -> String { return self.t("Ошибка: ", "Error: ") + error.userMessage(self) }
     public func entryStatus(_ error: XrayError) -> String { return "XRAY: " + error.userMessage(self) }
 

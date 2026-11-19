@@ -1,0 +1,37 @@
+# Смоук Xraygram macOS: macos-20261119-3
+# 2026-11-19 11:02:56, 26.7.1, бандл: upstream/xraygram-local/dist/Xraygram-macos-20261119-3.app
+# бинарник: Nov 19 10:56:16 2026, 246997840 байт, core: xray 26.11.9
+
+## B — бандл
+PASS  B1  подпись бандла валидна
+PASS  B2  bundle id/имя: io.github.xraygram.desktop / Xraygram
+PASS  B3  нет URL-схем tg:// в Info.plist
+PASS  B4  нет ссылок на /opt/homebrew и build-каталоги
+PASS  B5  нет Contents/Library (LoginItems/LaunchAgents) в бандле
+PASS  B6  entitlements пустые (нет Network Extension), ключей: 0
+PASS  B7  FEAT-03: маркер «network blocked, showing the XRAY gate» в бинарнике
+PASS  B7  FEAT-04: маркер «TCP relays, xray proxy» в бинарнике
+PASS  B7  FEAT-04: маркер «REFLECTOR TCP via SOCKS5» в бинарнике
+PASS  B8  строка UI «Подключение через XRAY» есть
+PASS  B8  строка UI «Подключиться без XRAY» есть
+PASS  B8  строка UI «Подключиться напрямую?» есть
+PASS  B8  строка UI «Поделиться сервером» есть
+PASS  B8  строка UI «Сохранённые серверы» есть
+
+## C — xraygram-core отдельно (фиктивный сервер 192.0.2.1)
+PASS  C1  пустая ссылка → ошибка (ERROR empty link)
+PASS  C2  мусор → ошибка (ERROR unsupported share format)
+PASS  C3  обрезанная vless → ошибка (ERROR no valid outbound found)
+PASS  C4  Reality-ссылка → OK vless 192.0.2.1:443 fake
+PASS  C5  run → READY (READY vless 192.0.2.1:443 fake)
+PASS  C6  слушает только 127.0.0.1 (127.0.0.1:39101 )
+PASS  C7  ссылки нет в аргументах процесса
+PASS  C8  SOCKS: без пароля 05ff, неверный 01xx≠00, верный 0100 (noauth 05ff badpass 0101 goodpass 0100 udp 7 )
+PASS  C9  UDP ASSOCIATE отклонён (REP 7, udp:false)
+PASS  C10  занятый порт → ошибка bind (BUG-11)
+PASS  C11  SIGTERM → выход за 0.0 с
+PASS  C12  смерть родителя → core вышел за 0.6 с
+
+## G — FEAT-03: чистый профиль
+PASS  G1  QA-копия запущена в фоне (pid 65806, run-qa.sh, workdir qa/gate)
+PASS  G2  в логе: Xraygram: network BLOCKED (XRAY entries: no, direct allowed: no). 

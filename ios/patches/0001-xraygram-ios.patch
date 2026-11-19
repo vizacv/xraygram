@@ -1455,6 +1455,423 @@ index c4332216..7ab524a4 100644
          }
      }
  }
+diff --git a/submodules/AvatarNode/Sources/AvatarNode.swift b/submodules/AvatarNode/Sources/AvatarNode.swift
+index 01d65fb6..fec61d9d 100644
+--- a/submodules/AvatarNode/Sources/AvatarNode.swift
++++ b/submodules/AvatarNode/Sources/AvatarNode.swift
+@@ -96,7 +96,7 @@ public func calculateAvatarColors(context: AccountContext?, explicitColorIndex:
+         }
+     }
+     
+-    let colors: [UIColor]
++    var colors: [UIColor]
+     if icon != .none {
+         if case .deletedIcon = icon {
+             colors = AvatarNode.grayscaleColors
+@@ -185,6 +185,10 @@ public func calculateAvatarColors(context: AccountContext?, explicitColorIndex:
+         } else {
+             colors = AvatarNode.gradientColors[colorIndex % AvatarNode.gradientColors.count]
+         }
++        // Xraygram (FEAT-20): заглушки аватаров в палитре «Рентген».
++        if let theme, theme.isRentgen, let index = AvatarNode.gradientColors.firstIndex(where: { $0 == colors }) {
++            colors = rentgenAvatarColors[index % rentgenAvatarColors.count]
++        }
+     }
+     
+     return colors
+@@ -462,7 +466,7 @@ public func drawAvatarNodeContent(bounds: CGRect, parameters: Any?, isRasterizin
+             }
+             
+             let string = letters.count == 0 ? "" : (letters[0] + (letters.count == 1 ? "" : letters[1]))
+-            let attributedString = NSAttributedString(string: string, attributes: [NSAttributedString.Key.font: parameters.font, NSAttributedString.Key.foregroundColor: UIColor.white])
++            let attributedString = NSAttributedString(string: string, attributes: [NSAttributedString.Key.font: parameters.font, NSAttributedString.Key.foregroundColor: (parameters.theme?.isRentgen ?? false) ? rentgenBg : UIColor.white])
+             
+             let line = CTLineCreateWithAttributedString(attributedString)
+             let lineBounds = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
+diff --git a/submodules/ChatListUI/BUILD b/submodules/ChatListUI/BUILD
+index 58a001c6..af904379 100644
+--- a/submodules/ChatListUI/BUILD
++++ b/submodules/ChatListUI/BUILD
+@@ -20,6 +20,7 @@ swift_library(
+         "//submodules/TelegramPresentationData:TelegramPresentationData",
+         "//submodules/TelegramUIPreferences:TelegramUIPreferences",
+         "//submodules/AccountContext:AccountContext",
++        "//submodules/XraygramKit:XraygramKit",
+         "//submodules/TelegramBaseController:TelegramBaseController",
+         "//submodules/OverlayStatusController:OverlayStatusController",
+         "//submodules/AlertUI:AlertUI",
+diff --git a/submodules/ChatListUI/Sources/ChatListController.swift b/submodules/ChatListUI/Sources/ChatListController.swift
+index 1ef2cfaf..f61d013e 100644
+--- a/submodules/ChatListUI/Sources/ChatListController.swift
++++ b/submodules/ChatListUI/Sources/ChatListController.swift
+@@ -2447,6 +2447,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController
+     
+     override public func viewDidAppear(_ animated: Bool) {
+         super.viewDidAppear(animated)
++        self.xraygramUpdateStatusVisibility(true)
+                 
+         if self.powerSavingMonitoringDisposable == nil {
+             self.powerSavingMonitoringDisposable = (self.context.sharedContext.automaticMediaDownloadSettings
+@@ -2939,6 +2940,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController
+     
+     override public func viewDidDisappear(_ animated: Bool) {
+         super.viewDidDisappear(animated)
++        self.xraygramUpdateStatusVisibility(false)
+         
+         if self.dismissSearchOnDisappear {
+             self.dismissSearchOnDisappear = false
+@@ -3606,6 +3608,30 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController
+     }
+     
+     private(set) var storyUploadProgress: [PeerId: Float] = [:]
++    
++    // Xraygram (FEAT-20, PAR-23): значок статуса XRAY над корневым списком чатов.
++    private var xraygramStatus: XraygramChatListStatus?
++    private(set) var xraygramStatusState: XraygramChatListStatus.State?
++    
++    private func xraygramUpdateStatusVisibility(_ isVisible: Bool) {
++        guard case .chatList(groupId: .root) = self.location, !self.previewing, !self.isSideList else {
++            return
++        }
++        if self.xraygramStatus == nil {
++            self.xraygramStatus = XraygramChatListStatus(context: self.context, updated: { [weak self] state in
++                guard let self else {
++                    return
++                }
++                self.xraygramStatusState = state
++                self.requestLayout(transition: .animated(duration: 0.2, curve: .easeInOut))
++            })
++        }
++        self.xraygramStatus?.setVisible(isVisible)
++    }
++    
++    func xraygramOpenProxySettings() {
++        (self.navigationController as? NavigationController)?.pushViewController(self.context.sharedContext.makeProxySettingsController(context: self.context))
++    }
+     private func updateStoryUploadProgress(_ progress: [PeerId: Float]) {
+         self.storyUploadProgress = progress.mapValues {
+             max(0.027, min(0.99, $0))
+@@ -7451,7 +7477,12 @@ private final class ChatListLocationContext {
+                 titleContent = NetworkStatusTitle(text: defaultTitle, activity: false, hasProxy: isRoot && hasProxy, connectsViaProxy: connectsViaProxy, isPasscodeSet: isRoot && isPasscodeSet, isManuallyLocked: isRoot && isManuallyLocked, peerStatus: peerStatus)
+             }
+             
+-            if titleContent.hasProxy {
++            if titleContent.hasProxy, isRoot, !(self.parentController?.isSideList ?? true), !(self.parentController?.previewing ?? true) {
++                // Xraygram (FEAT-20 п. 11, F20-17): на корневом списке вход в прокси один — значок статуса XRAY.
++                self.proxyButton = nil
++                titleContent.hasProxy = false
++                titleContent.connectsViaProxy = false
++            } else if titleContent.hasProxy {
+                 let proxyStatus: ChatTitleProxyStatus
+                 if titleContent.connectsViaProxy {
+                     proxyStatus = titleContent.activity ? .connecting : .connected
+diff --git a/submodules/ChatListUI/Sources/ChatListControllerNode.swift b/submodules/ChatListUI/Sources/ChatListControllerNode.swift
+index bc6825e3..77d89c6a 100644
+--- a/submodules/ChatListUI/Sources/ChatListControllerNode.swift
++++ b/submodules/ChatListUI/Sources/ChatListControllerNode.swift
+@@ -1804,6 +1804,11 @@ final class ChatListControllerNode: ASDisplayNode, ASGestureRecognizerDelegate {
+                         return
+                     }
+                     controller.openSideColumnOverflowMenu(sourceView: sourceView, items: items)
++                },
++                xrayStatus: self.controller?.xraygramStatusState.flatMap { state in
++                    return XrayStatusPillComponent(text: state.text, color: state.color, accessibilityHint: state.hint, action: { [weak self] in
++                        self?.controller?.xraygramOpenProxySettings()
++                    })
+                 }
+             )),
+             environment: {},
+diff --git a/submodules/ChatListUI/Sources/XraygramChatListStatus.swift b/submodules/ChatListUI/Sources/XraygramChatListStatus.swift
+new file mode 100644
+index 00000000..d13ae28b
+--- /dev/null
++++ b/submodules/ChatListUI/Sources/XraygramChatListStatus.swift
+@@ -0,0 +1,213 @@
++import Foundation
++import UIKit
++import SwiftSignalKit
++import TelegramCore
++import AccountContext
++import TelegramPresentationData
++import XraygramKit
++
++/// Xraygram (FEAT-20 п. 8–12, PAR-23): состояние значка статуса XRAY над списком чатов.
++/// Приоритет (первое подходящее): нет сети → напрямую → другой прокси → нет связи (ядро не работает или подключение
++/// > 20 с при живой сети) → подключение → подключено (`XRAY · <имя> · <N> мс`, пинг не чаще раза в 60 с, пока список
++/// на экране). Пока действует блокировка FEAT-03, значка нет.
++final class XraygramChatListStatus {
++    struct State: Equatable {
++        let text: String
++        let color: UIColor
++        let hint: String
++
++        static func ==(lhs: State, rhs: State) -> Bool {
++            return lhs.text == rhs.text && lhs.color.isEqual(rhs.color) && lhs.hint == rhs.hint
++        }
++    }
++
++    private let context: AccountContext
++    private let updated: (State?) -> Void
++
++    private var networkState: AccountNetworkState?
++    private var proxySettings = ProxySettings.defaultSettings
++    private var strings: XrayStrings
++    private var pingMs: Int?
++    private var pingLink: String?
++    private var connectingSince: Double?
++    private var currentState: State?
++
++    private var mainDisposable: Disposable?
++    private let pingDisposable = MetaDisposable()
++    private var connectingTimer: SwiftSignalKit.Timer?
++    private var endpointsObserver: NSObjectProtocol?
++    private var isVisible = false
++
++    init(context: AccountContext, updated: @escaping (State?) -> Void) {
++        self.context = context
++        self.updated = updated
++        self.strings = XrayStrings(appLanguageCode: context.sharedContext.currentPresentationData.with { $0 }.strings.primaryComponent.languageCode)
++
++        let proxySettings = context.sharedContext.accountManager.sharedData(keys: [SharedDataKeys.proxySettings])
++        |> map { sharedData -> ProxySettings in
++            return sharedData.entries[SharedDataKeys.proxySettings]?.get(ProxySettings.self) ?? ProxySettings.defaultSettings
++        }
++        |> distinctUntilChanged
++
++        self.mainDisposable = (combineLatest(queue: .mainQueue(),
++            context.account.networkState,
++            proxySettings,
++            context.sharedContext.presentationData
++        )
++        |> deliverOnMainQueue).start(next: { [weak self] networkState, proxySettings, presentationData in
++            guard let self else {
++                return
++            }
++            self.strings = XrayStrings(appLanguageCode: presentationData.strings.primaryComponent.languageCode)
++            let activeLinkChanged = self.proxySettings.activeServer?.xrayLink != proxySettings.activeServer?.xrayLink
++            self.networkState = networkState
++            self.proxySettings = proxySettings
++            if activeLinkChanged {
++                self.pingMs = nil
++                self.restartPing()
++            }
++            self.recompute()
++        })
++
++        // Ядро упало или поднялось снова — пересчитать «нет связи».
++        self.endpointsObserver = NotificationCenter.default.addObserver(forName: XrayProxyManager.endpointsChangedNotification, object: nil, queue: .main, using: { [weak self] _ in
++            self?.recompute()
++        })
++    }
++
++    deinit {
++        self.mainDisposable?.dispose()
++        self.pingDisposable.dispose()
++        self.connectingTimer?.invalidate()
++        if let endpointsObserver = self.endpointsObserver {
++            NotificationCenter.default.removeObserver(endpointsObserver)
++        }
++    }
++
++    /// Пинг идёт, только пока список чатов на экране.
++    func setVisible(_ isVisible: Bool) {
++        if self.isVisible == isVisible {
++            return
++        }
++        self.isVisible = isVisible
++        self.restartPing()
++    }
++
++    private func restartPing() {
++        guard self.isVisible, let server = self.proxySettings.activeServer, let link = server.xrayLink, self.proxySettings.enabled else {
++            self.pingDisposable.set(nil)
++            return
++        }
++        self.pingLink = link
++        let network = self.context.account.network
++        // Раз в 60 с: тот же механизм, что и в списке прокси (ProxyServersStatuses), по одной записи.
++        let tick: Signal<Void, NoError> = .single(Void()) |> then(.single(Void()) |> delay(60.0, queue: .mainQueue()) |> restart)
++        self.pingDisposable.set((tick
++        |> mapToSignal { _ -> Signal<ProxyServerStatus?, NoError> in
++            return ProxyServersStatuses(network: network, servers: .single([server])).statuses()
++            |> map { statuses -> ProxyServerStatus? in
++                return statuses[server]
++            }
++            |> filter { status in
++                if let status, case .checking = status {
++                    return false
++                }
++                return status != nil
++            }
++            |> take(1)
++        }
++        |> deliverOnMainQueue).start(next: { [weak self] status in
++            guard let self, self.pingLink == link else {
++                return
++            }
++            if let status, case let .available(rtt) = status {
++                self.pingMs = Int(rtt * 1000.0)
++                Logger.shared.log("Xraygram", "status ping \(self.pingMs ?? 0) ms")
++            } else {
++                self.pingMs = nil
++                Logger.shared.log("Xraygram", "status ping: not available")
++            }
++            self.recompute()
++        }))
++    }
++
++    private func recompute() {
++        let state = self.computeState()
++        if state != self.currentState {
++            self.currentState = state
++            self.updated(state)
++        }
++    }
++
++    private func computeState() -> State? {
++        let strings = self.strings
++        let hint = strings.statusOpenProxySettings
++        let settings = self.proxySettings
++        if settings.xraygramNetworkBlocked {
++            return nil
++        }
++        guard let networkState = self.networkState else {
++            return nil
++        }
++
++        var isConnecting = false
++        switch networkState {
++        case .waitingForNetwork:
++            self.updateConnecting(false)
++            return State(text: strings.statusNoNetwork, color: rentgenText2, hint: hint)
++        case .connecting, .updating:
++            isConnecting = true
++        case .online:
++            isConnecting = false
++        }
++
++        guard settings.enabled, let server = settings.activeServer else {
++            self.updateConnecting(false)
++            return State(text: strings.statusDirect, color: rentgenWarn, hint: hint)
++        }
++        guard let link = server.xrayLink else {
++            self.updateConnecting(false)
++            return State(text: strings.statusOtherProxy, color: rentgenWarn, hint: hint)
++        }
++        let name: String
++        if case let .success(info) = XrayLink.check(link) {
++            name = info.title
++        } else {
++            name = "XRAY"
++        }
++
++        self.updateConnecting(isConnecting)
++        let connectingTooLong: Bool
++        if isConnecting, let connectingSince = self.connectingSince {
++            connectingTooLong = CFAbsoluteTimeGetCurrent() - connectingSince > 20.0
++        } else {
++            connectingTooLong = false
++        }
++        if XrayProxyManager.shared.lastError(for: link) != nil || connectingTooLong {
++            return State(text: strings.statusNoConnection(name), color: rentgenError, hint: hint)
++        }
++        if isConnecting {
++            return State(text: strings.statusConnecting(name), color: rentgenWarn, hint: hint)
++        }
++        return State(text: strings.statusConnected(name, pingMs: self.pingMs), color: rentgenAccentColor, hint: hint)
++    }
++
++    /// «Подключение» дольше 20 с при живой сети — «нет связи» (F20-08): перепроверить через 20 с.
++    private func updateConnecting(_ isConnecting: Bool) {
++        if isConnecting {
++            if self.connectingSince == nil {
++                self.connectingSince = CFAbsoluteTimeGetCurrent()
++                self.connectingTimer?.invalidate()
++                let timer = SwiftSignalKit.Timer(timeout: 20.5, repeat: false, completion: { [weak self] in
++                    self?.recompute()
++                }, queue: Queue.mainQueue())
++                self.connectingTimer = timer
++                timer.start()
++            }
++        } else {
++            self.connectingSince = nil
++            self.connectingTimer?.invalidate()
++            self.connectingTimer = nil
++        }
++    }
++}
+diff --git a/submodules/ItemListUI/Sources/Items/ItemListMultilineInputItem.swift b/submodules/ItemListUI/Sources/Items/ItemListMultilineInputItem.swift
+index 348816b9..26ff964f 100644
+--- a/submodules/ItemListUI/Sources/Items/ItemListMultilineInputItem.swift
++++ b/submodules/ItemListUI/Sources/Items/ItemListMultilineInputItem.swift
+@@ -51,9 +51,11 @@ public class ItemListMultilineInputItem: ListViewItem, ItemListItem {
+     let minimalHeight: CGFloat?
+     let inlineAction: ItemListMultilineInputInlineAction?
+     let noInsets: Bool
++    /// Xraygram (FEAT-20 п. 13): моноширинный шрифт для технических данных (ссылка vless://).
++    let monospaced: Bool
+     public let tag: ItemListItemTag?
+     
+-    public init(presentationData: ItemListPresentationData, systemStyle: ItemListSystemStyle = .legacy, text: String, placeholder: String, maxLength: ItemListMultilineInputItemTextLimit?, sectionId: ItemListSectionId, style: ItemListStyle, capitalization: Bool = true, autocorrection: Bool = true, returnKeyType: UIReturnKeyType = .default, minimalHeight: CGFloat? = nil, textUpdated: @escaping (String) -> Void, shouldUpdateText: @escaping (String) -> Bool = { _ in return true }, processPaste: ((String) -> Void)? = nil, updatedFocus: ((Bool) -> Void)? = nil, tag: ItemListItemTag? = nil, action: (() -> Void)? = nil, inlineAction: ItemListMultilineInputInlineAction? = nil, noInsets: Bool = false) {
++    public init(presentationData: ItemListPresentationData, systemStyle: ItemListSystemStyle = .legacy, text: String, placeholder: String, maxLength: ItemListMultilineInputItemTextLimit?, sectionId: ItemListSectionId, style: ItemListStyle, capitalization: Bool = true, autocorrection: Bool = true, returnKeyType: UIReturnKeyType = .default, minimalHeight: CGFloat? = nil, textUpdated: @escaping (String) -> Void, shouldUpdateText: @escaping (String) -> Bool = { _ in return true }, processPaste: ((String) -> Void)? = nil, updatedFocus: ((Bool) -> Void)? = nil, tag: ItemListItemTag? = nil, action: (() -> Void)? = nil, inlineAction: ItemListMultilineInputInlineAction? = nil, noInsets: Bool = false, monospaced: Bool = false) {
+         self.presentationData = presentationData
+         self.systemStyle = systemStyle
+         self.text = text
+@@ -73,6 +75,7 @@ public class ItemListMultilineInputItem: ListViewItem, ItemListItem {
+         self.action = action
+         self.inlineAction = inlineAction
+         self.noInsets = noInsets
++        self.monospaced = monospaced
+     }
+     
+     public func nodeConfiguredForParams(async: @escaping (@escaping () -> Void) -> Void, params: ListViewItemLayoutParams, synchronousLoads: Bool, neighbors: ListViewItemNeighbors, completion: @escaping (ListViewItemNode, @escaping () -> (Signal<Void, NoError>?, (ListViewItemApply) -> Void)) -> Void) {
+@@ -165,7 +168,7 @@ public class ItemListMultilineInputItemNode: ListViewItemNode, ASEditableTextNod
+         var textColor: UIColor = .black
+         if let item = self.item {
+             textColor = item.presentationData.theme.list.itemPrimaryTextColor
+-            self.textNode.typingAttributes = [NSAttributedString.Key.font.rawValue: Font.regular(item.presentationData.fontSize.itemListBaseFontSize), NSAttributedString.Key.foregroundColor.rawValue: textColor]
++            self.textNode.typingAttributes = [NSAttributedString.Key.font.rawValue: (item.monospaced ? Font.monospace(item.presentationData.fontSize.itemListBaseFontSize) : Font.regular(item.presentationData.fontSize.itemListBaseFontSize)), NSAttributedString.Key.foregroundColor.rawValue: textColor]
+         } else {
+             self.textNode.typingAttributes = [NSAttributedString.Key.font.rawValue: Font.regular(17.0), NSAttributedString.Key.foregroundColor.rawValue: textColor]
+         }
+@@ -235,8 +238,8 @@ public class ItemListMultilineInputItemNode: ListViewItemNode, ASEditableTextNod
+             if measureText.hasSuffix("\n") || measureText.isEmpty {
+                measureText += "|"
+             }
+-            let attributedMeasureText = NSAttributedString(string: measureText, font: Font.regular(item.presentationData.fontSize.itemListBaseFontSize), textColor: .black)
+-            let attributedText = NSAttributedString(string: item.text, font: Font.regular(item.presentationData.fontSize.itemListBaseFontSize), textColor: item.presentationData.theme.list.itemPrimaryTextColor)
++            let attributedMeasureText = NSAttributedString(string: measureText, font: (item.monospaced ? Font.monospace(item.presentationData.fontSize.itemListBaseFontSize) : Font.regular(item.presentationData.fontSize.itemListBaseFontSize)), textColor: .black)
++            let attributedText = NSAttributedString(string: item.text, font: (item.monospaced ? Font.monospace(item.presentationData.fontSize.itemListBaseFontSize) : Font.regular(item.presentationData.fontSize.itemListBaseFontSize)), textColor: item.presentationData.theme.list.itemPrimaryTextColor)
+             let (textLayout, textApply) = makeTextLayout(TextNodeLayoutArguments(attributedString: attributedMeasureText, backgroundColor: nil, maximumNumberOfLines: 0, truncationType: .end, constrainedSize: CGSize(width: params.width - 16.0 - leftInset - rightInset, height: CGFloat.greatestFiniteMagnitude), alignment: .natural, lineSpacing: 0.0, cutout: nil, insets: UIEdgeInsets()))
+             
+             let separatorHeight = UIScreenPixel
+@@ -264,7 +267,7 @@ public class ItemListMultilineInputItemNode: ListViewItemNode, ASEditableTextNod
+             let layout = ListViewItemNodeLayout(contentSize: contentSize, insets: insets)
+             let layoutSize = layout.size
+             
+-            let attributedPlaceholderText = NSAttributedString(string: item.placeholder, font: Font.regular(item.presentationData.fontSize.itemListBaseFontSize), textColor: item.presentationData.theme.list.itemPlaceholderTextColor)
++            let attributedPlaceholderText = NSAttributedString(string: item.placeholder, font: (item.monospaced ? Font.monospace(item.presentationData.fontSize.itemListBaseFontSize) : Font.regular(item.presentationData.fontSize.itemListBaseFontSize)), textColor: item.presentationData.theme.list.itemPlaceholderTextColor)
+             
+             return (layout, { [weak self] in
+                 if let strongSelf = self {
+@@ -278,7 +281,7 @@ public class ItemListMultilineInputItemNode: ListViewItemNode, ASEditableTextNod
+                         strongSelf.backgroundNode.backgroundColor = itemBackgroundColor
+                         
+                         if strongSelf.isNodeLoaded {
+-                            strongSelf.textNode.typingAttributes = [NSAttributedString.Key.font.rawValue: Font.regular(item.presentationData.fontSize.itemListBaseFontSize), NSAttributedString.Key.foregroundColor.rawValue: item.presentationData.theme.list.itemPrimaryTextColor]
++                            strongSelf.textNode.typingAttributes = [NSAttributedString.Key.font.rawValue: (item.monospaced ? Font.monospace(item.presentationData.fontSize.itemListBaseFontSize) : Font.regular(item.presentationData.fontSize.itemListBaseFontSize)), NSAttributedString.Key.foregroundColor.rawValue: item.presentationData.theme.list.itemPrimaryTextColor]
+                             strongSelf.textNode.tintColor = item.presentationData.theme.list.itemAccentColor
+                         }
+                         
+@@ -458,7 +461,7 @@ public class ItemListMultilineInputItemNode: ListViewItemNode, ASEditableTextNod
+         if let item = self.item {
+             if let text = self.textNode.attributedText {
+                 let updatedText = text.string
+-                let updatedAttributedText = NSAttributedString(string: updatedText, font: Font.regular(item.presentationData.fontSize.itemListBaseFontSize), textColor: item.presentationData.theme.list.itemPrimaryTextColor)
++                let updatedAttributedText = NSAttributedString(string: updatedText, font: (item.monospaced ? Font.monospace(item.presentationData.fontSize.itemListBaseFontSize) : Font.regular(item.presentationData.fontSize.itemListBaseFontSize)), textColor: item.presentationData.theme.list.itemPrimaryTextColor)
+                 if text.string != updatedAttributedText.string {
+                     self.textNode.attributedText = updatedAttributedText
+                 }
 diff --git a/submodules/LegacyComponents/Sources/TGLocalization.m b/submodules/LegacyComponents/Sources/TGLocalization.m
 index 05dd9f6e..12e83817 100644
 --- a/submodules/LegacyComponents/Sources/TGLocalization.m
@@ -1537,6 +1954,19 @@ index 6b9bc4d2..b91006a8 100644
      req.DestPort = _scheme.address.port;
      
      NSMutableData *reqData = [[NSMutableData alloc] init];
+diff --git a/submodules/PresentationDataUtils/Sources/DefaultAccentPresentationData.swift b/submodules/PresentationDataUtils/Sources/DefaultAccentPresentationData.swift
+index a9886ac4..37de00be 100644
+--- a/submodules/PresentationDataUtils/Sources/DefaultAccentPresentationData.swift
++++ b/submodules/PresentationDataUtils/Sources/DefaultAccentPresentationData.swift
+@@ -10,6 +10,8 @@ private func themeWithDefaultAccent(_ theme: PresentationTheme) -> PresentationT
+         defaultTheme = defaultDarkColorPresentationTheme
+     case .nightAccent:
+         return defaultDarkTintedPresentationTheme
++    case .rentgen:
++        return theme
+     }
+ 
+     let updatedTheme = customizePresentationTheme(
 diff --git a/submodules/QrCodeUI/Sources/QrCodeScreen.swift b/submodules/QrCodeUI/Sources/QrCodeScreen.swift
 index 292c57eb..01286f47 100644
 --- a/submodules/QrCodeUI/Sources/QrCodeScreen.swift
@@ -1803,7 +2233,7 @@ index e42e4d60..0cf1f8cb 100644
                      
                      if !result.isEmpty {
 diff --git a/submodules/SettingsUI/Sources/Data and Storage/ProxyServerSettingsController.swift b/submodules/SettingsUI/Sources/Data and Storage/ProxyServerSettingsController.swift
-index 61ce937b..c1d03761 100644
+index 61ce937b..1057085c 100644
 --- a/submodules/SettingsUI/Sources/Data and Storage/ProxyServerSettingsController.swift	
 +++ b/submodules/SettingsUI/Sources/Data and Storage/ProxyServerSettingsController.swift	
 @@ -11,22 +11,31 @@ import AccountContext
@@ -1964,7 +2394,7 @@ index 61ce937b..c1d03761 100644
 +                }, action: {
 +                    // Return = убрать клавиатуру (видно превью сервера).
 +                    arguments.dismissInput()
-+                })
++                }, monospaced: true)
 +            case let .xrayInfo(text):
 +                return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
              case let .modeSocks5(_, text, value):
@@ -2275,7 +2705,7 @@ index a07fd8d4..c1a199ea 100644
                          }
 diff --git a/submodules/SettingsUI/Sources/Data and Storage/XraygramGateController.swift b/submodules/SettingsUI/Sources/Data and Storage/XraygramGateController.swift
 new file mode 100644
-index 00000000..bac50072
+index 00000000..64c2da36
 --- /dev/null
 +++ b/submodules/SettingsUI/Sources/Data and Storage/XraygramGateController.swift	
 @@ -0,0 +1,321 @@
@@ -2448,7 +2878,7 @@ index 00000000..bac50072
 +                return !value.contains("\n")
 +            }, action: {
 +                arguments.dismissInput()
-+            })
++            }, monospaced: true)
 +        case let .linkInfo(text):
 +            return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
 +        case let .connect(title, enabled):
@@ -2582,7 +3012,7 @@ index 00000000..bac50072
 +        presentationData = presentationData.withUpdated(theme: presentationData.theme.withModalBlocksBackground())
 +
 +        let xs = xraygramStrings(presentationData)
-+        let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(xs.gateTitle), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: nil, animateChanges: false)
++        let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .textWithSubtitle(xs.gateTitle, xs.gateOverline) /* FEAT-20 п. 13: XRAY · VLESS */, leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: nil, animateChanges: false)
 +        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: xraygramGateEntries(state: state, savedLinks: savedLinks, xs: xs), style: .blocks, emptyStateItem: nil, animateChanges: true)
 +        return (controllerState, (listState, arguments))
 +    }
@@ -2988,6 +3418,63 @@ index 00000000..d45b5230
 +        self.dismiss(animated: true)
 +    }
 +}
+diff --git a/submodules/SettingsUI/Sources/ThemePickerController.swift b/submodules/SettingsUI/Sources/ThemePickerController.swift
+index e8ae1a96..529067f7 100644
+--- a/submodules/SettingsUI/Sources/ThemePickerController.swift
++++ b/submodules/SettingsUI/Sources/ThemePickerController.swift
+@@ -1007,10 +1007,12 @@ public func themePickerController(context: AccountContext, focusOnItemTag: Theme
+         }
+         
+         var defaultThemes: [PresentationThemeReference] = []
++        // Xraygram (FEAT-20 п. 1): «Рентген» первым, стандартные темы на месте.
+         if presentationData.autoNightModeTriggered {
+-            defaultThemes.append(contentsOf: [.builtin(.nightAccent), .builtin(.night)])
++            defaultThemes.append(contentsOf: [.builtin(.rentgen), .builtin(.nightAccent), .builtin(.night)])
+         } else {
+             defaultThemes.append(contentsOf: [
++                .builtin(.rentgen),
+                 .builtin(.dayClassic),
+                 .builtin(.nightAccent),
+                 .builtin(.day),
+diff --git a/submodules/SettingsUI/Sources/Themes/ThemeAutoNightSettingsController.swift b/submodules/SettingsUI/Sources/Themes/ThemeAutoNightSettingsController.swift
+index c2cc159b..37312559 100644
+--- a/submodules/SettingsUI/Sources/Themes/ThemeAutoNightSettingsController.swift
++++ b/submodules/SettingsUI/Sources/Themes/ThemeAutoNightSettingsController.swift
+@@ -586,7 +586,7 @@ public func themeAutoNightSettingsController(context: AccountContext) -> ViewCon
+         let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.presentationThemeSettings]?.get(PresentationThemeSettings.self) ?? PresentationThemeSettings.defaultSettings
+         
+         // Without bubbles Neutral Night leads, as Neutral leads Appearance.
+-        let defaultThemes: [PresentationThemeReference] = settings.chatBubbleSettings.bubbleMode ? [.builtin(.night), .builtin(.nightAccent)] : [.builtin(.neutralNight), .builtin(.night), .builtin(.nightAccent)]
++        let defaultThemes: [PresentationThemeReference] = settings.chatBubbleSettings.bubbleMode ? [.builtin(.night), .builtin(.nightAccent), .builtin(.rentgen)] : [.builtin(.neutralNight), .builtin(.night), .builtin(.nightAccent)]
+         let cloudThemes: [PresentationThemeReference] = cloudThemes.map { .cloud(PresentationCloudTheme(theme: $0, resolvedWallpaper: nil, creatorAccountId: $0.isCreator ? context.account.id : nil)) }
+         
+         var availableThemes = defaultThemes
+diff --git a/submodules/SettingsUI/Sources/Themes/ThemeSettingsController.swift b/submodules/SettingsUI/Sources/Themes/ThemeSettingsController.swift
+index f74a40b1..542a6d3a 100644
+--- a/submodules/SettingsUI/Sources/Themes/ThemeSettingsController.swift
++++ b/submodules/SettingsUI/Sources/Themes/ThemeSettingsController.swift
+@@ -1163,10 +1163,12 @@ public func themeSettingsController(context: AccountContext, focusOnItemTag: The
+         }
+         
+         var defaultThemes: [PresentationThemeReference] = []
++        // Xraygram (FEAT-20 п. 1): «Рентген» первым, стандартные темы на месте.
+         if presentationData.autoNightModeTriggered {
+-            defaultThemes.append(contentsOf: [.builtin(.nightAccent), .builtin(.night)])
++            defaultThemes.append(contentsOf: [.builtin(.rentgen), .builtin(.nightAccent), .builtin(.night)])
+         } else {
+             defaultThemes.append(contentsOf: [
++                .builtin(.rentgen),
+                 .builtin(.dayClassic),
+                 .builtin(.nightAccent),
+                 .builtin(.day),
+@@ -1187,6 +1189,7 @@ public func themeSettingsController(context: AccountContext, focusOnItemTag: The
+             chatThemes = bubblelessCarouselThemes(chatThemes: chatThemes)
+         } else {
+             chatThemes.insert(.builtin(.dayClassic), at: 0)
++            chatThemes.insert(.builtin(.rentgen), at: 0) // Xraygram (FEAT-20)
+         }
+         // The hidden rows slide only on the update where the mode flipped.
+         let bubbleModeChanged = previousBubbleMode.swap(bubbleMode).flatMap { $0 != bubbleMode } ?? false
 diff --git a/submodules/TelegramCallsUI/BUILD b/submodules/TelegramCallsUI/BUILD
 index 56178cf9..04c0cafc 100644
 --- a/submodules/TelegramCallsUI/BUILD
@@ -3667,6 +4154,625 @@ index 3fda88e0..103e7ebc 100644
          if self.enabled, let activeServer = self.activeServer {
              return activeServer
          } else {
+diff --git a/submodules/TelegramPresentationData/Sources/MakePresentationTheme.swift b/submodules/TelegramPresentationData/Sources/MakePresentationTheme.swift
+index bbf371fc..106d5d75 100644
+--- a/submodules/TelegramPresentationData/Sources/MakePresentationTheme.swift
++++ b/submodules/TelegramPresentationData/Sources/MakePresentationTheme.swift
+@@ -47,6 +47,8 @@ public func makeDefaultPresentationTheme(reference: PresentationBuiltinThemeRefe
+             theme = makeDefaultNeutralPresentationTheme(dark: false, extendingThemeReference: extendingThemeReference, serviceBackgroundColor: serviceBackgroundColor, preview: preview)
+         case .neutralNight:
+             theme = makeDefaultNeutralPresentationTheme(dark: true, extendingThemeReference: extendingThemeReference, serviceBackgroundColor: serviceBackgroundColor, preview: preview)
++        case .rentgen:
++            theme = makeRentgenPresentationTheme(extendingThemeReference: extendingThemeReference, preview: preview)
+     }
+     return theme
+ }
+@@ -62,6 +64,9 @@ public func customizePresentationTheme(_ theme: PresentationTheme, editing: Bool
+             return customizeDefaultDarkPresentationTheme(theme: theme, editing: editing, title: title, accentColor: accentColor, backgroundColors: backgroundColors, bubbleColors: bubbleColors, animateBubbleColors: animateBubbleColors ?? false, wallpaper: wallpaper, baseColor: baseColor)
+         case .nightAccent:
+             return customizeDefaultDarkTintedPresentationTheme(theme: theme, editing: editing, title: title, accentColor: accentColor, backgroundColors: backgroundColors, bubbleColors: bubbleColors, animateBubbleColors: animateBubbleColors ?? false, wallpaper: wallpaper, baseColor: baseColor)
++        case .rentgen:
++            // Xraygram: палитра «Рентген» фиксированная; обои пользователя хранятся отдельно (chatWallpaper).
++            return theme
+     }
+ }
+ 
+diff --git a/submodules/TelegramPresentationData/Sources/PresentationData.swift b/submodules/TelegramPresentationData/Sources/PresentationData.swift
+index 97e348d0..6524eb05 100644
+--- a/submodules/TelegramPresentationData/Sources/PresentationData.swift
++++ b/submodules/TelegramPresentationData/Sources/PresentationData.swift
+@@ -958,6 +958,8 @@ public func themeDisplayName(strings: PresentationStrings, reference: Presentati
+             name = strings.Appearance_ThemeCarouselNeutral
+         case .neutralNight:
+             name = strings.Appearance_ThemeCarouselNeutralNight
++        case .rentgen:
++            name = strings.primaryComponent.languageCode.lowercased().hasPrefix("ru") ? "Рентген" : "X-Ray"
+         }
+     case let .local(theme):
+         name = theme.title
+diff --git a/submodules/TelegramPresentationData/Sources/PresentationTheme.swift b/submodules/TelegramPresentationData/Sources/PresentationTheme.swift
+index 906ac312..b7189cfa 100644
+--- a/submodules/TelegramPresentationData/Sources/PresentationTheme.swift
++++ b/submodules/TelegramPresentationData/Sources/PresentationTheme.swift
+@@ -1562,7 +1562,7 @@ public extension PresentationThemeReference {
+                         return .builtin(.dayClassic)
+                     case .night, .neutralNight:
+                         return .builtin(.night)
+-                    case .nightAccent:
++                    case .nightAccent, .rentgen:
+                         return .builtin(.nightAccent)
+                 }
+             case let .cloud(info):
+diff --git a/submodules/TelegramPresentationData/Sources/PresentationThemeCodable.swift b/submodules/TelegramPresentationData/Sources/PresentationThemeCodable.swift
+index b127bbbd..a2e49591 100644
+--- a/submodules/TelegramPresentationData/Sources/PresentationThemeCodable.swift
++++ b/submodules/TelegramPresentationData/Sources/PresentationThemeCodable.swift
+@@ -2060,7 +2060,7 @@ extension PresentationBuiltinThemeReference: @retroactive Codable {
+                 try container.encode("day")
+             case .dayClassic:
+                 try container.encode("classic")
+-            case .nightAccent:
++            case .nightAccent, .rentgen:
+                 try container.encode("nighttinted")
+             case .night, .neutralNight:
+                 try container.encode("night")
+diff --git a/submodules/TelegramPresentationData/Sources/RentgenPresentationTheme.swift b/submodules/TelegramPresentationData/Sources/RentgenPresentationTheme.swift
+new file mode 100644
+index 00000000..bb69c8ca
+--- /dev/null
++++ b/submodules/TelegramPresentationData/Sources/RentgenPresentationTheme.swift
+@@ -0,0 +1,551 @@
++import Foundation
++import UIKit
++import TelegramCore
++import TelegramUIPreferences
++
++// Xraygram (FEAT-20, PAR-22): встроенная тема «Рентген» (branding/theme-rentgen.md). Сделана из генератора
++// «Tinted Night» upstream: все цвета, которые там выводятся из акцента, заменены токенами палитры. Таблица
++// «ключ темы → роль» — ios/decisions.md.
++public let rentgenBg = UIColor(rgb: 0x0B1220)
++public let rentgenSurface = UIColor(rgb: 0x121B2E)
++public let rentgenSurface2 = UIColor(rgb: 0x18233A)
++public let rentgenBorder = UIColor(rgb: 0x22304A)
++public let rentgenSeparator = UIColor(rgb: 0x16213A)
++public let rentgenText = UIColor(rgb: 0xE6F1FF)
++public let rentgenText2 = UIColor(rgb: 0x8EA3BF)
++public let rentgenText3 = UIColor(rgb: 0x5F7391)
++public let rentgenAccentColor = UIColor(rgb: 0x3EF2C8)
++public let rentgenAccentHi = UIColor(rgb: 0x8FFBE0)
++public let rentgenOnAccent = UIColor(rgb: 0x04211B)
++public let rentgenBubbleOut = UIColor(rgb: 0x10403A)
++public let rentgenBubbleOutTime = UIColor(rgb: 0x7FD9C2)
++public let rentgenWarn = UIColor(rgb: 0xF2B33E)
++public let rentgenError = UIColor(rgb: 0xFF6B6B)
++public let rentgenWallpaperColor: UInt32 = 0x0B1220
++
++public func makeRentgenPresentationTheme(extendingThemeReference: PresentationThemeReference? = nil, preview: Bool) -> PresentationTheme {
++    let accentColor = rentgenAccentColor
++    
++    let secondaryBadgeTextColor = rentgenOnAccent
++    
++    let mainBackgroundColor = rentgenSurface
++    let mainSelectionColor = rentgenSurface2
++    let additionalBackgroundColor = rentgenBg
++    let mainSeparatorColor = UIColor(rgb: 0x1C2840)
++    let mainForegroundColor = rentgenText2
++    let mainSecondaryColor = rentgenText3
++    let mainSecondaryTextColor = rentgenText2
++    let mainFreeTextColor = rentgenText2
++    
++
++    let outgoingBubbleFillColors: [UIColor] = [rentgenBubbleOut]
++
++    let outgoingScamColor = rentgenError
++    let outgoingPrimaryTextColor = rentgenText
++    let outgoingSecondaryTextColor = rentgenBubbleOutTime
++    let outgoingLinkTextColor = accentColor
++    let outgoingCheckColor = accentColor
++    
++    let highlightedIncomingBubbleColor = UIColor(rgb: 0x1E2B46)
++    let highlightedOutgoingBubbleColor = UIColor(rgb: 0x15504A)
++    
++    let mainInputColor = rentgenSurface2
++    let inputBackgroundColor = rentgenSurface2
++    
++    let rootTabBar = PresentationThemeRootTabBar(
++        backgroundColor: mainBackgroundColor,
++        separatorColor: mainSeparatorColor,
++        iconColor: rentgenText,
++        selectedIconColor: accentColor,
++        textColor: rentgenText,
++        selectedTextColor: accentColor,
++        badgeBackgroundColor: accentColor,
++        badgeStrokeColor: accentColor,
++        badgeTextColor: rentgenOnAccent
++    )
++
++    let rootNavigationBar = PresentationThemeRootNavigationBar(
++        buttonColor: accentColor,
++        disabledButtonColor: rentgenBorder,
++        primaryTextColor: rentgenText,
++        secondaryTextColor: mainSecondaryColor,
++        controlColor: mainSecondaryColor,
++        accentTextColor: accentColor,
++        blurredBackgroundColor: mainBackgroundColor.withAlphaComponent(0.9),
++        opaqueBackgroundColor: mainBackgroundColor,
++        separatorColor: mainSeparatorColor,
++        badgeBackgroundColor: accentColor,
++        badgeStrokeColor: accentColor,
++        badgeTextColor: rentgenOnAccent,
++        segmentedBackgroundColor: mainInputColor,
++        segmentedForegroundColor: rentgenText3,
++        segmentedTextColor: rentgenText,
++        segmentedDividerColor: rentgenText2,
++        clearButtonBackgroundColor: UIColor(rgb: 0xffffff, alpha: 0.1),
++        clearButtonForegroundColor: rentgenText
++    )
++
++    let navigationSearchBar = PresentationThemeNavigationSearchBar(
++        backgroundColor: mainBackgroundColor,
++        accentColor: accentColor,
++        inputFillColor: UIColor(white: 1.0, alpha: 0.1),
++        inputTextColor: rentgenText,
++        inputPlaceholderTextColor: mainSecondaryColor,
++        inputIconColor: mainSecondaryColor,
++        inputClearButtonColor: mainSecondaryColor,
++        separatorColor: additionalBackgroundColor
++    )
++
++    let intro = PresentationThemeIntro(
++        statusBarStyle: .white,
++        primaryTextColor: rentgenText,
++        accentTextColor: accentColor,
++        disabledTextColor: rentgenBorder,
++        startButtonColor: accentColor,
++        dotColor: mainSecondaryColor
++    )
++
++    let passcode = PresentationThemePasscode(
++        backgroundColors: PresentationThemeGradientColors(topColor: rentgenSurface, bottomColor: rentgenBg),
++        buttonColor: mainBackgroundColor
++    )
++
++    let rootController = PresentationThemeRootController(
++        statusBarStyle: .white,
++        tabBar: rootTabBar,
++        navigationBar: rootNavigationBar,
++        navigationSearchBar: navigationSearchBar,
++        keyboardColor: .dark
++    )
++
++    let switchColors = PresentationThemeSwitch(
++        frameColor: rentgenText2,
++        handleColor: UIColor(rgb: 0x121212),
++        contentColor: accentColor,
++        positiveColor: UIColor(rgb: 0x08a723),
++        negativeColor: rentgenError
++    )
++
++    let list = PresentationThemeList(
++        blocksBackgroundColor: additionalBackgroundColor,
++        modalBlocksBackgroundColor: additionalBackgroundColor,
++        plainBackgroundColor: additionalBackgroundColor,
++        modalPlainBackgroundColor: mainBackgroundColor,
++        itemPrimaryTextColor: rentgenText,
++        itemSecondaryTextColor: rentgenText2,
++        itemDisabledTextColor: rentgenText2,
++        itemAccentColor: accentColor,
++        itemHighlightedColor: UIColor(rgb: 0x28b772),
++        itemDestructiveColor: rentgenError,
++        itemPlaceholderTextColor: rentgenText2,
++        itemBlocksBackgroundColor: mainBackgroundColor,
++        itemModalBlocksBackgroundColor: mainBackgroundColor,
++        itemHighlightedBackgroundColor: mainSelectionColor,
++        itemBlocksSeparatorColor: mainSeparatorColor,
++        itemPlainSeparatorColor: mainSeparatorColor,
++        disclosureArrowColor: rentgenText2,
++        sectionHeaderTextColor: mainFreeTextColor,
++        freeTextColor: mainFreeTextColor,
++        freeTextErrorColor: rentgenError,
++        freeTextSuccessColor: UIColor(rgb: 0x30cf30),
++        freeMonoIconColor: mainFreeTextColor,
++        itemSwitchColors: switchColors,
++        itemDisclosureActions: PresentationThemeItemDisclosureActions(
++            neutral1: PresentationThemeFillForeground(fillColor: accentColor, foregroundColor: rentgenOnAccent),
++            neutral2: PresentationThemeFillForeground(fillColor: UIColor(rgb: 0xcd7800), foregroundColor: rentgenText),
++            destructive: PresentationThemeFillForeground(fillColor: UIColor(rgb: 0xc70c0c), foregroundColor: rentgenText),
++            constructive: PresentationThemeFillForeground(fillColor: UIColor(rgb: 0x08a723), foregroundColor: rentgenText),
++            accent: PresentationThemeFillForeground(fillColor: accentColor, foregroundColor: rentgenOnAccent),
++            warning: PresentationThemeFillForeground(fillColor: UIColor(rgb: 0xcd7800), foregroundColor: rentgenText),
++            inactive: PresentationThemeFillForeground(fillColor: rentgenBorder, foregroundColor: rentgenText)
++        ),
++        itemCheckColors: PresentationThemeFillStrokeForeground(
++            fillColor: accentColor,
++            strokeColor: rentgenText2,
++            foregroundColor: secondaryBadgeTextColor
++        ),
++        controlSecondaryColor: rentgenText2,
++        freeInputField: PresentationInputFieldTheme(
++            backgroundColor: rentgenSurface2,
++            strokeColor: rentgenSurface2,
++            placeholderColor: rentgenText2,
++            primaryColor: rentgenText,
++            controlColor: rentgenText2
++        ),
++        freePlainInputField: PresentationInputFieldTheme(
++            backgroundColor: rentgenSurface2,
++            strokeColor: rentgenSurface2,
++            placeholderColor: rentgenText2,
++            primaryColor: rentgenText,
++            controlColor: rentgenText2
++        ),
++        mediaPlaceholderColor: rentgenText.mixedWith(mainBackgroundColor, alpha: 0.9),
++        scrollIndicatorColor: UIColor(white: 1.0, alpha: 0.5),
++        pageIndicatorInactiveColor: rentgenText3,
++        inputClearButtonColor: mainSecondaryColor,
++        itemBarChart: PresentationThemeItemBarChart(color1: accentColor, color2: rentgenText2, color3: rentgenBorder),
++        itemInputField: PresentationInputFieldTheme(backgroundColor: mainInputColor, strokeColor: mainInputColor, placeholderColor: mainSecondaryColor, primaryColor: rentgenText, controlColor: mainSecondaryColor),
++        paymentOption: PresentationThemeList.PaymentOption(
++            inactiveFillColor: UIColor(rgb: 0x00A650).withMultipliedAlpha(0.3),
++            inactiveForegroundColor: UIColor(rgb: 0x00A650),
++            activeFillColor: UIColor(rgb: 0x00A650),
++            activeForegroundColor: rentgenText
++        )
++    )
++    
++    let chatList = PresentationThemeChatList(
++        backgroundColor: additionalBackgroundColor,
++        itemSeparatorColor: rentgenSeparator,
++        itemBackgroundColor: additionalBackgroundColor,
++        pinnedItemBackgroundColor: mainBackgroundColor,
++        itemHighlightedBackgroundColor: mainSelectionColor,
++        pinnedItemHighlightedBackgroundColor: mainSelectionColor,
++        itemSelectedBackgroundColor: mainSelectionColor,
++        titleColor: rentgenText,
++        secretTitleColor: UIColor(rgb: 0x89df9e),
++        dateTextColor: rentgenText2,
++        authorNameColor: rentgenText,
++        messageTextColor: rentgenText2,
++        messageHighlightedTextColor: rentgenText,
++        messageDraftTextColor: rentgenError,
++        checkmarkColor: accentColor,
++        pendingIndicatorColor: rentgenText3,
++        failedFillColor: rentgenError,
++        failedForegroundColor: rentgenText,
++        muteIconColor: rentgenText3,
++        unreadBadgeActiveBackgroundColor: accentColor,
++        unreadBadgeActiveTextColor: secondaryBadgeTextColor,
++        unreadBadgeInactiveBackgroundColor: rentgenText3,
++        unreadBadgeInactiveTextColor: additionalBackgroundColor,
++        reactionBadgeActiveBackgroundColor: UIColor(rgb: 0xFF2D55),
++        pinnedBadgeColor: rentgenText2,
++        pinnedSearchBarColor: rentgenSurface2,
++        regularSearchBarColor: rentgenSurface2,
++        sectionHeaderFillColor: rentgenBg,
++        sectionHeaderTextColor: rentgenText2,
++        verifiedIconFillColor: accentColor,
++        verifiedIconForegroundColor: rentgenOnAccent,
++        secretIconColor: UIColor(rgb: 0x89df9e),
++        pinnedArchiveAvatarColor: PresentationThemeArchiveAvatarColors(backgroundColors: PresentationThemeGradientColors(topColor: UIColor(rgb: 0x72d5fd), bottomColor: UIColor(rgb: 0x2a9ef1)), foregroundColor: rentgenText),
++        unpinnedArchiveAvatarColor: PresentationThemeArchiveAvatarColors(backgroundColors: PresentationThemeGradientColors(topColor: rentgenBorder, bottomColor: rentgenBorder), foregroundColor: additionalBackgroundColor),
++        onlineDotColor: accentColor,
++        storyUnseenColors: PresentationThemeGradientColors(topColor: UIColor(rgb: 0x34C76F), bottomColor: UIColor(rgb: 0x3DA1FD)),
++        storyUnseenPrivateColors: PresentationThemeGradientColors(topColor: UIColor(rgb: 0x7CD636), bottomColor: UIColor(rgb: 0x26B470)),
++        storySeenColors: PresentationThemeGradientColors(topColor: mainForegroundColor, bottomColor: mainForegroundColor)
++    )
++    
++    let buttonStrokeColor = rentgenText3.withAlphaComponent(0.15)
++    let incomingFillColor = rentgenSurface2
++    
++    let incomingBubbleAlpha: CGFloat = 1.0
++    
++    let message = PresentationThemeChatMessage(
++        incoming: PresentationThemePartedColors(
++            bubble: PresentationThemeBubbleColor(
++                withWallpaper: PresentationThemeBubbleColorComponents(
++                    fill: [incomingFillColor.withAlphaComponent(incomingBubbleAlpha)],
++                    highlightedFill: highlightedIncomingBubbleColor,
++                    stroke: rentgenSurface2,
++                    shadow: nil,
++                    reactionInactiveBackground: UIColor(rgb: 0xffffff, alpha: 0.07),
++                    reactionInactiveForeground: rentgenText,
++                    reactionActiveBackground: accentColor,
++                    reactionActiveForeground: rentgenText,
++                    reactionStarsInactiveBackground: UIColor(rgb: 0xFEF1D4, alpha: 1.0),
++                    reactionStarsInactiveForeground: UIColor(rgb: 0xD3720A),
++                    reactionStarsActiveBackground: UIColor(rgb: 0xD3720A, alpha: 1.0),
++                    reactionStarsActiveForeground: .white,
++                    reactionInactiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1),
++                    reactionActiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1)
++                ),
++                withoutWallpaper: PresentationThemeBubbleColorComponents(
++                    fill: [incomingFillColor.withAlphaComponent(incomingBubbleAlpha)],
++                    highlightedFill: highlightedIncomingBubbleColor,
++                    stroke: rentgenSurface2,
++                    shadow: nil,
++                    reactionInactiveBackground: UIColor(rgb: 0xffffff, alpha: 0.07),
++                    reactionInactiveForeground: rentgenText,
++                    reactionActiveBackground: accentColor,
++                    reactionActiveForeground: rentgenText,
++                    reactionStarsInactiveBackground: UIColor(rgb: 0xFEF1D4, alpha: 1.0),
++                    reactionStarsInactiveForeground: UIColor(rgb: 0xD3720A),
++                    reactionStarsActiveBackground: UIColor(rgb: 0xD3720A, alpha: 1.0),
++                    reactionStarsActiveForeground: .white,
++                    reactionInactiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1),
++                    reactionActiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1)
++                )
++            ), primaryTextColor: rentgenText, secondaryTextColor: rentgenText2, linkTextColor: accentColor, linkHighlightColor: accentColor.withAlphaComponent(0.5), scamColor: rentgenError, textHighlightColor: UIColor(rgb: 0xf5c038), accentTextColor: accentColor, accentControlColor: accentColor, accentControlDisabledColor: rentgenText2, mediaActiveControlColor: accentColor, mediaInactiveControlColor: accentColor.withAlphaComponent(0.5), mediaControlInnerBackgroundColor: mainBackgroundColor, pendingActivityColor: rentgenText2, fileTitleColor: accentColor, fileDescriptionColor: rentgenText2, fileDurationColor: rentgenText2, mediaPlaceholderColor: rentgenSurface2, polls: PresentationThemeChatBubblePolls(radioButton: rentgenText3, radioProgress: accentColor, highlight: accentColor.withAlphaComponent(0.12), separator: mainSeparatorColor, bar: accentColor, barIconForeground: rentgenOnAccent, barPositive: UIColor(rgb: 0x00A700), barNegative: UIColor(rgb: 0xFE3824)), actionButtonsFillColor: PresentationThemeVariableColor(withWallpaper: additionalBackgroundColor.withAlphaComponent(0.5), withoutWallpaper: additionalBackgroundColor.withAlphaComponent(0.5)), actionButtonsStrokeColor: PresentationThemeVariableColor(color: buttonStrokeColor), actionButtonsTextColor: PresentationThemeVariableColor(color: rentgenText), textSelectionColor: accentColor.withAlphaComponent(0.2), textSelectionKnobColor: accentColor
++        ),
++        outgoing: PresentationThemePartedColors(
++            bubble: PresentationThemeBubbleColor(
++                withWallpaper: PresentationThemeBubbleColorComponents(
++                    fill: outgoingBubbleFillColors,
++                    highlightedFill: highlightedOutgoingBubbleColor,
++                    stroke: accentColor.withAlphaComponent(0.3),
++                    shadow: nil,
++                    reactionInactiveBackground: UIColor(rgb: 0xffffff, alpha: 0.1),
++                    reactionInactiveForeground: rentgenText,
++                    reactionActiveBackground: rentgenText,
++                    reactionActiveForeground: .clear,
++                    reactionStarsInactiveBackground: UIColor(rgb: 0xFEF1D4, alpha: 1.0),
++                    reactionStarsInactiveForeground: UIColor(rgb: 0xD3720A),
++                    reactionStarsActiveBackground: UIColor(rgb: 0xD3720A, alpha: 1.0),
++                    reactionStarsActiveForeground: .white,
++                    reactionInactiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1),
++                    reactionActiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1)
++                ),
++                withoutWallpaper: PresentationThemeBubbleColorComponents(
++                    fill: outgoingBubbleFillColors,
++                    highlightedFill: highlightedOutgoingBubbleColor,
++                    stroke: accentColor.withAlphaComponent(0.3),
++                    shadow: nil,
++                    reactionInactiveBackground: UIColor(rgb: 0xffffff, alpha: 0.1),
++                    reactionInactiveForeground: rentgenText,
++                    reactionActiveBackground: rentgenText,
++                    reactionActiveForeground: .clear,
++                    reactionStarsInactiveBackground: UIColor(rgb: 0xFEF1D4, alpha: 1.0),
++                    reactionStarsInactiveForeground: UIColor(rgb: 0xD3720A),
++                    reactionStarsActiveBackground: UIColor(rgb: 0xD3720A, alpha: 1.0),
++                    reactionStarsActiveForeground: .white,
++                    reactionInactiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1),
++                    reactionActiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1)
++                )
++            ), primaryTextColor: outgoingPrimaryTextColor, secondaryTextColor: outgoingSecondaryTextColor, linkTextColor: outgoingLinkTextColor, linkHighlightColor: UIColor.white.withAlphaComponent(0.5), scamColor: outgoingScamColor, textHighlightColor: UIColor(rgb: 0xf5c038), accentTextColor: accentColor, accentControlColor: accentColor, accentControlDisabledColor: rentgenText2, mediaActiveControlColor: outgoingPrimaryTextColor, mediaInactiveControlColor: outgoingSecondaryTextColor, mediaControlInnerBackgroundColor: outgoingBubbleFillColors[0], pendingActivityColor: outgoingSecondaryTextColor, fileTitleColor: outgoingPrimaryTextColor, fileDescriptionColor: outgoingSecondaryTextColor, fileDurationColor: outgoingSecondaryTextColor, mediaPlaceholderColor: rentgenText3, polls: PresentationThemeChatBubblePolls(radioButton: outgoingPrimaryTextColor, radioProgress: accentColor, highlight: accentColor.withAlphaComponent(0.12), separator: mainSeparatorColor, bar: outgoingPrimaryTextColor, barIconForeground: .clear, barPositive: outgoingPrimaryTextColor, barNegative: outgoingPrimaryTextColor), actionButtonsFillColor: PresentationThemeVariableColor(withWallpaper: additionalBackgroundColor.withAlphaComponent(0.5), withoutWallpaper: additionalBackgroundColor.withAlphaComponent(0.5)), actionButtonsStrokeColor: PresentationThemeVariableColor(color: buttonStrokeColor), actionButtonsTextColor: PresentationThemeVariableColor(color: rentgenText), textSelectionColor: UIColor.white.withAlphaComponent(0.2), textSelectionKnobColor: UIColor.white
++        ),
++        freeform: PresentationThemeBubbleColor(
++            withWallpaper: PresentationThemeBubbleColorComponents(
++                fill: [mainBackgroundColor],
++                highlightedFill: highlightedIncomingBubbleColor,
++                stroke: mainBackgroundColor,
++                shadow: nil,
++                reactionInactiveBackground: incomingFillColor.withAlphaComponent(incomingBubbleAlpha),
++                reactionInactiveForeground: rentgenText,
++                reactionActiveBackground: accentColor,
++                reactionActiveForeground: rentgenText,
++                reactionStarsInactiveBackground: UIColor(rgb: 0xFEF1D4, alpha: 1.0),
++                reactionStarsInactiveForeground: UIColor(rgb: 0xD3720A),
++                reactionStarsActiveBackground: UIColor(rgb: 0xD3720A, alpha: 1.0),
++                reactionStarsActiveForeground: .white,
++                reactionInactiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1),
++                reactionActiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1)
++            ),
++            withoutWallpaper: PresentationThemeBubbleColorComponents(
++                fill: [mainBackgroundColor],
++                highlightedFill: highlightedIncomingBubbleColor,
++                stroke: mainBackgroundColor,
++                shadow: nil,
++                reactionInactiveBackground: incomingFillColor.withAlphaComponent(incomingBubbleAlpha),
++                reactionInactiveForeground: rentgenText,
++                reactionActiveBackground: accentColor,
++                reactionActiveForeground: rentgenText,
++                reactionStarsInactiveBackground: UIColor(rgb: 0xFEF1D4, alpha: 1.0),
++                reactionStarsInactiveForeground: UIColor(rgb: 0xD3720A),
++                reactionStarsActiveBackground: UIColor(rgb: 0xD3720A, alpha: 1.0),
++                reactionStarsActiveForeground: .white,
++                reactionInactiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1),
++                reactionActiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1)
++            )
++        ),
++        infoPrimaryTextColor: rentgenText,
++        infoLinkTextColor: accentColor,
++        outgoingCheckColor: outgoingCheckColor,
++        mediaDateAndStatusFillColor: UIColor(white: 0.0, alpha: 0.3),
++        mediaDateAndStatusTextColor: rentgenText,
++        shareButtonFillColor: PresentationThemeVariableColor(color: additionalBackgroundColor.withAlphaComponent(0.5)),
++        shareButtonStrokeColor: PresentationThemeVariableColor(color: buttonStrokeColor),
++        shareButtonForegroundColor: PresentationThemeVariableColor(color: UIColor(rgb: 0xb2b2b2)),
++        mediaOverlayControlColors: PresentationThemeFillForeground(fillColor: UIColor(rgb: 0x000000, alpha: 0.6), foregroundColor: rentgenText),
++        selectionControlColors: PresentationThemeFillStrokeForeground(fillColor: accentColor, strokeColor: rentgenText, foregroundColor: rentgenOnAccent),
++        deliveryFailedColors: PresentationThemeFillForeground(fillColor: rentgenError, foregroundColor: rentgenText),
++        mediaHighlightOverlayColor: UIColor(white: 1.0, alpha: 0.6),
++        stickerPlaceholderColor: PresentationThemeVariableColor(color: mainBackgroundColor.withAlphaComponent(0.5)),
++        stickerPlaceholderShimmerColor: PresentationThemeVariableColor(color: UIColor(rgb: 0xffffff, alpha: 0.05))
++    )
++    
++    let serviceMessage = PresentationThemeServiceMessage(
++        components: PresentationThemeServiceMessageColor(withDefaultWallpaper: PresentationThemeServiceMessageColorComponents(fill: additionalBackgroundColor, primaryText: rentgenText, linkHighlight: UIColor(rgb: 0xffffff, alpha: 0.12), scam: rentgenError, dateFillStatic: additionalBackgroundColor.withAlphaComponent(0.6), dateFillFloating: additionalBackgroundColor.withAlphaComponent(0.2)), withCustomWallpaper: PresentationThemeServiceMessageColorComponents(fill: additionalBackgroundColor, primaryText: rentgenText, linkHighlight: UIColor(rgb: 0xffffff, alpha: 0.12), scam: rentgenError, dateFillStatic: additionalBackgroundColor.withAlphaComponent(0.6), dateFillFloating: additionalBackgroundColor.withAlphaComponent(0.2))),
++        unreadBarFillColor: mainBackgroundColor,
++        unreadBarStrokeColor: mainBackgroundColor,
++        unreadBarTextColor: rentgenText,
++        dateTextColor: PresentationThemeVariableColor(color: rentgenText)
++    )
++
++    let inputPanelMediaRecordingControl = PresentationThemeChatInputPanelMediaRecordingControl(
++        buttonColor: accentColor,
++        micLevelColor: accentColor.withAlphaComponent(0.2),
++        activeIconColor: rentgenOnAccent
++    )
++    
++    let inputPanel = PresentationThemeChatInputPanel(
++        panelBackgroundColor: mainBackgroundColor,
++        panelBackgroundColorNoWallpaper: rentgenSurface2,
++        panelSeparatorColor: mainSeparatorColor,
++        panelControlAccentColor: accentColor,
++        panelControlColor: rentgenText,
++        panelControlDisabledColor: UIColor(rgb: 0x90979F, alpha: 0.5),
++        panelControlDestructiveColor: rentgenError,
++        inputBackgroundColor: inputBackgroundColor,
++        inputStrokeColor: rentgenSurface2,
++        inputPlaceholderColor: rentgenText3,
++        inputTextColor: rentgenText,
++        inputControlColor: rentgenText3,
++        actionControlFillColor: accentColor,
++        actionControlForegroundColor: rentgenOnAccent,
++        primaryTextColor: rentgenText,
++        secondaryTextColor: UIColor(rgb: 0xffffff, alpha: 0.5),
++        mediaRecordingDotColor: accentColor,
++        mediaRecordingControl: inputPanelMediaRecordingControl
++    )
++
++    let inputMediaPanel = PresentationThemeInputMediaPanel(
++        panelSeparatorColor: mainBackgroundColor,
++        panelIconColor: rentgenText2,
++        panelHighlightedIconBackgroundColor: rentgenText2.withMultipliedAlpha(0.25),
++        panelHighlightedIconColor: rentgenText2.mixedWith(inputPanel.primaryTextColor, alpha: 0.35),
++        panelContentVibrantOverlayColor: rentgenText2,
++        panelContentControlVibrantOverlayColor: mainSecondaryTextColor.withAlphaComponent(0.3),
++        panelContentControlVibrantSelectionColor: mainSecondaryTextColor.withAlphaComponent(0.1),
++        panelContentControlOpaqueOverlayColor: mainSecondaryTextColor.withAlphaComponent(0.1),
++        panelContentControlOpaqueSelectionColor: mainSecondaryTextColor.withAlphaComponent(0.1),
++        panelContentVibrantSearchOverlayColor: rentgenText2,
++        panelContentVibrantSearchOverlaySelectedColor: rentgenText2,
++        panelContentVibrantSearchOverlayHighlightColor: mainSecondaryTextColor.withAlphaComponent(0.1),
++        panelContentOpaqueSearchOverlayColor: rentgenText2,
++        panelContentOpaqueSearchOverlaySelectedColor: rentgenText2,
++        panelContentOpaqueSearchOverlayHighlightColor: mainSecondaryTextColor.withAlphaComponent(0.1),
++        stickersBackgroundColor: additionalBackgroundColor,
++        stickersSectionTextColor: rentgenText2,
++        stickersSearchBackgroundColor: rentgenSurface2,
++        stickersSearchPlaceholderColor: rentgenText3,
++        stickersSearchPrimaryColor: rentgenText,
++        stickersSearchControlColor: rentgenText3,
++        gifsBackgroundColor: additionalBackgroundColor,
++        backgroundColor: additionalBackgroundColor.withMultipliedAlpha(0.75)
++    )
++
++    let inputButtonPanel = PresentationThemeInputButtonPanel(
++        panelSeparatorColor: mainBackgroundColor,
++        panelBackgroundColor: rentgenSurface2,
++        buttonFillColor: rentgenBorder,
++        buttonHighlightColor: UIColor(rgb: 0xffffff, alpha: 0.2),
++        buttonStrokeColor: rentgenSurface2,
++        buttonHighlightedFillColor: rentgenBorder.withAlphaComponent(0.7),
++        buttonHighlightedStrokeColor: rentgenSurface2,
++        buttonTextColor: rentgenText
++    )
++
++    let historyNavigation = PresentationThemeChatHistoryNavigation(
++        fillColor: mainBackgroundColor,
++        strokeColor: mainSeparatorColor,
++        foregroundColor: rentgenText2,
++        badgeBackgroundColor: accentColor,
++        badgeStrokeColor: accentColor,
++        badgeTextColor: rentgenOnAccent
++    )
++
++    let chat = PresentationThemeChat(
++        defaultWallpaper: .color(rentgenWallpaperColor),
++        animateMessageColors: false,
++        message: message,
++        serviceMessage: serviceMessage,
++        inputPanel: inputPanel,
++        inputMediaPanel: inputMediaPanel,
++        inputButtonPanel: inputButtonPanel,
++        historyNavigation: historyNavigation
++    )
++
++    let actionSheet = PresentationThemeActionSheet(
++        dimColor: UIColor(white: 0.0, alpha: 0.5),
++        backgroundType: .dark,
++        opaqueItemBackgroundColor: mainBackgroundColor,
++        itemBackgroundColor: mainBackgroundColor.withAlphaComponent(0.8),
++        opaqueItemHighlightedBackgroundColor: mainSelectionColor,
++        itemHighlightedBackgroundColor: mainSelectionColor.withAlphaComponent(0.2),
++        opaqueItemSeparatorColor: additionalBackgroundColor,
++        standardActionTextColor: accentColor,
++        destructiveActionTextColor: rentgenError,
++        disabledActionTextColor: UIColor(white: 1.0, alpha: 0.5),
++        primaryTextColor: rentgenText,
++        secondaryTextColor: UIColor(white: 1.0, alpha: 0.5),
++        controlAccentColor: accentColor,
++        inputBackgroundColor: mainInputColor,
++        inputHollowBackgroundColor: mainInputColor,
++        inputBorderColor: mainInputColor,
++        inputPlaceholderColor: mainSecondaryColor,
++        inputTextColor: rentgenText,
++        inputClearButtonColor: mainSecondaryColor,
++        checkContentColor: secondaryBadgeTextColor
++    )
++    
++    let contextMenu = PresentationThemeContextMenu(
++        dimColor: UIColor(rgb: 0x000000, alpha: 0.6),
++        backgroundColor: rootNavigationBar.opaqueBackgroundColor.withAlphaComponent(0.78),
++        itemSeparatorColor: UIColor(rgb: 0xffffff, alpha: 0.15),
++        sectionSeparatorColor: UIColor(rgb: 0x000000, alpha: 0.2),
++        itemBackgroundColor: UIColor(rgb: 0x000000, alpha: 0.0),
++        itemHighlightedBackgroundColor: UIColor(rgb: 0xffffff, alpha: 0.15),
++        primaryColor: rentgenText,
++        secondaryColor: UIColor(rgb: 0xffffff, alpha: 0.5),
++        destructiveColor: rentgenError,
++        badgeFillColor: accentColor,
++        badgeForegroundColor: secondaryBadgeTextColor,
++        badgeInactiveFillColor: rentgenText3,
++        badgeInactiveForegroundColor: secondaryBadgeTextColor,
++        extractedContentTintColor: rentgenText
++    )
++
++    let inAppNotification = PresentationThemeInAppNotification(
++        fillColor: mainBackgroundColor,
++        primaryTextColor: rentgenText,
++        expandedNotification: PresentationThemeExpandedNotification(
++            backgroundType: .dark,
++            navigationBar: PresentationThemeExpandedNotificationNavigationBar(
++                backgroundColor: mainBackgroundColor,
++                primaryTextColor: rentgenText,
++                controlColor: accentColor,
++                separatorColor: mainSeparatorColor
++            )
++        )
++    )
++        
++    let chart = PresentationThemeChart(
++        labelsColor: UIColor(rgb: 0xbacce1, alpha: 0.6),
++        helperLinesColor: UIColor(rgb: 0xbacce1, alpha: 0.35),
++        strongLinesColor: UIColor(rgb: 0xbacce1, alpha: 0.35),
++        barStrongLinesColor: UIColor(rgb: 0xbacce1, alpha: 0.45),
++        detailsTextColor: rentgenText,
++        detailsArrowColor: rentgenText,
++        detailsViewColor: UIColor(rgb: 0x19232f),
++        rangeViewFrameColor: UIColor(rgb: 0x354659),
++        rangeViewMarkerColor: rentgenText
++    )
++
++    return PresentationTheme(
++        name: extendingThemeReference?.name ?? .builtin(.nightAccent),
++        index: extendingThemeReference?.index ?? PresentationThemeReference.builtin(.rentgen).index,
++        referenceTheme: .rentgen,
++        overallDarkAppearance: true,
++        intro: intro,
++        passcode: passcode,
++        rootController: rootController,
++        list: list,
++        chatList: chatList,
++        chat: chat,
++        actionSheet: actionSheet,
++        contextMenu: contextMenu,
++        inAppNotification: inAppNotification,
++        chart: chart,
++        preview: preview
++    )
++}
++
++public extension PresentationTheme {
++    /// Xraygram (FEAT-20): тема «Рентген» (заглушки аватаров, значок статуса и т. п. берут свои цвета).
++    var isRentgen: Bool {
++        return self.referenceTheme == .rentgen
++    }
++}
++
++/// Xraygram (FEAT-20): цвета заглушек аватаров «Рентгена» — по месту upstream-цветов (красный, оранжевый, фиолетовый,
++/// зелёный, бирюзовый, синий, розовый), чтобы цвет собеседника не «прыгал» при смене темы. Буквы — `rentgenBg`.
++public let rentgenAvatarColors: [[UIColor]] = [0xF28CB1, 0xF2B33E, 0xB49CFF, 0x8EE07A, 0x3EF2C8, 0x7FB2FF, 0xF28CB1].map { [UIColor(rgb: $0), UIColor(rgb: $0)] }
 diff --git a/submodules/TelegramUI/BUILD b/submodules/TelegramUI/BUILD
 index 116004c3..5505708c 100644
 --- a/submodules/TelegramUI/BUILD
@@ -3679,6 +4785,261 @@ index 116004c3..5505708c 100644
          "//submodules/WebProxyTransport:WebProxyTransport",
          "//submodules/MtProtoKit:MtProtoKit",
          "//submodules/TelegramPresentationData:TelegramPresentationData",
+diff --git a/submodules/TelegramUI/Components/ChatListHeaderComponent/Sources/ChatListNavigationBar.swift b/submodules/TelegramUI/Components/ChatListHeaderComponent/Sources/ChatListNavigationBar.swift
+index a4d20e87..4920a8b2 100644
+--- a/submodules/TelegramUI/Components/ChatListHeaderComponent/Sources/ChatListNavigationBar.swift
++++ b/submodules/TelegramUI/Components/ChatListHeaderComponent/Sources/ChatListNavigationBar.swift
+@@ -86,6 +86,8 @@ public final class ChatListNavigationBar: Component {
+     /// host's origin); nil keeps every button in the row.
+     public let sideColumn: SideColumnRegion?
+     public let openSideColumnOverflow: ((UIView, [NavigationBarComponent.OverflowItem]) -> Void)?
++    /// Xraygram (FEAT-20): значок статуса XRAY — отдельный слот между строкой заголовка и поиском.
++    public let xrayStatus: XrayStatusPillComponent?
+     
+     public init(
+         context: AccountContext,
+@@ -115,7 +117,8 @@ public final class ChatListNavigationBar: Component {
+         openStatusSetup: @escaping (UIView) -> Void,
+         allowAutomaticOrder: @escaping () -> Void,
+         sideColumn: SideColumnRegion? = nil,
+-        openSideColumnOverflow: ((UIView, [NavigationBarComponent.OverflowItem]) -> Void)? = nil
++        openSideColumnOverflow: ((UIView, [NavigationBarComponent.OverflowItem]) -> Void)? = nil,
++        xrayStatus: XrayStatusPillComponent? = nil
+     ) {
+         self.context = context
+         self.theme = theme
+@@ -145,6 +148,7 @@ public final class ChatListNavigationBar: Component {
+         self.allowAutomaticOrder = allowAutomaticOrder
+         self.sideColumn = sideColumn
+         self.openSideColumnOverflow = openSideColumnOverflow
++        self.xrayStatus = xrayStatus
+     }
+ 
+     public static func ==(lhs: ChatListNavigationBar, rhs: ChatListNavigationBar) -> Bool {
+@@ -217,6 +221,9 @@ public final class ChatListNavigationBar: Component {
+         if lhs.hasOwnGlassContainer != rhs.hasOwnGlassContainer {
+             return false
+         }
++        if lhs.xrayStatus != rhs.xrayStatus {
++            return false
++        }
+         if lhs.sideColumn != rhs.sideColumn {
+             return false
+         }
+@@ -232,6 +239,8 @@ public final class ChatListNavigationBar: Component {
+     }
+     
+     public static let searchScrollHeight: CGFloat = searchScrollHeightValue()
++    /// Xraygram (FEAT-20): высота слота значка статуса XRAY (пилюля 24 + отступ).
++    public static let xrayStatusSlotHeight: CGFloat = XrayStatusPillComponent.height + 6.0
+     public static let storiesScrollHeight: CGFloat = storiesHeightValue()
+ 
+     public final class View: UIView {
+@@ -244,6 +253,7 @@ public final class ChatListNavigationBar: Component {
+         
+         private var headerBackgroundContainer: UIView
+         public let headerContent = ComponentView<Empty>()
++        private var xrayStatusView: ComponentView<Empty>?
+         
+         public private(set) var searchContentNode: NavigationBarSearchContentNode?
+         /// A screen is expanding out of this header: see `updateExpansionContentStaysInScreen`.
+@@ -729,6 +739,46 @@ public final class ChatListNavigationBar: Component {
+                 }
+             }
+             
++            // Xraygram (FEAT-20): значок статуса — под строкой заголовка; при раскрытых историях едет вниз вместе с
++            // поиском (над ним), при прокрутке вверх остаётся под заголовком. Скрыт, пока открыт поиск.
++            if let xrayStatus = component.xrayStatus {
++                let statusView: ComponentView<Empty>
++                var statusTransition = transition
++                if let current = self.xrayStatusView {
++                    statusView = current
++                } else {
++                    statusTransition = statusTransition.withAnimation(.none)
++                    statusView = ComponentView()
++                    self.xrayStatusView = statusView
++                }
++                let statusSize = statusView.update(
++                    transition: statusTransition,
++                    component: AnyComponent(xrayStatus),
++                    environment: {},
++                    containerSize: CGSize(width: max(0.0, currentLayout.size.width - component.leftInset - component.rightInset - 32.0), height: XrayStatusPillComponent.height)
++                )
++                let titleBottom = component.statusBarHeight + 10.0 + 44.0
++                var statusY = titleBottom + 1.0
++                if let searchFrameValue, component.activeSearch == nil {
++                    statusY = max(statusY, searchFrameValue.minY - ChatListNavigationBar.xrayStatusSlotHeight + 2.0)
++                }
++                let statusFrame = CGRect(origin: CGPoint(x: component.leftInset + floor((currentLayout.size.width - component.leftInset - component.rightInset - statusSize.width) / 2.0), y: statusY), size: statusSize)
++                if let statusComponentView = statusView.view {
++                    if statusComponentView.superview == nil {
++                        self.contentView.addSubview(statusComponentView)
++                        transition.animateAlpha(view: statusComponentView, from: 0.0, to: 1.0)
++                    }
++                    statusTransition.setFrame(view: statusComponentView, frame: statusFrame)
++                    let hidden = component.activeSearch != nil
++                    transition.setAlpha(view: statusComponentView, alpha: hidden ? 0.0 : 1.0)
++                    statusComponentView.isUserInteractionEnabled = !hidden
++                    statusComponentView.accessibilityElementsHidden = hidden
++                }
++            } else if let statusView = self.xrayStatusView {
++                self.xrayStatusView = nil
++                statusView.view?.removeFromSuperview()
++            }
++            
+             self.updateSideColumn(component: component, transition: transition)
+             
+             let bottomContentsContainerPosition: CGPoint
+@@ -944,6 +994,10 @@ public final class ChatListNavigationBar: Component {
+                 if previousComponent.storySubscriptions != component.storySubscriptions {
+                     storySubscriptionsUpdated = true
+                 }
++                if previousComponent.xrayStatus != component.xrayStatus {
++                    // Xraygram: новый текст/цвет значка статуса — перераскладка без прокрутки.
++                    storySubscriptionsUpdated = true
++                }
+             }
+             
+             self.component = component
+@@ -958,6 +1012,9 @@ public final class ChatListNavigationBar: Component {
+             } else {
+                 contentHeight += 44.0
+                 contentHeight += 9.0
++                if component.xrayStatus != nil {
++                    contentHeight += ChatListNavigationBar.xrayStatusSlotHeight
++                }
+                 
+                 if component.search != nil {
+                     contentHeight += navigationBarSearchContentHeight + 2.0
+diff --git a/submodules/TelegramUI/Components/ChatListHeaderComponent/Sources/XrayStatusPillComponent.swift b/submodules/TelegramUI/Components/ChatListHeaderComponent/Sources/XrayStatusPillComponent.swift
+new file mode 100644
+index 00000000..3bc744a5
+--- /dev/null
++++ b/submodules/TelegramUI/Components/ChatListHeaderComponent/Sources/XrayStatusPillComponent.swift
+@@ -0,0 +1,123 @@
++import Foundation
++import UIKit
++import Display
++import ComponentFlow
++
++/// Xraygram (FEAT-20 п. 8–12, PAR-23): значок статуса XRAY над списком чатов — точка + текст моноширинным 12,
++/// фон — цвет состояния 10 %, обводка — 35 %, лёгкое свечение. Тап — список прокси. Тексты и цвета считает
++/// список чатов (ChatListController), здесь только отрисовка.
++public final class XrayStatusPillComponent: Component {
++    public typealias EnvironmentType = Empty
++
++    public let text: String
++    public let color: UIColor
++    public let accessibilityHint: String
++    public let action: () -> Void
++
++    public init(text: String, color: UIColor, accessibilityHint: String, action: @escaping () -> Void) {
++        self.text = text
++        self.color = color
++        self.accessibilityHint = accessibilityHint
++        self.action = action
++    }
++
++    public static func ==(lhs: XrayStatusPillComponent, rhs: XrayStatusPillComponent) -> Bool {
++        if lhs.text != rhs.text {
++            return false
++        }
++        if !lhs.color.isEqual(rhs.color) {
++            return false
++        }
++        if lhs.accessibilityHint != rhs.accessibilityHint {
++            return false
++        }
++        return true
++    }
++
++    public static let height: CGFloat = 24.0
++
++    public final class View: UIView {
++        private let backgroundView = UIView()
++        private let dotView = UIView()
++        private let label = UILabel()
++        private var component: XrayStatusPillComponent?
++
++        override init(frame: CGRect) {
++            super.init(frame: frame)
++
++            self.backgroundView.isUserInteractionEnabled = false
++            self.backgroundView.layer.cornerRadius = XrayStatusPillComponent.height / 2.0
++            self.backgroundView.layer.borderWidth = 1.0
++            self.backgroundView.layer.shadowOffset = CGSize()
++            self.backgroundView.layer.shadowRadius = 12.0
++            self.backgroundView.layer.shadowOpacity = 0.35
++            self.addSubview(self.backgroundView)
++
++            self.dotView.isUserInteractionEnabled = false
++            self.dotView.layer.cornerRadius = 3.0
++            self.addSubview(self.dotView)
++
++            self.label.isUserInteractionEnabled = false
++            self.label.font = UIFont.monospacedSystemFont(ofSize: 12.0, weight: .medium)
++            self.label.lineBreakMode = .byTruncatingTail
++            self.label.numberOfLines = 1
++            self.addSubview(self.label)
++
++            self.isAccessibilityElement = true
++            self.accessibilityTraits = .button
++
++            self.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.tapped)))
++        }
++
++        required init?(coder: NSCoder) {
++            fatalError("init(coder:) has not been implemented")
++        }
++
++        @objc private func tapped() {
++            self.component?.action()
++        }
++
++        override public func accessibilityActivate() -> Bool {
++            self.component?.action()
++            return true
++        }
++
++        func update(component: XrayStatusPillComponent, availableSize: CGSize, state: EmptyComponentState, environment: Environment<Empty>, transition: ComponentTransition) -> CGSize {
++            self.component = component
++
++            self.label.text = component.text
++            self.label.textColor = component.color
++            self.dotView.backgroundColor = component.color
++            self.backgroundView.backgroundColor = component.color.withAlphaComponent(0.1)
++            self.backgroundView.layer.borderColor = component.color.withAlphaComponent(0.35).cgColor
++            self.backgroundView.layer.shadowColor = component.color.cgColor
++            self.accessibilityLabel = component.text
++            self.accessibilityHint = component.accessibilityHint
++
++            let height = XrayStatusPillComponent.height
++            let leftInset: CGFloat = 10.0
++            let dotSize: CGFloat = 6.0
++            let dotSpacing: CGFloat = 6.0
++            let rightInset: CGFloat = 12.0
++            let maxLabelWidth = max(0.0, availableSize.width - leftInset - dotSize - dotSpacing - rightInset)
++            let labelSize = self.label.sizeThatFits(CGSize(width: maxLabelWidth, height: height))
++            let labelWidth = min(ceil(labelSize.width), maxLabelWidth)
++            let size = CGSize(width: leftInset + dotSize + dotSpacing + labelWidth + rightInset, height: height)
++
++            self.backgroundView.frame = CGRect(origin: CGPoint(), size: size)
++            self.backgroundView.layer.shadowPath = UIBezierPath(roundedRect: CGRect(origin: CGPoint(), size: size), cornerRadius: height / 2.0).cgPath
++            self.dotView.frame = CGRect(x: leftInset, y: floor((height - dotSize) / 2.0), width: dotSize, height: dotSize)
++            self.label.frame = CGRect(x: leftInset + dotSize + dotSpacing, y: floor((height - ceil(labelSize.height)) / 2.0), width: labelWidth, height: ceil(labelSize.height))
++
++            return size
++        }
++    }
++
++    public func makeView() -> View {
++        return View(frame: CGRect())
++    }
++
++    public func update(view: View, availableSize: CGSize, state: EmptyComponentState, environment: Environment<EnvironmentType>, transition: ComponentTransition) -> CGSize {
++        return view.update(component: self, availableSize: availableSize, state: state, environment: environment, transition: transition)
++    }
++}
 diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
 index bd33bb7f..a55c4c17 100644
 --- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
@@ -3814,8 +5175,30 @@ index 5e3f9fb8..8812a3a7 100644
      guard pixelSide > 0, let url = getAppBundle().url(forResource: "PlaneLogoPlain", withExtension: "tgs"), let data = try? Data(contentsOf: url), let unpacked = TGGUnzipData(data, 5 * 1024 * 1024), let instance = makeLottieInstance(data: unpacked, fitzModifier: .none, colorReplacements: nil), instance.frameCount > 0 else {
          return nil
      }
+diff --git a/submodules/TelegramUI/Components/Settings/ThemeCarouselItem/Sources/ThemeCarouselItem.swift b/submodules/TelegramUI/Components/Settings/ThemeCarouselItem/Sources/ThemeCarouselItem.swift
+index 83da5d44..234116e9 100644
+--- a/submodules/TelegramUI/Components/Settings/ThemeCarouselItem/Sources/ThemeCarouselItem.swift
++++ b/submodules/TelegramUI/Components/Settings/ThemeCarouselItem/Sources/ThemeCarouselItem.swift
+@@ -415,6 +415,8 @@ private final class ThemeCarouselThemeItemIconNode: ListViewItemNode {
+             } else if let _ = item.themeReference?.emoticon {
+             } else if case .builtin(.neutral) = item.themeReference {
+                 string = item.channelMode ? "" : "🩶"
++            } else if case .builtin(.rentgen) = item.themeReference {
++                string = item.channelMode ? "" : "🩻"
+             } else {
+                 string = item.channelMode ? "" : "🎨" 
+             }
+@@ -431,6 +433,8 @@ private final class ThemeCarouselThemeItemIconNode: ListViewItemNode {
+                         if var themeReference = item.themeReference {
+                             if case .builtin(.neutral) = themeReference, item.nightMode {
+                                 themeReference = .builtin(.neutralNight)
++                            } else if case .builtin(.rentgen) = themeReference {
++                                // Xraygram: «Рентген» — тёмная тема, в ночном режиме не подменяется на Night.
+                             } else if case .builtin = themeReference, item.nightMode {
+                                 themeReference = .builtin(.night)
+                             }
 diff --git a/submodules/TelegramUI/Sources/AppDelegate.swift b/submodules/TelegramUI/Sources/AppDelegate.swift
-index cf304286..7bd88291 100644
+index cf304286..b5325a07 100644
 --- a/submodules/TelegramUI/Sources/AppDelegate.swift
 +++ b/submodules/TelegramUI/Sources/AppDelegate.swift
 @@ -54,6 +54,7 @@ import WalletSendScreen
@@ -3902,7 +5285,7 @@ index cf304286..7bd88291 100644
              
              let legacyBasePath = appGroupUrl.path
              
-@@ -1192,6 +1165,55 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
+@@ -1192,6 +1165,69 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                  }
                  strongSelf.mainWindow.present(c, on: .root)
              }
@@ -3936,6 +5319,20 @@ index cf304286..7bd88291 100644
 +            }
 +            #endif
 +            
++            // Xraygram (FEAT-20 п. 2, F20-02): при обновлении поверх старой сборки — «Рентген», если стоит тема upstream
++            // по умолчанию (Classic, автоночь по системе, без своих цветов). Выбор пользователя не трогаем. Один раз.
++            if !UserDefaults.standard.bool(forKey: "xg.rentgenDefaultApplied") {
++                UserDefaults.standard.set(true, forKey: "xg.rentgenDefaultApplied")
++                let _ = updatePresentationThemeSettingsInteractively(accountManager: accountManager, { settings in
++                    let upstreamDefaultAutomatic = AutomaticThemeSwitchSetting(force: false, trigger: .system, theme: .builtin(.night))
++                    if settings.theme == .builtin(.dayClassic) && settings.themeSpecificAccentColors.isEmpty && settings.themeSpecificChatWallpapers.isEmpty && settings.automaticThemeSwitchSetting == upstreamDefaultAutomatic {
++                        Logger.shared.log("Xraygram", "theme: upstream default -> Rentgen")
++                        return settings.withUpdatedTheme(.builtin(.rentgen)).withUpdatedAutomaticThemeSwitchSetting(AutomaticThemeSwitchSetting(force: false, trigger: .explicitNone, theme: .builtin(.night)))
++                    }
++                    return settings
++                }).start()
++            }
++            
 +            // Xraygram (FEAT-19, F19-20): альтернативные иконки — иконки Telegram; если такая выбрана — вернуть основную.
 +            if application.alternateIconName != nil {
 +                application.setAlternateIconName(nil, completionHandler: nil)
@@ -3958,7 +5355,7 @@ index cf304286..7bd88291 100644
              sharedContext.presentCrossfadeController = { [weak self] in
                  guard let strongSelf = self else {
                      return
-@@ -2108,7 +2130,121 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
+@@ -2108,7 +2144,121 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
          })
      }
  
@@ -4108,6 +5505,52 @@ index b7dd5f35..9a06ec29 100644
                          f(.default)
                          
                          guard let self else {
+diff --git a/submodules/TelegramUIPreferences/Sources/BubblelessThemeSettings.swift b/submodules/TelegramUIPreferences/Sources/BubblelessThemeSettings.swift
+index 4c5cd98f..90f1d92a 100644
+--- a/submodules/TelegramUIPreferences/Sources/BubblelessThemeSettings.swift
++++ b/submodules/TelegramUIPreferences/Sources/BubblelessThemeSettings.swift
+@@ -14,7 +14,7 @@ public extension PresentationThemeSettings {
+                 return bubblelessTheme
+             }
+             switch self.theme {
+-                case .builtin(.night), .builtin(.nightAccent):
++                case .builtin(.night), .builtin(.nightAccent), .builtin(.rentgen):
+                     return .builtin(.neutralNight)
+                 default:
+                     return .builtin(.neutral)
+diff --git a/submodules/TelegramUIPreferences/Sources/PresentationThemeSettings.swift b/submodules/TelegramUIPreferences/Sources/PresentationThemeSettings.swift
+index d86948e3..a87e0616 100644
+--- a/submodules/TelegramUIPreferences/Sources/PresentationThemeSettings.swift
++++ b/submodules/TelegramUIPreferences/Sources/PresentationThemeSettings.swift
+@@ -19,6 +19,8 @@ public enum PresentationBuiltinThemeReference: Int32 {
+     // synced.
+     case neutral = 4
+     case neutralNight = 5
++    // Xraygram (FEAT-20): тема «Рентген», по умолчанию. Для сервера — tinted (своих тем сервер не знает).
++    case rentgen = 6
+     
+     public init(baseTheme: TelegramBaseTheme) {
+         switch baseTheme {
+@@ -41,7 +43,7 @@ public enum PresentationBuiltinThemeReference: Int32 {
+                 return .day
+             case .night, .neutralNight:
+                 return .night
+-            case .nightAccent:
++            case .nightAccent, .rentgen:
+                 return .tinted
+         }
+     }
+@@ -715,7 +717,9 @@ public struct PresentationThemeSettings: Codable {
+     }
+     
+     public static var defaultSettings: PresentationThemeSettings {
+-        return PresentationThemeSettings(theme: .builtin(.dayClassic), themePreferredBaseTheme: [:], themeSpecificAccentColors: [:], themeSpecificChatWallpapers: [:], useSystemFont: true, fontSize: .regular, listsFontSize: .regular, chatBubbleSettings: .default, automaticThemeSwitchSetting: AutomaticThemeSwitchSetting(force: false, trigger: .system, theme: .builtin(.night)), largeEmoji: true, reduceMotion: false)
++        // Xraygram (FEAT-20 п. 2–3): по умолчанию «Рентген», от светлой/тёмной темы системы не зависит —
++        // автопереключение выключено (если пользователь включит — как в upstream, ночная тема Night).
++        return PresentationThemeSettings(theme: .builtin(.rentgen), themePreferredBaseTheme: [:], themeSpecificAccentColors: [:], themeSpecificChatWallpapers: [:], useSystemFont: true, fontSize: .regular, listsFontSize: .regular, chatBubbleSettings: .default, automaticThemeSwitchSetting: AutomaticThemeSwitchSetting(force: false, trigger: .explicitNone, theme: .builtin(.night)), largeEmoji: true, reduceMotion: false)
+     }
+     
+     public init(theme: PresentationThemeReference, themePreferredBaseTheme: [Int64: TelegramBaseTheme], themeSpecificAccentColors: [Int64: PresentationThemeAccentColor], themeSpecificChatWallpapers: [Int64: TelegramWallpaper], useSystemFont: Bool, fontSize: PresentationFontSize, listsFontSize: PresentationFontSize, chatBubbleSettings: PresentationChatBubbleSettings, automaticThemeSwitchSetting: AutomaticThemeSwitchSetting, largeEmoji: Bool, reduceMotion: Bool) {
 diff --git a/submodules/TelegramVoip/Sources/OngoingCallContext.swift b/submodules/TelegramVoip/Sources/OngoingCallContext.swift
 index 852d6a70..d9b0d95b 100644
 --- a/submodules/TelegramVoip/Sources/OngoingCallContext.swift
