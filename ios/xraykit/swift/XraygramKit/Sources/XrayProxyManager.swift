@@ -91,12 +91,29 @@ public struct XrayStrings {
         if app.hasPrefix("ru") {
             self.english = false
         } else if app.isEmpty || app == "en" {
-            let system = (Locale.preferredLanguages.first ?? "").lowercased()
-            self.english = !system.hasPrefix("ru")
+            if let chosen = XraygramIntro.chosenLanguage {
+                // Выбор во вступлении (FEAT-19 §2): пакет строк Telegram придёт позже, через XRAY.
+                self.english = chosen != "ru"
+            } else {
+                let system = (Locale.preferredLanguages.first ?? "").lowercased()
+                self.english = !system.hasPrefix("ru")
+            }
         } else {
             self.english = true
         }
     }
+
+    // FEAT-19 §2: вступление.
+    public var introTitle: String { return "XRAYGRAM" }
+    public var introSubtitle: String { return self.t("Неофициальный клиент Telegram, который подключается через ваш сервер XRAY.", "An unofficial Telegram client that connects through your own XRAY server.") }
+    public var introStart: String { return self.t("Начать", "Start") }
+
+    // FEAT-19 §4: строка версии внизу настроек и диалог.
+    public func versionRow(version: String) -> String { return self.t("Xraygram для iOS \(version) · неофициальный клиент Telegram", "Xraygram for iOS \(version) · unofficial Telegram client") }
+    public func aboutTitle(version: String) -> String { return "Xraygram \(version)" }
+    public func aboutText(upstreamVersion: String) -> String { return self.t("Неофициальный клиент Telegram, который подключается через ваш сервер XRAY.\n\nНа основе Telegram iOS \(upstreamVersion). Исходный код: github.com/vizacv/xraygram", "An unofficial Telegram client that connects through your own XRAY server.\n\nBased on Telegram iOS \(upstreamVersion). Source code: github.com/vizacv/xraygram") }
+    public var aboutSourceCode: String { return self.t("Исходный код", "Source code") }
+    public var ok: String { return "OK" }
 
     private func t(_ ru: String, _ en: String) -> String {
         return self.english ? en : ru
@@ -543,5 +560,33 @@ public final class XrayProxyManager: @unchecked Sendable {
         var length = socklen_t(MemoryLayout<Int32>.size)
         getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &length)
         return error == 0
+    }
+}
+
+/// FEAT-19 §2: состояние вступления. Язык, выбранный во вступлении («Русский · English»), и флаг «пройдено»
+/// (после «Начать» показывается экран XRAY). Пакет строк Telegram для выбранного языка скачивается после
+/// подключения через XRAY (`pendingLanguage`).
+public enum XraygramIntro {
+    public static let sourceCodeURL = "https://github.com/vizacv/xraygram"
+    private static let languageKey = "xg.introLanguage"
+    private static let pendingKey = "xg.introPendingLanguage"
+
+    public static var chosenLanguage: String? {
+        get { return UserDefaults.standard.string(forKey: languageKey) }
+        set { UserDefaults.standard.set(newValue, forKey: languageKey) }
+    }
+
+    /// Язык, пакет которого ещё надо скачать и применить (nil — ничего не нужно).
+    public static var pendingLanguage: String? {
+        get { return UserDefaults.standard.string(forKey: pendingKey) }
+        set { UserDefaults.standard.set(newValue, forKey: pendingKey) }
+    }
+
+    /// Язык вступления по умолчанию — по правилу языка (FEAT-01): русский, если система на русском.
+    public static var defaultLanguage: String {
+        if let chosen = chosenLanguage {
+            return chosen
+        }
+        return (Locale.preferredLanguages.first ?? "").lowercased().hasPrefix("ru") ? "ru" : "en"
     }
 }

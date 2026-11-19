@@ -152,3 +152,30 @@ iCloud, Siri и Associated Domains. Ещё ограничения: 10 App ID з�
   (она же `app_specific_url_scheme`); `CFBundleName = Xraygram`.
 - **Для QA (симулятор)** — XRAY-запись без UI: `SIMCTL_CHILD_XRAYGRAM_ADD_LINK` или `SIMCTL_CHILD_XRAYGRAM_ADD_LINK_FILE`
   при `simctl launch` (код только под `targetEnvironment(simulator)`).
+
+## 2026-11-19 — Ребрендинг FEAT-19 (PAR-17…21)
+
+- **Заставка** — `LaunchScreen.xib`: фон `#0B1220`, по центру `XraygramLaunchIcon` (холст 240 pt из `branding/launch`,
+  кладёт `build.sh prepare`, в патч не входит).
+- **Вступление** — `AuthorizationSequenceSplashController` переписан: свой UIKit-экран вместо RMIntro (OpenGL-самолётик
+  и слайды только на английском). Луч — `CAGradientLayer` в маске скруглённой иконки, 1,2 с, один раз, без него при
+  «Уменьшить движение». Публичный API (кадр кнопки, снимки для перехода к номеру) сохранён — анимация перехода upstream
+  работает. «Русский · English» — `XraygramIntro.chosenLanguage` (сразу для `XrayStrings`); русский пакет строк Telegram
+  скачивается после разблокировки сети (`XraygramIntro.pendingLanguage`, `AppDelegate.xraygramApplyPendingLanguage`),
+  потом выбор сбрасывается (язык приложения уже ru).
+- **Порядок** — экран XRAY ждёт, пока сверху вступление (`updateXraygramGate`: `viewControllers.last is
+  AuthorizationSequenceSplashController`). Флага «пройдено» нет: после выхода из аккаунта upstream снова показывает
+  вступление — и экран XRAY снова после «Начать».
+- **Строки** — по списку ключей в `_PresentationStringsComponent` (см. `ios/rebrand-strings.md`).
+- **Иконки** — CallKit `CallKitLogo` ← `branding/glyph/ios` (prepare, вне патча); альтернативные иконки скрыты
+  (`getAvailableAlternateIcons` → `[]`, выбранная сбрасывается при запуске), ярлык «Иконка приложения» убран;
+  «Пригласить» в меню телефона — значок `AddUser`. Значки FAQ/Features/Support — не логотип, не трогали.
+- **QR** — `QrCodeScreen` (приглашения, папки, группы) `.none` без Lottie-самолётика; QR профиля (`QrStudio`) — без окна
+  в центре, без самолётика на экране и в экспорте (`QrStudioCodePaths.xraygramHasLogo = false`). Водяной знак кружочков
+  в upstream уже выключен (`RoundVideoDecoration.isEnabled = false`).
+- **«О приложении»** — последняя секция настроек: «Xraygram для iOS <CFBundleVersion> · неофициальный клиент Telegram»;
+  нажатие — алерт с полным текстом §4 и кнопкой «Исходный код». Версия Xraygram на iOS — build number (`ГГММДДЧЧ`),
+  версия upstream — `CFBundleShortVersionString` (13.2).
+- **Заголовок списка чатов** — «Чаты» (на iOS нет надписи-логотипа «Telegram»; продукт: платформенное исключение F19-17).
+- **Не трогаем** (продукт): альбом «Telegram» в «Фото», метку «Telegram» в «Контактах», сеанс «Telegram iOS».
+  Письмо в поддержку — «Xraygram: <версия>». BUG-21 (ar/ko `CFBundleDisplayName`) — исправлен.

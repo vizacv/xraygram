@@ -127,6 +127,14 @@ cmd_prepare() {
 	# Иконка Xraygram (FEAT-07): канон — branding/ios/AppIcon-1024.png.
 	install -m 644 "$XG_REPO/branding/ios/AppIcon-1024.png" \
 		"$XG_SRC/Telegram/Telegram-iOS/XraygramAppIcon.xcassets/AppIcon.appiconset/AppIcon-1024.png"
+	# FEAT-19: заставка и вступление (branding/launch: холст 240 pt, иконка 176 pt со свечением) и знак
+	# CallKit (branding/glyph/ios, 40 pt, важна только альфа) вместо самолётика.
+	local res="$XG_SRC/Telegram/Telegram-iOS/Resources" s
+	for s in 2x 3x; do
+		install -m 644 "$XG_REPO/branding/launch/LaunchIcon@$s.png" "$res/XraygramLaunchIcon@$s.png"
+		install -m 644 "$XG_REPO/branding/glyph/ios/CallKitIcon@$s.png" \
+			"$XG_SRC/submodules/TelegramUI/Images.xcassets/Call/CallKitLogo.imageset/CallKitLogo@$s.png"
+	done
 	write_configuration
 }
 

@@ -9,6 +9,8 @@
 #   third-party/XraygramCore/XraygramCore.xcframework  — собирается build-core.sh
 #   submodules/XraygramKit/Sources                     — канон в ios/xraykit/swift/XraygramKit
 #   Telegram/Telegram-iOS/XraygramAppIcon.xcassets/…/AppIcon-1024.png — канон в branding/ios
+#   Telegram/Telegram-iOS/Resources/XraygramLaunchIcon@*.png — канон в branding/launch
+#   submodules/TelegramUI/Images.xcassets/Call/CallKitLogo.imageset/*.png — канон в branding/glyph/ios
 # и служебное: build-input/, bazel-*.
 
 set -euo pipefail
@@ -23,6 +25,10 @@ EXCLUDES=(
 	':(exclude)third-party/XraygramCore/XraygramCore.xcframework'
 	':(exclude)submodules/XraygramKit/Sources'
 	':(exclude)Telegram/Telegram-iOS/XraygramAppIcon.xcassets/AppIcon.appiconset/AppIcon-1024.png'
+	':(exclude)Telegram/Telegram-iOS/Resources/XraygramLaunchIcon@2x.png'
+	':(exclude)Telegram/Telegram-iOS/Resources/XraygramLaunchIcon@3x.png'
+	':(exclude)submodules/TelegramUI/Images.xcassets/Call/CallKitLogo.imageset/CallKitLogo@2x.png'
+	':(exclude)submodules/TelegramUI/Images.xcassets/Call/CallKitLogo.imageset/CallKitLogo@3x.png'
 	':(exclude)build-input'
 	':(exclude)bazel-*'
 )

@@ -1,8 +1,30 @@
 diff --git a/Telegram/BUILD b/Telegram/BUILD
-index 1ac8279b..54237782 100644
+index 1ac8279b..cd47dd07 100644
 --- a/Telegram/BUILD
 +++ b/Telegram/BUILD
-@@ -430,20 +430,7 @@ plist_fragment(
+@@ -147,10 +147,12 @@ genrule(
+     srcs = [
+         "//build-system:GenerateStrings/GenerateStrings.py",
+         "Telegram-iOS/en.lproj/Localizable.strings",
++        "Telegram-iOS/XraygramRebrandKeys.txt",
+     ],
+     cmd = '''
+         python3 $(location //build-system:GenerateStrings/GenerateStrings.py) \\
+             --source=$(location Telegram-iOS/en.lproj/Localizable.strings) \\
++            --rebrandKeys=$(location Telegram-iOS/XraygramRebrandKeys.txt) \\
+             --outImplementation=$(location GeneratedPresentationStrings/Sources/PresentationStrings.m) \\
+             --outHeader=$(location GeneratedPresentationStrings/PublicHeaders/PresentationStrings/PresentationStrings.h) \\
+             --outData=$(location GeneratedPresentationStrings/Resources/PresentationStrings.data) \\
+@@ -385,7 +387,7 @@ swift_library(
+     data = [
+         ":Icons",
+         ":AppResources",
+-        ":AppIntentVocabularyResources",
++        # Xraygram: Siri выключен, фразы «Send a Telegram message» не нужны (FEAT-19).
+         ":InfoPlistStringResources",
+         "//submodules/LegacyComponents:LegacyComponentsResources",
+         "//submodules/LegacyComponents:LegacyComponentsAssets",
+@@ -430,20 +432,7 @@ plist_fragment(
              <string>{telegram_bundle_id}</string>
              <key>CFBundleURLSchemes</key>
              <array>
@@ -24,7 +46,7 @@ index 1ac8279b..54237782 100644
              </array>
          </dict>
      </array>
-@@ -452,6 +439,9 @@ plist_fragment(
+@@ -452,6 +441,9 @@ plist_fragment(
      )
  )
  
@@ -34,7 +56,7 @@ index 1ac8279b..54237782 100644
  official_apple_pay_merchants = [
      "merchant.ph.telegra.Telegraph",
      "merchant.sberbank.ph.telegra.Telegraph",
-@@ -641,7 +631,7 @@ plist_fragment(
+@@ -641,7 +633,7 @@ plist_fragment(
      template =
      """
      <key>CFBundleDisplayName</key>
@@ -43,7 +65,7 @@ index 1ac8279b..54237782 100644
      """
  )
  
-@@ -1696,11 +1686,11 @@ plist_fragment(
+@@ -1696,11 +1688,11 @@ plist_fragment(
      <key>CFBundleDevelopmentRegion</key>
      <string>en</string>
      <key>CFBundleDisplayName</key>
@@ -57,7 +79,29 @@ index 1ac8279b..54237782 100644
      <key>CFBundlePackageType</key>
      <string>APPL</string>
      <key>CFBundleSignature</key>
-@@ -1922,7 +1912,9 @@ ios_application(
+@@ -1758,17 +1750,17 @@ plist_fragment(
+     <key>NSCameraUsageDescription</key>
+     <string>We need this so that you can take and share photos and videos.</string>
+     <key>NSContactsUsageDescription</key>
+-    <string>Telegram stores your contacts heavily encrypted in the cloud to let you connect with your friends across all your devices.</string>
++    <string>Xraygram stores your contacts heavily encrypted in the Telegram cloud to let you connect with your friends across all your devices.</string>
+     <key>NSFaceIDUsageDescription</key>
+     <string>You can use Face ID to unlock the app.</string>
+     <key>NSLocationAlwaysUsageDescription</key>
+-    <string>When you send your location to your friends, Telegram needs access to show them a map. You also need this to send locations from an Apple Watch.</string>
++    <string>When you send your location to your friends, Xraygram needs access to show them a map. You also need this to send locations from an Apple Watch.</string>
+     <key>NSLocationWhenInUseUsageDescription</key>
+-    <string>When you send your location to your friends, Telegram needs access to show them a map.</string>
++    <string>When you send your location to your friends, Xraygram needs access to show them a map.</string>
+     <key>NSMicrophoneUsageDescription</key>
+     <string>We need this so that you can record and share voice messages and videos with sound.</string>
+     <key>NSMotionUsageDescription</key>
+-    <string>When you send your location to your friends, Telegram needs access to show them a map.</string>
++    <string>When you send your location to your friends, Xraygram needs access to show them a map.</string>
+     <key>NSPhotoLibraryAddUsageDescription</key>
+     <string>We need this so that you can share photos and videos from your photo library.</string>
+     <key>NSPhotoLibraryUsageDescription</key>
+@@ -1922,7 +1914,9 @@ ios_application(
          ":RequiredDeviceCapabilitiesPlist",
          ":UrlTypesInfoPlist",
      ],
@@ -68,6 +112,55 @@ index 1ac8279b..54237782 100644
      alternate_icons = [
          ":{}".format(name) for name in alternate_icon_folders
      ],
+diff --git a/Telegram/Telegram-iOS/Base.lproj/LaunchScreen.xib b/Telegram/Telegram-iOS/Base.lproj/LaunchScreen.xib
+index f6a094e0..5c0ad9af 100644
+--- a/Telegram/Telegram-iOS/Base.lproj/LaunchScreen.xib
++++ b/Telegram/Telegram-iOS/Base.lproj/LaunchScreen.xib
+@@ -1,25 +1,37 @@
+ <?xml version="1.0" encoding="UTF-8"?>
++<!-- Xraygram (FEAT-19 §1, PAR-17): фон #0B1220 (тема «Рентген»), по центру иконка (холст 240 pt, сама иконка 176 pt
++     со скруглением 40 и свечением — уже в картинке Resources/XraygramLaunchIcon@2x/@3x.png, её кладёт build.sh prepare). -->
+ <document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="21507" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" colorMatched="YES">
+-    <device id="ipad12_9" orientation="landscape" layout="fullscreen" appearance="dark"/>
++    <device id="retina6_1" orientation="portrait" appearance="dark"/>
+     <dependencies>
+         <deployment version="4096" identifier="iOS"/>
+         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="21505"/>
+-        <capability name="System colors in document resources" minToolsVersion="11.0"/>
+         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+     </dependencies>
+     <objects>
+         <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner"/>
+         <placeholder placeholderIdentifier="IBFirstResponder" id="-2" customClass="UIResponder"/>
+         <view contentMode="scaleToFill" id="O8c-13-3vw">
+-            <rect key="frame" x="0.0" y="0.0" width="1366" height="1024"/>
++            <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
+             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+-            <color key="backgroundColor" systemColor="systemBackgroundColor"/>
++            <subviews>
++                <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="XraygramLaunchIcon" translatesAutoresizingMaskIntoConstraints="NO" id="xgL-ic-001">
++                    <rect key="frame" x="87" y="328" width="240" height="240"/>
++                    <constraints>
++                        <constraint firstAttribute="width" constant="240" id="xgL-cw-001"/>
++                        <constraint firstAttribute="height" constant="240" id="xgL-ch-001"/>
++                    </constraints>
++                </imageView>
++            </subviews>
++            <color key="backgroundColor" red="0.043137254901960784" green="0.070588235294117646" blue="0.12549019607843137" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
++            <constraints>
++                <constraint firstItem="xgL-ic-001" firstAttribute="centerX" secondItem="O8c-13-3vw" secondAttribute="centerX" id="xgL-cx-001"/>
++                <constraint firstItem="xgL-ic-001" firstAttribute="centerY" secondItem="O8c-13-3vw" secondAttribute="centerY" id="xgL-cy-001"/>
++            </constraints>
+             <point key="canvasLocation" x="139" y="117"/>
+         </view>
+     </objects>
+     <resources>
+-        <systemColor name="systemBackgroundColor">
+-            <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+-        </systemColor>
++        <image name="XraygramLaunchIcon" width="240" height="240"/>
+     </resources>
+ </document>
 diff --git a/Telegram/Telegram-iOS/XraygramAppIcon.xcassets/AppIcon.appiconset/Contents.json b/Telegram/Telegram-iOS/XraygramAppIcon.xcassets/AppIcon.appiconset/Contents.json
 new file mode 100644
 index 00000000..f22e10cd
@@ -100,6 +193,188 @@ index 00000000..73c00596
 +    "version" : 1
 +  }
 +}
+diff --git a/Telegram/Telegram-iOS/XraygramRebrandKeys.txt b/Telegram/Telegram-iOS/XraygramRebrandKeys.txt
+new file mode 100644
+index 00000000..5ab6fd7e
+--- /dev/null
++++ b/Telegram/Telegram-iOS/XraygramRebrandKeys.txt
+@@ -0,0 +1,97 @@
++# Xraygram (FEAT-19, PAR-20): ключи PresentationStrings, где «Telegram» — это само приложение на этом устройстве.
++# В их значениях «Telegram»/«TELEGRAM»/«Телеграм(м)» → «Xraygram»/«XRAYGRAM» (кроме защищённых словосочетаний:
++# Telegram Premium/Stars/Business/Passport/…/account/servers/cloud, «on Telegram»). Ключи вне списка не трогаются.
++# Подмена — в _PresentationStringsComponent (бандл и облачные языковые пакеты, в т.ч. уже скачанные), см.
++# build-system/GenerateStrings/GenerateStrings.py. Множественные формы (_0/_1/_2/_3_10/_many/_any) — по базовому ключу.
++# Канон для QA (F19-09/10/12) — этот файл; пояснения — ios/rebrand-strings.md.
++
++# Доступ к камере, микрофону, фото, контактам, геопозиции (пункт «Настройки → Xraygram»)
++AccessDenied.AgeVerificationCamera
++AccessDenied.CallMicrophone
++AccessDenied.Camera
++AccessDenied.CameraRestricted
++AccessDenied.Contacts
++AccessDenied.LocationAlwaysDenied
++AccessDenied.LocationDenied
++AccessDenied.LocationDisabled
++AccessDenied.LocationPreciseDenied
++AccessDenied.LocationTracking
++AccessDenied.LocationWeather
++AccessDenied.MicrophoneRestricted
++AccessDenied.PhotosAndVideos
++AccessDenied.PhotosRestricted
++AccessDenied.QrCamera
++AccessDenied.QrCode
++AccessDenied.SaveMedia
++AccessDenied.VideoCallCamera
++AccessDenied.VideoMessageCamera
++AccessDenied.VideoMessageMicrophone
++AccessDenied.VideoMicrophone
++AccessDenied.VoiceMicrophone
++AccessDenied.Wallpapers
++Attachment.CameraAccessText
++Attachment.LimitedMediaAccessText
++Contacts.AccessDeniedError
++Contacts.AccessDeniedHelpLandscape
++Contacts.AccessDeniedHelpPortrait
++Contacts.LimitedAccess.Text
++Contacts.PermissionsText
++Media.LimitedAccessText
++Story.Camera.AccessPlaceholderTitle
++Map.HomeAndWorkInfo
++InfoPlist.NSLocationAlwaysAndWhenInUseUsageDescription
++InfoPlist.NSLocationAlwaysUsageDescription
++InfoPlist.NSLocationWhenInUseUsageDescription
++
++# Звонки как приложение
++Call.StatusIncoming
++Call.StatusOngoing
++Call.PhoneCallInProgressMessage
++Calls.RatingTitle
++Chat.Context.Phone.TelegramVoiceCall
++Chat.Context.Phone.TelegramVideoCall
++UserInfo.TelegramCall
++UserInfo.TelegramVideoCall
++Privacy.Calls.IntegrationHelp
++
++# Код-пароль и блокировка приложения
++DialogList.PasscodeLockHelp
++EnterPasscode.EnterPasscode
++EnterPasscode.EnterTitle
++EnterPasscode.TouchId
++Passcode.AppLockedAlert
++PasscodeSettings.EncryptDataHelp
++PasscodeSettings.LockTelegram
++
++# Хранилище и кэш этого приложения
++Cache.Indexing
++ClearCache.ClearCache
++ClearCache.StorageCache
++ClearCache.StorageServiceFiles
++StorageManagement.DescriptionAppUsage
++StorageManagement.DescriptionChatUsage
++AppUpgrade.Running
++
++# Обновление и версия приложения
++Update.AppVersion
++Update.Title
++Update.UpdateApp
++Conversation.UpdateTelegram
++Conversation.UnsupportedMedia
++Conversation.UnsupportedMedia.Text
++Conversation.UnsupportedMediaPlaceholder
++Story.UnsupportedAction
++Story.UnsupportedText
++Login.ErrorAppOutdated
++Gift.Transfer.UpdateRequired.Text
++Passport.UpdateRequiredError
++
++# Прочее «о приложении»
++Application.Name
++ChatImportActivity.OpenApp
++Share.AuthDescription
++Intents.ErrorLockedText
++Permissions.CellularDataText.v0
++PowerSavingScreen.OptionAutoplayEffectsText
++WebBrowser.Telegram
++WebBrowser.ClearCookies.Info
+diff --git a/Telegram/Telegram-iOS/ar.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/ar.lproj/InfoPlist.strings
+index 174276a9..0e84d449 100644
+--- a/Telegram/Telegram-iOS/ar.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/ar.lproj/InfoPlist.strings
+@@ -1,5 +1,4 @@
+ /* Localized versions of Info.plist keys */
+-"CFBundleDisplayName" = "تيليجرام";
+ "NSContactsUsageDescription" = "سيقوم تيليجرام برفع جهات الاتصال الخاصة بك باستمرار إلى خوادم التخزين السحابية ذات التشفير العالي لتتمكن من التواصل مع أصدقائك من خلال جميع أجهزتك.";
+ "NSLocationWhenInUseUsageDescription" = "عندما ترغب في مشاركة مكانك مع أصدقائك، تيليجرام يحتاج لصلاحيات لعرض الخريطة لهم.";
+ "NSLocationAlwaysAndWhenInUseUsageDescription" = "عندما تختار أن تشارك مكانك بشكل حي مع أصدقائك في المحادثة، يحتاج تيليجرام إلى الوصول لموقعك في الخلفية حتى بعد إغلاق تيليجرام خلال فترة المشاركة.";
+diff --git a/Telegram/Telegram-iOS/be.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/be.lproj/InfoPlist.strings
+index 3f3e41d3..4ef3b750 100644
+--- a/Telegram/Telegram-iOS/be.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/be.lproj/InfoPlist.strings
+@@ -1,9 +1,9 @@
+ /* Localized versions of Info.plist keys */
+ 
+ "NSContactsUsageDescription" = "Telegram будзе запампоўваць вашы кантакты на свае моцна абароненыя і зашыфраваныя воблачныя серверы, каб вы маглі кантактаваць са сваімі сябрамі з любой вашай прылады.";
+-"NSLocationWhenInUseUsageDescription" = "Калі вы адпраўляе месцазнаходжанне сваім сябрам, Telegram патрэбны доступ да сэрвісаў геалакацыі, каб размясціць вас на карце.";
+-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Калі вы трансліруеце ваша месцазнаходжанне сябрам у чаце, Telegram патрэбны доступ у фонавым рэжыме да вашага месцазнаходжання, каб абнаўляць яго падчас трансляцыі.";
+-"NSLocationAlwaysUsageDescription" = "Калі вы трансліруеце ваша месцазнаходжанне сябрам у чаце, Telegram патрэбны доступ у фонавым рэжыме да вашага месцазнаходжання, каб абнаўляць яго падчас трансляцыі. Гэта таксама неабходна для таго, каб адпраўляць месцазнаходжанне праз Apple Watch.";
++"NSLocationWhenInUseUsageDescription" = "Калі вы адпраўляе месцазнаходжанне сваім сябрам, Xraygram патрэбны доступ да сэрвісаў геалакацыі, каб размясціць вас на карце.";
++"NSLocationAlwaysAndWhenInUseUsageDescription" = "Калі вы трансліруеце ваша месцазнаходжанне сябрам у чаце, Xraygram патрэбны доступ у фонавым рэжыме да вашага месцазнаходжання, каб абнаўляць яго падчас трансляцыі.";
++"NSLocationAlwaysUsageDescription" = "Калі вы трансліруеце ваша месцазнаходжанне сябрам у чаце, Xraygram патрэбны доступ у фонавым рэжыме да вашага месцазнаходжання, каб абнаўляць яго падчас трансляцыі. Гэта таксама неабходна для таго, каб адпраўляць месцазнаходжанне праз Apple Watch.";
+ "NSCameraUsageDescription" = "Нам неабходны гэты дазвол, каб вы маглі рабіць і адпраўляць фота і відэа, а таксама відэавыклікі.";
+ "NSPhotoLibraryUsageDescription" = "Нам неабходны гэты дазвол, каб вы маглі абагульваць фота і відэа са сваёй галерэі.";
+ "NSPhotoLibraryAddUsageDescription" = "Нам неабходны гэты дазвол, каб вы маглі захоўваць фота і відэа ў сваю галерэю.";
+diff --git a/Telegram/Telegram-iOS/ca.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/ca.lproj/InfoPlist.strings
+index f57e0cec..c8c7619b 100644
+--- a/Telegram/Telegram-iOS/ca.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/ca.lproj/InfoPlist.strings
+@@ -1,9 +1,9 @@
+ /* Localized versions of Info.plist keys */
+ 
+ "NSContactsUsageDescription" = "Telegram pujarà automàticament els vostres contactes als seus servidors xifrats, perquè pugueu connectar-vos amb els amics des de qualsevol dispositiu.";
+-"NSLocationWhenInUseUsageDescription" = "Si envieu la vostra ubicació als amics, Telegram requereix accés per a mostra-los un mapa.";
+-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Si trieu de compartir la vostra ubicació en directe amb amics en un xat, Telegram requereix accés en segon pla a la vostra ubicació per a actualitzar-la durant la compartició en directe.";
+-"NSLocationAlwaysUsageDescription" = "Si trieu de compartir la vostra ubicació en directe amb amics en un xat, Telegram requereix de tenir accés en segon pla a la vostra ubicació per a actualitzar-la durant la compartició en directe. També necessiteu això per a enviar ubicacions des d'un Apple Watch.";
++"NSLocationWhenInUseUsageDescription" = "Si envieu la vostra ubicació als amics, Xraygram requereix accés per a mostra-los un mapa.";
++"NSLocationAlwaysAndWhenInUseUsageDescription" = "Si trieu de compartir la vostra ubicació en directe amb amics en un xat, Xraygram requereix accés en segon pla a la vostra ubicació per a actualitzar-la durant la compartició en directe.";
++"NSLocationAlwaysUsageDescription" = "Si trieu de compartir la vostra ubicació en directe amb amics en un xat, Xraygram requereix de tenir accés en segon pla a la vostra ubicació per a actualitzar-la durant la compartició en directe. També necessiteu això per a enviar ubicacions des d'un Apple Watch.";
+ "NSCameraUsageDescription" = "Ens cal això perquè pugueu fer i compartir fotos i vídeos, així com fer videotrucades.";
+ "NSPhotoLibraryUsageDescription" = "Ens cal això perquè pugueu compartir fotos i vídeos de la biblioteca de fotos.";
+ "NSPhotoLibraryAddUsageDescription" = "Ens cal això perquè així pugueu desar fotos i vídeos a la biblioteca de fotos.";
+diff --git a/Telegram/Telegram-iOS/de.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/de.lproj/InfoPlist.strings
+index 792eaa3c..bcbe65c3 100644
+--- a/Telegram/Telegram-iOS/de.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/de.lproj/InfoPlist.strings
+@@ -1,9 +1,9 @@
+ /* Localized versions of Info.plist keys */
+ 
+ "NSContactsUsageDescription" = "Telegram lädt deine Kontakte durchgehend auf die stark verschlüsselten Cloud Server, damit du dich mit deinen Freunden auf all deinen Geräten verbinden kannst.";
+-"NSLocationWhenInUseUsageDescription" = "Wenn du Freunden deinen Standort mitteilen willst, musst du Telegram den Zugriff darauf erlauben.";
+-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Wenn du deinen Live-Standort mit Freunden im Chat teilen möchtest, benötigt Telegram so lange im Hintergrund Zugriff auf deinen Standort, bis du ihn nicht mehr teilen willst.";
+-"NSLocationAlwaysUsageDescription" = "Wenn du Freunden deinen Standort mitteilen willst, musst du Telegram den Zugriff darauf erlauben. Diese Bereichtigung wird auch für die Apple Watch benötigt.";
++"NSLocationWhenInUseUsageDescription" = "Wenn du Freunden deinen Standort mitteilen willst, musst du Xraygram den Zugriff darauf erlauben.";
++"NSLocationAlwaysAndWhenInUseUsageDescription" = "Wenn du deinen Live-Standort mit Freunden im Chat teilen möchtest, benötigt Xraygram so lange im Hintergrund Zugriff auf deinen Standort, bis du ihn nicht mehr teilen willst.";
++"NSLocationAlwaysUsageDescription" = "Wenn du Freunden deinen Standort mitteilen willst, musst du Xraygram den Zugriff darauf erlauben. Diese Bereichtigung wird auch für die Apple Watch benötigt.";
+ "NSCameraUsageDescription" = "Brauchen wir, damit du Bilder und Videos aufnehmen und teilen kannst.";
+ "NSPhotoLibraryUsageDescription" = "Brauchen wir, damit du Bilder und Videos aus deiner Fotomediathek teilen kannst.";
+ "NSPhotoLibraryAddUsageDescription" = "Brauchen wir, damit du Bilder und Videos in deiner Fotomediathek speichern kannst.";
+diff --git a/Telegram/Telegram-iOS/en.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/en.lproj/InfoPlist.strings
+index e77338c5..e3f5af8a 100644
+--- a/Telegram/Telegram-iOS/en.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/en.lproj/InfoPlist.strings
+@@ -1,9 +1,9 @@
+ /* Localized versions of Info.plist keys */
+ 
+-"NSContactsUsageDescription" = "Telegram will continuously upload your contacts to its heavily encrypted cloud servers to let you connect with your friends across all your devices.";
+-"NSLocationWhenInUseUsageDescription" = "When you send your location to your friends, Telegram needs access to show them a map.";
+-"NSLocationAlwaysAndWhenInUseUsageDescription" = "When you choose to share your Live Location with friends in a chat, Telegram needs background access to your location to keep them updated for the duration of the live sharing.";
+-"NSLocationAlwaysUsageDescription" = "When you choose to share your live location with friends in a chat, Telegram needs background access to your location to keep them updated for the duration of the live sharing. You also need this to send locations from an Apple Watch.";
++"NSContactsUsageDescription" = "Xraygram will continuously upload your contacts to Telegram's heavily encrypted cloud servers to let you connect with your friends across all your devices.";
++"NSLocationWhenInUseUsageDescription" = "When you send your location to your friends, Xraygram needs access to show them a map.";
++"NSLocationAlwaysAndWhenInUseUsageDescription" = "When you choose to share your Live Location with friends in a chat, Xraygram needs background access to your location to keep them updated for the duration of the live sharing.";
++"NSLocationAlwaysUsageDescription" = "When you choose to share your live location with friends in a chat, Xraygram needs background access to your location to keep them updated for the duration of the live sharing. You also need this to send locations from an Apple Watch.";
+ "NSCameraUsageDescription" = "We need this so that you can take and share photos and videos, as well as make video calls.";
+ "NSPhotoLibraryUsageDescription" = "We need this so that you can share photos and videos from your photo library and save the ones you capture.";
+ "NSPhotoLibraryAddUsageDescription" = "We need this so that you can save photos and videos to your photo library and save the ones you capture.";
 diff --git a/Telegram/Telegram-iOS/en.lproj/Localizable.strings b/Telegram/Telegram-iOS/en.lproj/Localizable.strings
 index 0c6e4e28..eaec8c3a 100644
 --- a/Telegram/Telegram-iOS/en.lproj/Localizable.strings
@@ -115,6 +390,356 @@ index 0c6e4e28..eaec8c3a 100644
  
  "Tour.Title2" = "Fast";
  "Tour.Text2" = "**Telegram** delivers messages\nfaster than any other application.";
+diff --git a/Telegram/Telegram-iOS/es.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/es.lproj/InfoPlist.strings
+index 672fbd1a..b3ab5ba8 100644
+--- a/Telegram/Telegram-iOS/es.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/es.lproj/InfoPlist.strings
+@@ -1,9 +1,9 @@
+ /* Localized versions of Info.plist keys */
+ 
+ "NSContactsUsageDescription" = "Telegram subirá continuamente tus contactos a sus servidores fuertemente cifrados, para permitirte interactuar con tus amigos en todos tus dispositivos.";
+-"NSLocationWhenInUseUsageDescription" = "Cuando envías tu ubicación a tus amigos, Telegram necesita acceso para mostrarles un mapa.";
+-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Cuando eliges compartir tu ubicación en tiempo real con amigos en un chat, Telegram necesita acceso en segundo plano a tu ubicación para mantenerla actualizada mientras la función esté en uso.";
+-"NSLocationAlwaysUsageDescription" = "Cuando envías tu ubicación a tus amigos, Telegram necesita acceso para mostrarles un mapa. También es requerido para enviar ubicaciones desde un Apple Watch.";
++"NSLocationWhenInUseUsageDescription" = "Cuando envías tu ubicación a tus amigos, Xraygram necesita acceso para mostrarles un mapa.";
++"NSLocationAlwaysAndWhenInUseUsageDescription" = "Cuando eliges compartir tu ubicación en tiempo real con amigos en un chat, Xraygram necesita acceso en segundo plano a tu ubicación para mantenerla actualizada mientras la función esté en uso.";
++"NSLocationAlwaysUsageDescription" = "Cuando envías tu ubicación a tus amigos, Xraygram necesita acceso para mostrarles un mapa. También es requerido para enviar ubicaciones desde un Apple Watch.";
+ "NSCameraUsageDescription" = "Necesitamos esto para que puedas tomar y compartir fotos y videos, así como para realizar videollamadas.";
+ "NSPhotoLibraryUsageDescription" = "Es requerido para que puedas compartir fotos y vídeos desde tu biblioteca de fotos.";
+ "NSPhotoLibraryAddUsageDescription" = "Necesitamos esto para que puedas guardar fotos y videos en tu biblioteca de fotos.";
+diff --git a/Telegram/Telegram-iOS/fr.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/fr.lproj/InfoPlist.strings
+index fa15291c..3ea87039 100644
+--- a/Telegram/Telegram-iOS/fr.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/fr.lproj/InfoPlist.strings
+@@ -1,12 +1,12 @@
+ /* Localized versions of Info.plist keys */
+ 
+ "NSContactsUsageDescription" = "Telegram va synchroniser en continu vos contacts sur ses serveurs chiffrés pour vous permettre de joindre vos amis sur tous vos appareils.";
+-"NSLocationWhenInUseUsageDescription" = "Quand vous envoyez votre position à vos amis, Telegram doit accéder à votre position pour leur montrer une carte.";
+-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Quand vous décidez de partager votre position en temps réel dans un échange, Telegram doit y accéder en arrière-plan pour l'actualiser pendant la durée du partage.";
+-"NSLocationAlwaysUsageDescription" = "Quand vous décidez de partager votre position en temps réel dans un échange, Telegram doit y accéder en arrière-plan pour l'actualiser pendant la durée du partage. Cela sert aussi à envoyer une position depuis l'Apple Watch.";
++"NSLocationWhenInUseUsageDescription" = "Quand vous envoyez votre position à vos amis, Xraygram doit accéder à votre position pour leur montrer une carte.";
++"NSLocationAlwaysAndWhenInUseUsageDescription" = "Quand vous décidez de partager votre position en temps réel dans un échange, Xraygram doit y accéder en arrière-plan pour l'actualiser pendant la durée du partage.";
++"NSLocationAlwaysUsageDescription" = "Quand vous décidez de partager votre position en temps réel dans un échange, Xraygram doit y accéder en arrière-plan pour l'actualiser pendant la durée du partage. Cela sert aussi à envoyer une position depuis l'Apple Watch.";
+ "NSCameraUsageDescription" = "Nous en avons besoin pour que vous puissiez prendre et partager des photos et des vidéos.";
+ "NSPhotoLibraryUsageDescription" = "Nous en avons besoin pour que vous puissiez partager des photos et des vidéos de votre photothèque.";
+ "NSPhotoLibraryAddUsageDescription" = "Nous en avons besoin pour que vous puissiez enregistrer des photos et des vidéos dans votre photothèque.";
+ "NSMicrophoneUsageDescription" = "Nous en avons besoin pour que vous puissiez enregistrer et partager des messages vocaux et des vidéos avec du son.";
+ "NSSiriUsageDescription" = "Vous pouvez utiliser Siri pour envoyer des messages.";
+-"NSFaceIDUsageDescription" = "Vous pouvez déverrouiller Telegram avec Face ID.";
++"NSFaceIDUsageDescription" = "Vous pouvez déverrouiller Xraygram avec Face ID.";
+diff --git a/Telegram/Telegram-iOS/id.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/id.lproj/InfoPlist.strings
+index 8291c51d..59fb6799 100644
+--- a/Telegram/Telegram-iOS/id.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/id.lproj/InfoPlist.strings
+@@ -1,9 +1,9 @@
+ /* Localized versions of Info.plist keys */
+ 
+ "NSContactsUsageDescription" = "Telegram akan terus mengunggah kontak Anda ke penyimpanan awan yang dienkripsi penuh, sehingga Anda dapat terhubung dengan teman Anda di semua perangkat Anda.";
+-"NSLocationWhenInUseUsageDescription" = "Ketika Anda mengirim lokasi untuk teman, Telegram membutuhkan akses untuk berbagi peta.";
+-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Jika Anda memilih untuk membagikan Live Location dengan teman dalam obrolan, Telegram memerlukan akses latar belakang ke lokasi Anda agar lokasi tetap diperbarui selama lokasi langsung dibagikan.";
+-"NSLocationAlwaysUsageDescription" = "Jika Anda ingin berbagi Live Location dengan teman dalam chat, Telegram perlu akses latar belakang ke lokasi Anda agar lokasi tetap diperbarui selama lokasi langsung dibagikan. Hal yang sama perlu dilakukan untuk berbagi lokasi dari Apple Watch.";
++"NSLocationWhenInUseUsageDescription" = "Ketika Anda mengirim lokasi untuk teman, Xraygram membutuhkan akses untuk berbagi peta.";
++"NSLocationAlwaysAndWhenInUseUsageDescription" = "Jika Anda memilih untuk membagikan Live Location dengan teman dalam obrolan, Xraygram memerlukan akses latar belakang ke lokasi Anda agar lokasi tetap diperbarui selama lokasi langsung dibagikan.";
++"NSLocationAlwaysUsageDescription" = "Jika Anda ingin berbagi Live Location dengan teman dalam chat, Xraygram perlu akses latar belakang ke lokasi Anda agar lokasi tetap diperbarui selama lokasi langsung dibagikan. Hal yang sama perlu dilakukan untuk berbagi lokasi dari Apple Watch.";
+ "NSCameraUsageDescription" = "Kami membutuhkan hal ini agar Anda dapat mengambil dan membagikan foto dan video.";
+ "NSPhotoLibraryUsageDescription" = "Kami membutuhkan hal ini agar Anda dapat berbagi foto dan video dari galeri foto Anda.";
+ "NSPhotoLibraryAddUsageDescription" = "Kami membutuhkan hal ini agar Anda dapat menyimpan foto dan video ke galeri foto.";
+diff --git a/Telegram/Telegram-iOS/it.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/it.lproj/InfoPlist.strings
+index a9a5ed17..09e48bf6 100644
+--- a/Telegram/Telegram-iOS/it.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/it.lproj/InfoPlist.strings
+@@ -1,9 +1,9 @@
+ /* Localized versions of Info.plist keys */
+ 
+ "NSContactsUsageDescription" = "Telegram caricherà continuamente i tuoi contatti sui suoi server cloud altamente criptati per farti connettere con i tuoi amici da tutti i tuoi dispositivi.";
+-"NSLocationWhenInUseUsageDescription" = "Quando invii la tua posizione ai tuoi amici, Telegram ha bisogno di accedere per mostrare loro la mappa.";
+-"NSLocationAlwaysUsageDescription" = "Quando invii la tua posizione ai tuoi amici, Telegram ha bisogno di accedere per mostrare loro la mappa. Ti serve anche per inviare posizioni da Apple Watch.";
+-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Quando scegli di condividere la tua Posizione Attuale con gli amici in una chat, Telegram ha bisogno dell'accesso in background alla tua posizione per tenerli aggiornati durante la durata della condivisione della posizione.";
++"NSLocationWhenInUseUsageDescription" = "Quando invii la tua posizione ai tuoi amici, Xraygram ha bisogno di accedere per mostrare loro la mappa.";
++"NSLocationAlwaysUsageDescription" = "Quando invii la tua posizione ai tuoi amici, Xraygram ha bisogno di accedere per mostrare loro la mappa. Ti serve anche per inviare posizioni da Apple Watch.";
++"NSLocationAlwaysAndWhenInUseUsageDescription" = "Quando scegli di condividere la tua Posizione Attuale con gli amici in una chat, Xraygram ha bisogno dell'accesso in background alla tua posizione per tenerli aggiornati durante la durata della condivisione della posizione.";
+ "NSCameraUsageDescription" = "Ci serve per farti scattare, registrare e condividere foto e video, oltre che per fare videochiamate.";
+ "NSPhotoLibraryUsageDescription" = "Ci serve per farti condividere foto e video dalla tua libreria foto.";
+ "NSPhotoLibraryAddUsageDescription" = "Ci serve per farti salvare foto e video nella tua libreria foto.";
+diff --git a/Telegram/Telegram-iOS/ko.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/ko.lproj/InfoPlist.strings
+index b692e0af..a6e89290 100644
+--- a/Telegram/Telegram-iOS/ko.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/ko.lproj/InfoPlist.strings
+@@ -1,9 +1,8 @@
+ /* Localized versions of Info.plist keys */
+-"CFBundleDisplayName" = "텔레그램";
+-"NSContactsUsageDescription" = "Telegram will continuously upload your contacts to its heavily encrypted cloud servers to let you connect with your friends across all your devices.";
++"NSContactsUsageDescription" = "Xraygram will continuously upload your contacts to Telegram's heavily encrypted cloud servers to let you connect with your friends across all your devices.";
+ "NSLocationWhenInUseUsageDescription" = "친구에게 회원님의 위치를 전송할 경우 위치를 지도에 표시하기 위해 텔레그램이 위치 정보에 접근할 수 있어야 합니다.";
+ "NSLocationAlwaysUsageDescription" = "친구에게 회원님의 위치를 전송할 경우 위치를 지도에 표시하기 위해 텔레그램이 위치 정보에 접근할 수 있어야 합니다. 애플워치에 위치 전송을 위해서도 필요합니다.";
+-"NSLocationAlwaysAndWhenInUseUsageDescription" = "When you choose to share your Live Location with friends in a chat, Telegram needs background access to your location to keep them updated for the duration of the live sharing.";
++"NSLocationAlwaysAndWhenInUseUsageDescription" = "When you choose to share your Live Location with friends in a chat, Xraygram needs background access to your location to keep them updated for the duration of the live sharing.";
+ "NSCameraUsageDescription" = "사진과 비디오 촬영을 위하여 필요합니다.";
+ "NSPhotoLibraryUsageDescription" = "촬영한 사진과 비디오를 공유하기 위하여 필요합니다.";
+ "NSPhotoLibraryAddUsageDescription" = "사진과 동영상을 갤러리에 저장하기 위해 이 권한이 필요합니다.";
+diff --git a/Telegram/Telegram-iOS/ms.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/ms.lproj/InfoPlist.strings
+index c6d7bf72..8a2c0329 100644
+--- a/Telegram/Telegram-iOS/ms.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/ms.lproj/InfoPlist.strings
+@@ -1,9 +1,9 @@
+ /* Localized versions of Info.plist keys */
+ 
+ "NSContactsUsageDescription" = "Telegram akan sentiasa muat naik kenalan anda ke pelayan awan yang berenkripsi tinggi agar anda boleh berhubung dengan rakan anda di semua peranti anda.";
+-"NSLocationWhenInUseUsageDescription" = "Bila anda hantar lokasi anda kepada rakan anda, Telegram perlukan akses untuk tunjuk peta.";
+-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Bila anda pilih untuk kongsi Lokasi Langsung anda dengan rakan dalam chat, Telegram perlu akses latar belakang ke lokasi anda agar lokasi anda sentiasa dikemaskini ketika perkongsian.";
+-"NSLocationAlwaysUsageDescription" = "Bila anda pilih untuk kongsi lokasi langsung anda dengan rakan dalam chat, Telegram perlu akses latar belakang agar lokasi anda sentiasa dikemaskini. Anda juga harus hantar lokasi anda ke Jam Apple.";
++"NSLocationWhenInUseUsageDescription" = "Bila anda hantar lokasi anda kepada rakan anda, Xraygram perlukan akses untuk tunjuk peta.";
++"NSLocationAlwaysAndWhenInUseUsageDescription" = "Bila anda pilih untuk kongsi Lokasi Langsung anda dengan rakan dalam chat, Xraygram perlu akses latar belakang ke lokasi anda agar lokasi anda sentiasa dikemaskini ketika perkongsian.";
++"NSLocationAlwaysUsageDescription" = "Bila anda pilih untuk kongsi lokasi langsung anda dengan rakan dalam chat, Xraygram perlu akses latar belakang agar lokasi anda sentiasa dikemaskini. Anda juga harus hantar lokasi anda ke Jam Apple.";
+ "NSCameraUsageDescription" = "Kita perlukan ini agar anda boleh ambil dan kongsi foto dan video, dan juga buat panggilan video.";
+ "NSPhotoLibraryUsageDescription" = "Kita perlu ini agar anda boleh kongsi foto dan video dari librari foto anda.";
+ "NSPhotoLibraryAddUsageDescription" = "Kita perlu ini agar anda boleh simpan foto dan video ke librari foto anda.";
+diff --git a/Telegram/Telegram-iOS/nl.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/nl.lproj/InfoPlist.strings
+index 1bddf64f..9d754d9a 100644
+--- a/Telegram/Telegram-iOS/nl.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/nl.lproj/InfoPlist.strings
+@@ -1,9 +1,9 @@
+ /* Localized versions of Info.plist keys */
+ 
+ "NSContactsUsageDescription" = "Telegram synchroniseert je contacten continu naar onze zwaar versleutelde Cloud-servers, zodat je contact kunt opnemen met je vrienden vanaf al je apparaten.";
+-"NSLocationWhenInUseUsageDescription" = "Als je je locatie met vrienden wilt delen heeft Telegram toegang nodig om ze een kaart te kunnen tonen.";
+-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Als je ervoor kiest om je huidige locatie te delen met vrienden in een chat heeft Telegram achtergrondtoegang tot je locatie nodig om deze bij te werken tijdens het live-delen.";
+-"NSLocationAlwaysUsageDescription" = "Telegram heeft toegang nodig om een kaart aan je vrienden te tonen als je jouw locatie met ze deelt. Je hebt dit ook nodig om locaties te sturen vanaf een Apple Watch.";
++"NSLocationWhenInUseUsageDescription" = "Als je je locatie met vrienden wilt delen heeft Xraygram toegang nodig om ze een kaart te kunnen tonen.";
++"NSLocationAlwaysAndWhenInUseUsageDescription" = "Als je ervoor kiest om je huidige locatie te delen met vrienden in een chat heeft Xraygram achtergrondtoegang tot je locatie nodig om deze bij te werken tijdens het live-delen.";
++"NSLocationAlwaysUsageDescription" = "Xraygram heeft toegang nodig om een kaart aan je vrienden te tonen als je jouw locatie met ze deelt. Je hebt dit ook nodig om locaties te sturen vanaf een Apple Watch.";
+ "NSCameraUsageDescription" = "We hebben dit nodig zodat je foto's en video's kunt maken en delen.";
+ "NSPhotoLibraryUsageDescription" = "We hebben dit nodig zodat je foto's en video's kunt delen vanuit je fotobibliotheek.";
+ "NSPhotoLibraryAddUsageDescription" = "We hebben dit nodig zodat je foto's en video's kunt opslaan in je fotobibliotheek.";
+diff --git a/Telegram/Telegram-iOS/pl.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/pl.lproj/InfoPlist.strings
+index e2edd5f9..a1f36f9d 100644
+--- a/Telegram/Telegram-iOS/pl.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/pl.lproj/InfoPlist.strings
+@@ -1,9 +1,9 @@
+ /* Localized versions of Info.plist keys */
+ 
+ "NSContactsUsageDescription" = "Telegram będzie nieprzerwanie przesyłać kontakty do silnie zaszyfrowanych serwerów w chmurze, aby umożliwić ci połączenie się ze znajomymi na wszystkich urządzeniach.";
+-"NSLocationWhenInUseUsageDescription" = "Gdy wysyłasz swoją lokalizację znajomym, Telegram potrzebuje dostępu, aby pokazać im mapę.";
+-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Gdy zdecydujesz się udostępnić swoją „lokalizację na żywo” znajomym podczas czatu, Telegram potrzebuje dostępu w tle do twojej lokalizacji, aby zapewnić jej aktualizację przez cały czas udostępniania „na żywo”.";
+-"NSLocationAlwaysUsageDescription" = "Gdy zdecydujesz się udostępnić swoją „lokalizację na żywo” znajomym podczas czatu, Telegram potrzebuje dostępu w tle do twojej lokalizacji, aby zapewnić jej aktualizację przez cały czas udostępniania „na żywo”. Jest to również potrzebne do wysyłania lokalizacji z Apple Watch.";
++"NSLocationWhenInUseUsageDescription" = "Gdy wysyłasz swoją lokalizację znajomym, Xraygram potrzebuje dostępu, aby pokazać im mapę.";
++"NSLocationAlwaysAndWhenInUseUsageDescription" = "Gdy zdecydujesz się udostępnić swoją „lokalizację na żywo” znajomym podczas czatu, Xraygram potrzebuje dostępu w tle do twojej lokalizacji, aby zapewnić jej aktualizację przez cały czas udostępniania „na żywo”.";
++"NSLocationAlwaysUsageDescription" = "Gdy zdecydujesz się udostępnić swoją „lokalizację na żywo” znajomym podczas czatu, Xraygram potrzebuje dostępu w tle do twojej lokalizacji, aby zapewnić jej aktualizację przez cały czas udostępniania „na żywo”. Jest to również potrzebne do wysyłania lokalizacji z Apple Watch.";
+ "NSCameraUsageDescription" = "Potrzebujemy tego, aby można było robić i udostępniać zdjęcia i wideo, a także prowadzić rozmowy wideo.";
+ "NSPhotoLibraryUsageDescription" = "Potrzebujemy tego, aby można było udostępniać zdjęcia i wideo ze swojej biblioteki zdjęć.";
+ "NSPhotoLibraryAddUsageDescription" = "Potrzebujemy tego, aby można było zapisywać zdjęcia i wideo w swojej bibliotece zdjęć.";
+diff --git a/Telegram/Telegram-iOS/pt.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/pt.lproj/InfoPlist.strings
+index ddc65bbd..adda89e4 100644
+--- a/Telegram/Telegram-iOS/pt.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/pt.lproj/InfoPlist.strings
+@@ -1,9 +1,9 @@
+ /* Localized versions of Info.plist keys */
+ 
+ "NSContactsUsageDescription" = "Telegram atualizará continuamente os seus contatos em servidores na nuvem fortemente criptografados para que você se conecte com seus amigos através de todos os seus dispositivos.";
+-"NSLocationWhenInUseUsageDescription" = "Para enviar sua localização para seus amigos o Telegram precisa de permissão para mostrá-los o mapa.";
+-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Quando você escolhe compartilhar sua Localização em Tempo Real com amigos no chat, o Telegram precisa de acesso à sua localização em segundo plano para mantê-los atualizados durante o compartilhamento.";
+-"NSLocationAlwaysUsageDescription" = "Para enviar sua localização para seus amigos, o Telegram precisa de permissão para mostrá-los o mapa. Você também precisará disso para enviar localizações de um Apple Watch.";
++"NSLocationWhenInUseUsageDescription" = "Para enviar sua localização para seus amigos o Xraygram precisa de permissão para mostrá-los o mapa.";
++"NSLocationAlwaysAndWhenInUseUsageDescription" = "Quando você escolhe compartilhar sua Localização em Tempo Real com amigos no chat, o Xraygram precisa de acesso à sua localização em segundo plano para mantê-los atualizados durante o compartilhamento.";
++"NSLocationAlwaysUsageDescription" = "Para enviar sua localização para seus amigos, o Xraygram precisa de permissão para mostrá-los o mapa. Você também precisará disso para enviar localizações de um Apple Watch.";
+ "NSCameraUsageDescription" = "Precisamos acessar sua câmera para que você possa capturar fotos e vídeos.";
+ "NSPhotoLibraryUsageDescription" = "Precisamos disso para que você possa compartilhar fotos e vídeos de sua galeria.";
+ "NSPhotoLibraryAddUsageDescription" = "Precisamos disso para que você possa salvar fotos e vídeos em sua galeria de fotos.";
+diff --git a/Telegram/Telegram-iOS/ru.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/ru.lproj/InfoPlist.strings
+index 08c349a3..1ba8a3bf 100644
+--- a/Telegram/Telegram-iOS/ru.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/ru.lproj/InfoPlist.strings
+@@ -1,7 +1,7 @@
+ /* Localized versions of Info.plist keys */
+ 
+ "NSContactsUsageDescription" = "Актуальная информация о ваших контактах будет храниться зашифрованной в облаке Telegram, чтобы вы могли связаться с друзьями с любого устройства.";
+-"NSLocationWhenInUseUsageDescription" = "Когда вы отправляете друзьям геопозицию, Telegram нужно разрешение, чтобы показать им карту.";
++"NSLocationWhenInUseUsageDescription" = "Когда вы отправляете друзьям геопозицию, Xraygram нужно разрешение, чтобы показать им карту.";
+ "NSLocationAlwaysAndWhenInUseUsageDescription" = "Фоновый доступ к геопозиции требуется, чтобы обновлять вашу геопозицию, когда вы транслируете её в чат с друзьями.";
+ "NSLocationAlwaysUsageDescription" = "Фоновый доступ к геопозиции требуется, чтобы обновлять вашу геопозицию, когда вы транслируете её в чат с друзьями. Он также необходим для отправки геопозиции с Apple Watch.";
+ "NSCameraUsageDescription" = "Это необходимо, чтобы вы могли делиться снятыми фотографиями и видео.";
+diff --git a/Telegram/Telegram-iOS/tr.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/tr.lproj/InfoPlist.strings
+index 283b1f2a..f9a448b9 100644
+--- a/Telegram/Telegram-iOS/tr.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/tr.lproj/InfoPlist.strings
+@@ -1,9 +1,9 @@
+ /* Localized versions of Info.plist keys */
+ 
+ "NSContactsUsageDescription" = "Telegram, arkadaşlarınızla tüm cihazlarınız arasında bağlantı kurmanızı sağlamak için kişilerinizi sürekli olarak şifreli bulut sunucularına yükleyecek.";
+-"NSLocationWhenInUseUsageDescription" = "Konumunuzu arkadaşlarınıza gönderdiğinizde, Telegram'ın onlara bir harita göstermesi için erişmesi gerekiyor.";
+-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Canlı Konumunuzu arkadaşlarınızla bir sohbette paylaşmayı seçtiğinizde, Telegram'ın canlı paylaşım süresince onları güncel tutmak için konumunuza arka plan erişimi olması gerekir.";
+-"NSLocationAlwaysUsageDescription" = "Canlı konumunuzu bir sohbette arkadaşlarınızla paylaşmayı seçtiğinizde, Telegram'ın canlı paylaşım süresince konumunuzu güncel tutması için bir arka plan erişimi gerekir. Ayrıca Apple Watch'dan konum göndermek için de buna ihtiyacınız var.";
++"NSLocationWhenInUseUsageDescription" = "Konumunuzu arkadaşlarınıza gönderdiğinizde, Xraygram'ın onlara bir harita göstermesi için erişmesi gerekiyor.";
++"NSLocationAlwaysAndWhenInUseUsageDescription" = "Canlı Konumunuzu arkadaşlarınızla bir sohbette paylaşmayı seçtiğinizde, Xraygram'ın canlı paylaşım süresince onları güncel tutmak için konumunuza arka plan erişimi olması gerekir.";
++"NSLocationAlwaysUsageDescription" = "Canlı konumunuzu bir sohbette arkadaşlarınızla paylaşmayı seçtiğinizde, Xraygram'ın canlı paylaşım süresince konumunuzu güncel tutması için bir arka plan erişimi gerekir. Ayrıca Apple Watch'dan konum göndermek için de buna ihtiyacınız var.";
+ "NSCameraUsageDescription" = "Fotoğraf ve video çekip paylaşabilmeniz ve görüntülü arama yapabilmeniz için buna ihtiyacımız var.";
+ "NSPhotoLibraryUsageDescription" = "Fotoğraf arşivinizdeki fotoğraf ve videoları paylaşabilmeniz için buna ihtiyacımız var.";
+ "NSPhotoLibraryAddUsageDescription" = "Fotoğraf arşivine fotoğraf ve video kaydedebilmeniz için buna ihtiyacımız var.";
+diff --git a/Telegram/Telegram-iOS/uk.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/uk.lproj/InfoPlist.strings
+index f9e8f941..d2f97552 100644
+--- a/Telegram/Telegram-iOS/uk.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/uk.lproj/InfoPlist.strings
+@@ -1,9 +1,9 @@
+ /* Localized versions of Info.plist keys */
+ 
+ "NSContactsUsageDescription" = "Telegram завантажуватиме ваші контакти до зашифрованих хмарних серверів,  щоб ви могли зʼєднуватися з друзями на всіх пристроях.";
+-"NSLocationWhenInUseUsageDescription" = "Коли ви надсилаєте розташування друзям, Telegram потребує доступу, щоб показати їм мапу.";
+-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Коли ви захочете поділитися Маячком із друзями у чаті, Telegram потребує фонового доступу до розташування, щоб воно оновлювалося на час трансляції маячка.";
+-"NSLocationAlwaysUsageDescription" = "Коли ви захочете поділитися Маячком із друзями у чаті, Telegram потребує фонового доступу до розташування, щоб воно оновлювалося на час трансляції маячка. Також вам це потрібно для надсилання розташувань з Apple Watch.";
++"NSLocationWhenInUseUsageDescription" = "Коли ви надсилаєте розташування друзям, Xraygram потребує доступу, щоб показати їм мапу.";
++"NSLocationAlwaysAndWhenInUseUsageDescription" = "Коли ви захочете поділитися Маячком із друзями у чаті, Xraygram потребує фонового доступу до розташування, щоб воно оновлювалося на час трансляції маячка.";
++"NSLocationAlwaysUsageDescription" = "Коли ви захочете поділитися Маячком із друзями у чаті, Xraygram потребує фонового доступу до розташування, щоб воно оновлювалося на час трансляції маячка. Також вам це потрібно для надсилання розташувань з Apple Watch.";
+ "NSCameraUsageDescription" = "Нам це потрібно, щоб ви могли знімати та ділитися фото й відео.";
+ "NSPhotoLibraryUsageDescription" = "Нам це потрібно, щоб ви могли ділитися фото та відео з вашої бібліотеки фото.";
+ "NSPhotoLibraryAddUsageDescription" = "Нам це потрібно, щоб ви могли зберігати фото та відео до вашої бібліотеки фото.";
+diff --git a/Telegram/Telegram-iOS/uz.lproj/InfoPlist.strings b/Telegram/Telegram-iOS/uz.lproj/InfoPlist.strings
+index ec5ffb65..fd7b4b13 100644
+--- a/Telegram/Telegram-iOS/uz.lproj/InfoPlist.strings
++++ b/Telegram/Telegram-iOS/uz.lproj/InfoPlist.strings
+@@ -1,9 +1,9 @@
+ /* Localized versions of Info.plist keys */
+ 
+ "NSContactsUsageDescription" = "Telegram barcha qurilmalaringizdan doʻstlaringiz bilan bogʻlana olishingiz uchun muntazam ravishda kontaktlaringizni kuchli shifrlanadigan bulut serverlariga yuklaydi.";
+-"NSLocationWhenInUseUsageDescription" = "Joylashuvingizni doʻstlaringizga yuborganingizda Telegram ularga xaritani koʻrsatishi uchun ruxsat kerak boʻladi.";
+-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Chatda doʻstlarga Jonli joylashuvingizni ulashishni tanlaganingizda, Telegram joylashuvingizni jonli ulashish davomida yangilab turishi uchun undan fonda foydalanishi kerak.";
+-"NSLocationAlwaysUsageDescription" = "Chatda doʻstlarga Jonli joylashuvingizni ulashishni tanlaganingizda, Telegram joylashuvingizni jonli ulashish davomida yangilab turishi uchun undan fonda foydalanishi kerak. Sizga bu Apple Watchdan joylashuvlarni yuborish uchun ham kerak.";
++"NSLocationWhenInUseUsageDescription" = "Joylashuvingizni doʻstlaringizga yuborganingizda Xraygram ularga xaritani koʻrsatishi uchun ruxsat kerak boʻladi.";
++"NSLocationAlwaysAndWhenInUseUsageDescription" = "Chatda doʻstlarga Jonli joylashuvingizni ulashishni tanlaganingizda, Xraygram joylashuvingizni jonli ulashish davomida yangilab turishi uchun undan fonda foydalanishi kerak.";
++"NSLocationAlwaysUsageDescription" = "Chatda doʻstlarga Jonli joylashuvingizni ulashishni tanlaganingizda, Xraygram joylashuvingizni jonli ulashish davomida yangilab turishi uchun undan fonda foydalanishi kerak. Sizga bu Apple Watchdan joylashuvlarni yuborish uchun ham kerak.";
+ "NSCameraUsageDescription" = "Bu bizga rasm va videolarga olish, shuningdek, video chaqiruvlar qilish va ularni ulashishingiz uchun kerak.";
+ "NSPhotoLibraryUsageDescription" = "Bu bizga galereyangizdan rasm va videolaringizni ulasha olishingiz uchun kerak.";
+ "NSPhotoLibraryAddUsageDescription" = "Bu bizga rasm va videolaringizni galereyangizga saqlay olishingiz uchun kerak.";
+diff --git a/build-system/GenerateStrings/GenerateStrings.py b/build-system/GenerateStrings/GenerateStrings.py
+index e10ff2b8..93b2f4c3 100644
+--- a/build-system/GenerateStrings/GenerateStrings.py
++++ b/build-system/GenerateStrings/GenerateStrings.py
+@@ -220,6 +220,70 @@ def sanitize_entry_identifer(string: str) -> str:
+     return string.replace('.', '_')
+ 
+ 
++# Xraygram (FEAT-19, PAR-20): подмена «Telegram» → «Xraygram» по списку ключей (--rebrandKeys). Применяется к
++# словарю каждого _PresentationStringsComponent (бандл, облачные пакеты) и к запасному en-словарю в getSingle.
++XRAYGRAM_REBRAND_KEYS = []
++
++
++def xraygram_rebrand_objc() -> str:
++    keys = ',\n        '.join('@"{}"'.format(k.replace('\\', '\\\\').replace('"', '\\"')) for k in XRAYGRAM_REBRAND_KEYS)
++    return r"""
++static NSArray<NSString *> * _Nonnull xgRebrandKeys(void) {
++    static NSArray<NSString *> *keys = nil;
++    static dispatch_once_t onceToken;
++    dispatch_once(&onceToken, ^{
++        keys = @[
++        """ + keys + r"""
++        ];
++    });
++    return keys;
++}
++
++static NSString * _Nonnull xgRebrandValue(NSString * _Nonnull value) {
++    static NSRegularExpression *upper = nil;
++    static NSRegularExpression *regular = nil;
++    static dispatch_once_t onceToken;
++    dispatch_once(&onceToken, ^{
++        NSString *protectedTail = @"(?!\\s+(Premium|PREMIUM|Stars|STARS|Business|Passport|Gateway|Ads|Wallet|account|servers|cloud|API|users|FAQ|Support|Features|Desktop|Web))";
++        upper = [NSRegularExpression regularExpressionWithPattern:[@"\\bTELEGRAM\\b" stringByAppendingString:protectedTail] options:0 error:nil];
++        regular = [NSRegularExpression regularExpressionWithPattern:[@"(?<![Oo]n )(?<!аккаунт )(?<!аккаунте )(?<!серверах )(?<!серверы )(?<!облаке )(\\bTelegram\\b|Телеграмм?[а-яё]*)" stringByAppendingString:protectedTail] options:0 error:nil];
++    });
++    if ([value rangeOfString:@"elegram" options:NSCaseInsensitiveSearch].location == NSNotFound && [value rangeOfString:@"Телеграм"].location == NSNotFound) {
++        return value;
++    }
++    NSString *result = [upper stringByReplacingMatchesInString:value options:0 range:NSMakeRange(0, value.length) withTemplate:@"XRAYGRAM"];
++    result = [regular stringByReplacingMatchesInString:result options:0 range:NSMakeRange(0, result.length) withTemplate:@"Xraygram"];
++    return result;
++}
++
++static NSDictionary<NSString *, NSString *> * _Nonnull xgRebrandDict(NSDictionary<NSString *, NSString *> * _Nonnull dict) {
++    static NSArray<NSString *> *suffixes = nil;
++    static dispatch_once_t onceToken;
++    dispatch_once(&onceToken, ^{
++        suffixes = @[@"", @"_0", @"_1", @"_2", @"_3_10", @"_many", @"_any"];
++    });
++    NSMutableDictionary<NSString *, NSString *> *result = nil;
++    for (NSString *baseKey in xgRebrandKeys()) {
++        for (NSString *suffix in suffixes) {
++            NSString *key = suffix.length == 0 ? baseKey : [baseKey stringByAppendingString:suffix];
++            NSString *value = dict[key];
++            if (value == nil) {
++                continue;
++            }
++            NSString *updated = xgRebrandValue(value);
++            if (![updated isEqualToString:value]) {
++                if (result == nil) {
++                    result = [dict mutableCopy];
++                }
++                result[key] = updated;
++            }
++        }
++    }
++    return result != nil ? result : dict;
++}
++"""
++
++
+ def generate(header_path: str, implementation_path: str, data_path: str, entries: [Entry]):
+     print('Generating strings into:\n{}\n{}'.format(header_path, implementation_path))
+     with open(header_path, 'wb') as header_file, open(implementation_path, 'wb') as source_file,\
+@@ -309,7 +373,7 @@ static _FormattedString * _Nonnull getFormatted{num_arguments}(_PresentationStri
+ #import <PresentationStrings/PresentationStrings.h>
+ #import <NumberPluralizationForm/NumberPluralizationForm.h>
+ #import <AppBundle/AppBundle.h>
+-
++''' + xraygram_rebrand_objc() + '''
+ @implementation _FormattedStringRange
+ 
+ - (instancetype _Nonnull)initWithIndex:(NSInteger)index range:(NSRange)range {
+@@ -349,7 +413,7 @@ static _FormattedString * _Nonnull getFormatted{num_arguments}(_PresentationStri
+         _languageCode = languageCode;
+         _localizedName = localizedName;
+         _pluralizationRulesCode = pluralizationRulesCode;
+-        _dict = dict;
++        _dict = xgRebrandDict(dict);
+     }
+     return self;
+ }
+@@ -471,6 +535,9 @@ static NSString * _Nonnull getSingle(_PresentationStrings * _Nullable strings, N
+                 return;
+             }
+             fallbackDict = [NSDictionary dictionaryWithContentsOfURL:[NSURL fileURLWithPath:stringsPath]];
++            if (fallbackDict) {
++                fallbackDict = xgRebrandDict(fallbackDict);
++            }
+         });
+         result = fallbackDict[key]; 
+     }
+@@ -699,6 +766,12 @@ if __name__ == '__main__':
+         help='Path to PresentationStrings.data',
+         metavar='path'
+     )
++    parser.add_argument(
++        '--rebrandKeys',
++        required=False,
++        help='Xraygram: file with PresentationStrings keys to rebrand (one per line, # comments)',
++        metavar='path'
++    )
+ 
+     if len(sys.argv) < 2:
+         parser.print_help()
+@@ -706,6 +779,13 @@ if __name__ == '__main__':
+ 
+     args = parser.parse_args()
+ 
++    if args.rebrandKeys:
++        with open(args.rebrandKeys, 'r', encoding='utf-8') as keys_file:
++            for line in keys_file:
++                line = line.strip()
++                if line and not line.startswith('#'):
++                    XRAYGRAM_REBRAND_KEYS.append(line)
++
+     parsed_strings = parse_strings(args.source)
+     all_entries = parse_entries(parsed_strings)
+     generate(header_path=args.outHeader, implementation_path=args.outImplementation, data_path=args.outData,
 diff --git a/build-system/Make/BuildConfiguration.py b/build-system/Make/BuildConfiguration.py
 index d7354475..0fe121ac 100644
 --- a/build-system/Make/BuildConfiguration.py
@@ -206,6 +831,39 @@ index 4757af3b..fd403ecd 100644
          "//submodules/Display:Display",
          "//submodules/SSignalKit/SSignalKit",
          "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
+diff --git a/submodules/AuthorizationUI/Sources/AuthorizationSequenceController.swift b/submodules/AuthorizationUI/Sources/AuthorizationSequenceController.swift
+index d3c142b2..4aa4cc98 100644
+--- a/submodules/AuthorizationUI/Sources/AuthorizationSequenceController.swift
++++ b/submodules/AuthorizationUI/Sources/AuthorizationSequenceController.swift
+@@ -1242,6 +1242,19 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
+         return controller
+     }
+     
++    /// Xraygram (FEAT-19 §2): во вступлении выбран язык, пакет строк Telegram пришёл после подключения через XRAY —
++    /// подставить строки и пересоздать открытый ввод номера (остальные экраны входа создаются уже с ними).
++    public func xraygramUpdateStrings(_ strings: PresentationStrings) {
++        self.presentationData = self.presentationData.withStrings(strings)
++        guard let last = self.viewControllers.last, last is AuthorizationSequencePhoneEntryController else {
++            return
++        }
++        var controllers = self.viewControllers.compactMap { $0 as? ViewController }.filter { !($0 is AuthorizationSequencePhoneEntryController) }
++        self.setViewControllers(controllers, animated: false)
++        controllers.append(self.phoneEntryController(countryCode: AuthorizationSequenceCountrySelectionController.defaultCountryCode(), number: "", splashController: nil))
++        self.setViewControllers(controllers, animated: false)
++    }
++    
+     private func updateState(state: InnerState) {
+         switch state {
+         case .authorized:
+@@ -1466,7 +1479,7 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
+         let appVersion = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "unknown"
+         let systemVersion = UIDevice.current.systemVersion
+         let locale = Locale.current.identifier
+-        emailBody.append("Telegram: \(appVersion)\n")
++        emailBody.append("Xraygram: \(appVersion)\n") // Xraygram (FEAT-19): версия этого приложения
+         emailBody.append("OS: \(systemVersion)\n")
+         emailBody.append("Locale: \(locale)\n")
+         emailBody.append("MNC: \(mnc)")
 diff --git a/submodules/AuthorizationUI/Sources/AuthorizationSequencePhoneEntryController.swift b/submodules/AuthorizationUI/Sources/AuthorizationSequencePhoneEntryController.swift
 index 9f9d8866..515314cc 100644
 --- a/submodules/AuthorizationUI/Sources/AuthorizationSequencePhoneEntryController.swift
@@ -250,6 +908,588 @@ index 9f9d8866..515314cc 100644
          }
      }
      
+diff --git a/submodules/AuthorizationUI/Sources/AuthorizationSequenceSplashController.swift b/submodules/AuthorizationUI/Sources/AuthorizationSequenceSplashController.swift
+index c4332216..7ab524a4 100644
+--- a/submodules/AuthorizationUI/Sources/AuthorizationSequenceSplashController.swift
++++ b/submodules/AuthorizationUI/Sources/AuthorizationSequenceSplashController.swift
+@@ -3,279 +3,333 @@ import UIKit
+ import Display
+ import AsyncDisplayKit
+ import TelegramCore
+-import SSignalKit
+ import SwiftSignalKit
+ import TelegramPresentationData
+-import LegacyComponents
+-import SolidRoundedButtonNode
+-import RMIntro
+ import AuthorizationUtils
++import XraygramKit
++
++// Xraygram (FEAT-19 §2, PAR-18): своё вступление одним экраном вместо слайдов upstream (RMIntro с самолётиком).
++// Иконка, по ней один раз проходит рентгеновский луч (1,2 с, без него при «Уменьшить движение»), `XRAYGRAM`
++// моноширинным, подпись, «Начать», «Русский · English». Цвета — палитра «Рентген» (branding/theme-rentgen.md).
++// «Начать» сети не требует: язык Xraygram-экранов меняется сразу, пакет строк Telegram для русского скачивается
++// после подключения через XRAY (XraygramIntro.pendingLanguage, AppDelegate). Экран XRAY ждёт, пока вступление
++// на экране (AppDelegate.updateXraygramGate).
++
++private enum Rentgen {
++    static let bg = UIColor(rgb: 0x0B1220)
++    static let text = UIColor(rgb: 0xE6F1FF)
++    static let text2 = UIColor(rgb: 0x8EA3BF)
++    static let text3 = UIColor(rgb: 0x5F7391)
++    static let accent = UIColor(rgb: 0x3EF2C8)
++    static let accentHi = UIColor(rgb: 0x8FFBE0)
++    static let onAccent = UIColor(rgb: 0x04211B)
++}
++
++private final class XraygramIntroView: UIView {
++    let iconView = UIImageView()
++    private let beamContainer = CALayer()
++    private let beamMask = CAShapeLayer()
++    private let beamLayer = CAGradientLayer()
++    private let beamLine = CALayer()
++    let titleLabel = UILabel()
++    let subtitleLabel = UILabel()
++    let startButton = UIButton(type: .custom)
++    private let ruButton = UIButton(type: .custom)
++    private let enButton = UIButton(type: .custom)
++    private let dotLabel = UILabel()
++    private var didPlayBeam = false
++
++    var language: String = XraygramIntro.defaultLanguage {
++        didSet {
++            self.updateTexts()
++        }
++    }
++    var startPressed: (() -> Void)?
++
++    override init(frame: CGRect) {
++        super.init(frame: frame)
++        self.backgroundColor = Rentgen.bg
++
++        self.iconView.image = UIImage(named: "XraygramLaunchIcon")
++        self.iconView.contentMode = .scaleAspectFit
++        self.iconView.isAccessibilityElement = false
++        self.addSubview(self.iconView)
++
++        // Луч: полоса accent 55 % с размытыми краями + тонкая линия accent-hi, внутри скруглённой иконки.
++        self.beamLayer.colors = [
++            Rentgen.accent.withAlphaComponent(0.0).cgColor,
++            Rentgen.accent.withAlphaComponent(0.55).cgColor,
++            Rentgen.accent.withAlphaComponent(0.55).cgColor,
++            Rentgen.accent.withAlphaComponent(0.0).cgColor
++        ]
++        self.beamLayer.locations = [0.0, 0.42, 0.58, 1.0]
++        self.beamLine.backgroundColor = Rentgen.accentHi.cgColor
++        self.beamLayer.addSublayer(self.beamLine)
++        self.beamContainer.addSublayer(self.beamLayer)
++        self.beamContainer.mask = self.beamMask
++        self.beamContainer.isHidden = true
++        self.layer.addSublayer(self.beamContainer)
++
++        self.titleLabel.attributedText = NSAttributedString(string: "XRAYGRAM", attributes: [
++            .font: UIFont.monospacedSystemFont(ofSize: 28.0, weight: .semibold),
++            .foregroundColor: Rentgen.text,
++            .kern: 6.0
++        ])
++        self.titleLabel.textAlignment = .center
++        self.titleLabel.accessibilityLabel = "Xraygram"
++        self.addSubview(self.titleLabel)
++
++        self.subtitleLabel.font = UIFont.systemFont(ofSize: 16.0)
++        self.subtitleLabel.textColor = Rentgen.text2
++        self.subtitleLabel.textAlignment = .center
++        self.subtitleLabel.numberOfLines = 0
++        self.addSubview(self.subtitleLabel)
++
++        self.startButton.backgroundColor = Rentgen.accent
++        self.startButton.setTitleColor(Rentgen.onAccent, for: .normal)
++        self.startButton.setTitleColor(Rentgen.onAccent.withAlphaComponent(0.6), for: .highlighted)
++        self.startButton.titleLabel?.font = UIFont.systemFont(ofSize: 17.0, weight: .semibold)
++        self.startButton.layer.cornerRadius = 25.0
++        self.startButton.layer.cornerCurve = .continuous
++        self.startButton.accessibilityIdentifier = "Auth.Welcome.StartButton"
++        self.startButton.addTarget(self, action: #selector(self.startTapped), for: .touchUpInside)
++        self.addSubview(self.startButton)
++
++        for (button, title, code) in [(self.ruButton, "Русский", "ru"), (self.enButton, "English", "en")] {
++            button.setTitle(title, for: .normal)
++            button.titleLabel?.font = UIFont.systemFont(ofSize: 15.0, weight: .medium)
++            button.accessibilityIdentifier = "Auth.Welcome.Language.\(code)"
++            button.addTarget(self, action: #selector(self.languageTapped(_:)), for: .touchUpInside)
++            self.addSubview(button)
++        }
++        self.dotLabel.text = "·"
++        self.dotLabel.font = UIFont.systemFont(ofSize: 15.0, weight: .medium)
++        self.dotLabel.textColor = Rentgen.text3
++        self.addSubview(self.dotLabel)
++
++        self.updateTexts()
++    }
++
++    required init?(coder: NSCoder) {
++        fatalError("init(coder:) has not been implemented")
++    }
++
++    private func updateTexts() {
++        let strings = XrayStrings(english: self.language != "ru")
++        self.subtitleLabel.text = strings.introSubtitle
++        self.startButton.setTitle(strings.introStart, for: .normal)
++        self.ruButton.setTitleColor(self.language == "ru" ? Rentgen.accent : Rentgen.text3, for: .normal)
++        self.enButton.setTitleColor(self.language == "ru" ? Rentgen.text3 : Rentgen.accent, for: .normal)
++        self.ruButton.isSelected = self.language == "ru"
++        self.enButton.isSelected = self.language != "ru"
++        self.setNeedsLayout()
++    }
++
++    @objc private func startTapped() {
++        self.startPressed?()
++    }
++
++    @objc private func languageTapped(_ sender: UIButton) {
++        let code = sender === self.ruButton ? "ru" : "en"
++        if code != self.language {
++            self.language = code
++            XraygramIntro.chosenLanguage = code
++        }
++    }
++
++    override func layoutSubviews() {
++        super.layoutSubviews()
++        let size = self.bounds.size
++        let sideInset: CGFloat = 32.0
++        let bottomInset = max(self.safeAreaInsets.bottom, 16.0)
++
++        let langHeight: CGFloat = 44.0
++        let langY = size.height - bottomInset - langHeight
++        let ruSize = self.ruButton.sizeThatFits(CGSize(width: 200.0, height: langHeight))
++        let enSize = self.enButton.sizeThatFits(CGSize(width: 200.0, height: langHeight))
++        let dotSize = self.dotLabel.sizeThatFits(CGSize(width: 40.0, height: langHeight))
++        let gap: CGFloat = 10.0
++        let totalLang = ruSize.width + gap + dotSize.width + gap + enSize.width
++        var x = floor((size.width - totalLang) / 2.0)
++        self.ruButton.frame = CGRect(x: x, y: langY, width: ruSize.width, height: langHeight)
++        x += ruSize.width + gap
++        self.dotLabel.frame = CGRect(x: x, y: langY, width: dotSize.width, height: langHeight)
++        x += dotSize.width + gap
++        self.enButton.frame = CGRect(x: x, y: langY, width: enSize.width, height: langHeight)
++
++        let buttonWidth = min(size.width - sideInset * 2.0, 360.0)
++        self.startButton.frame = CGRect(x: floor((size.width - buttonWidth) / 2.0), y: langY - 8.0 - 50.0, width: buttonWidth, height: 50.0)
++
++        // Холст иконки 240 pt (сама иконка 176 pt по центру, скругление 40 — в картинке).
++        let canvas: CGFloat = 240.0
++        let textWidth = min(size.width - sideInset * 2.0, 360.0)
++        let subtitleSize = self.subtitleLabel.sizeThatFits(CGSize(width: textWidth, height: 200.0))
++        let titleSize = self.titleLabel.sizeThatFits(CGSize(width: size.width, height: 60.0))
++        let blockHeight = canvas - 32.0 + 8.0 + titleSize.height + 12.0 + subtitleSize.height
++        let available = self.startButton.frame.minY - self.safeAreaInsets.top
++        let blockY = self.safeAreaInsets.top + max(0.0, floor((available - blockHeight) / 2.0)) - 16.0
++        let iconFrame = CGRect(x: floor((size.width - canvas) / 2.0), y: blockY, width: canvas, height: canvas)
++        self.iconView.frame = iconFrame
++        let titleY = iconFrame.maxY - 32.0 + 8.0
++        self.titleLabel.frame = CGRect(x: 0.0, y: titleY, width: size.width, height: titleSize.height)
++        self.subtitleLabel.frame = CGRect(x: floor((size.width - textWidth) / 2.0), y: self.titleLabel.frame.maxY + 12.0, width: textWidth, height: subtitleSize.height)
++
++        let iconSide: CGFloat = 176.0
++        let iconRect = CGRect(x: iconFrame.midX - iconSide / 2.0, y: iconFrame.midY - iconSide / 2.0, width: iconSide, height: iconSide)
++        CATransaction.begin()
++        CATransaction.setDisableActions(true)
++        self.beamContainer.frame = iconRect
++        self.beamMask.path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: iconRect.size), cornerRadius: 40.0).cgPath
++        self.beamLayer.frame = CGRect(x: 0.0, y: -48.0, width: iconSide, height: 48.0)
++        self.beamLine.frame = CGRect(x: 0.0, y: 23.5, width: iconSide, height: 1.0)
++        CATransaction.commit()
++    }
++
++    // Продолжение заставки: иконка из центра экрана (где она была на LaunchScreen) едет на место, текст проявляется.
++    func animateIn() {
++        self.layoutIfNeeded()
++        let target = self.iconView.center
++        let start = CGPoint(x: self.bounds.midX, y: self.bounds.midY)
++        self.iconView.layer.animatePosition(from: start, to: target, duration: 0.5, timingFunction: kCAMediaTimingFunctionSpring)
++        self.beamContainer.animatePosition(from: CGPoint(x: start.x, y: start.y), to: self.beamContainer.position, duration: 0.5, timingFunction: kCAMediaTimingFunctionSpring)
++        for view in [self.titleLabel, self.subtitleLabel, self.startButton, self.ruButton, self.enButton, self.dotLabel] as [UIView] {
++            view.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.4)
++        }
++    }
++
++    func playBeamIfNeeded() {
++        if self.didPlayBeam || UIAccessibility.isReduceMotionEnabled || self.bounds.isEmpty {
++            return
++        }
++        self.didPlayBeam = true
++        self.layoutIfNeeded()
++        let height = self.beamContainer.bounds.height
++        let beamHeight = self.beamLayer.bounds.height
++        self.beamContainer.isHidden = false
++        let animation = CABasicAnimation(keyPath: "position.y")
++        animation.fromValue = -beamHeight / 2.0
++        animation.toValue = height + beamHeight / 2.0
++        animation.duration = 1.2
++        animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
++        animation.fillMode = .forwards
++        animation.isRemovedOnCompletion = false
++        CATransaction.begin()
++        CATransaction.setCompletionBlock { [weak self] in
++            self?.beamContainer.isHidden = true
++        }
++        self.beamLayer.add(animation, forKey: "beam")
++        CATransaction.commit()
++    }
++}
+ 
+ public final class AuthorizationSequenceSplashController: ViewController {
+     private var controllerNode: AuthorizationSequenceSplashControllerNode {
+         return self.displayNode as! AuthorizationSequenceSplashControllerNode
+     }
+-    
++
+     private let accountManager: AccountManager<TelegramAccountManagerTypes>
+     private let account: UnauthorizedAccount
+     private let theme: PresentationTheme
+-    
+-    private let controller: RMIntroViewController
+-    
++
++    private let introView: XraygramIntroView
++
+     private var validLayout: ContainerViewLayout?
+-    
++
+     var nextPressed: ((PresentationStrings?) -> Void)?
+-    
+-    private let suggestedLocalization = Promise<SuggestedLocalizationInfo?>()
+-    private let activateLocalizationDisposable = MetaDisposable()
+-    
+-    private let startButton: SolidRoundedButtonNode
+-    
++
+     init(accountManager: AccountManager<TelegramAccountManagerTypes>, account: UnauthorizedAccount, theme: PresentationTheme) {
+         self.accountManager = accountManager
+         self.account = account
+         self.theme = theme
+-        
+-        self.suggestedLocalization.set(.single(nil)
+-        |> then(TelegramEngineUnauthorized(account: self.account).localization.currentlySuggestedLocalization(extractKeys: ["Login.ContinueWithLocalization"])))
+-        let suggestedLocalization = self.suggestedLocalization
+-        
+-        let localizationSignal = SSignal(generator: { subscriber in
+-            let disposable = suggestedLocalization.get().start(next: { localization in
+-                guard let localization = localization else {
+-                    return
+-                }
+-                
+-                var continueWithLanguageString: String = "Continue"
+-                for entry in localization.extractedEntries {
+-                    switch entry {
+-                        case let .string(key, value):
+-                            if key == "Login.ContinueWithLocalization" {
+-                                continueWithLanguageString = value
+-                            }
+-                        default:
+-                            break
+-                    }
+-                }
+-                
+-                if let available = localization.availableLocalizations.first, available.languageCode != "en" {
+-                    let value = TGSuggestedLocalization(info: TGAvailableLocalization(title: available.title, localizedTitle: available.localizedTitle, code: available.languageCode), continueWithLanguageString: continueWithLanguageString, chooseLanguageString: "Choose Language", chooseLanguageOtherString: "Choose Language", englishLanguageNameString: "English")
+-                    subscriber.putNext(value)
+-                }
+-            }, completed: {
+-                subscriber.putCompletion()
+-            })
+-            
+-            return SBlockDisposable(block: {
+-                disposable.dispose()
+-            })
+-        })
+-        
+-        self.controller = RMIntroViewController(backgroundColor: theme.list.plainBackgroundColor, primaryColor: theme.list.itemPrimaryTextColor, buttonColor: theme.intro.startButtonColor, accentColor: theme.list.itemAccentColor, regularDotColor: theme.intro.dotColor, highlightedDotColor: theme.list.itemAccentColor, suggestedLocalizationSignal: localizationSignal)
+-        
+-        // The tour is shown in English (it reads the en bundle); the page indicator's VoiceOver label follows it.
+-        self.controller.pageAccessibilityLabel = defaultPresentationStrings.VoiceOver_Common_Page
+-        self.controller.pageAccessibilityValue = { page, count in
+-            return defaultPresentationStrings.Items_NOfM("\(page)", "\(count)").string
+-        }
+-
+-        self.startButton = SolidRoundedButtonNode(title: "Start Messaging", theme: SolidRoundedButtonTheme(theme: theme), glass: false, height: 50.0, cornerRadius: 50.0 * 0.5, isShimmering: true)
+-        self.startButton.accessibilityIdentifier = "Auth.Welcome.StartButton"
++        self.introView = XraygramIntroView(frame: CGRect())
+ 
+         super.init(navigationBarPresentationData: nil)
+-        
++
+         self._hasGlassStyle = true
+-        
+         self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+-        
+-        self.statusBar.statusBarStyle = theme.intro.statusBarStyle.style
+-        
+-        self.controller.startMessaging = { [weak self] in
+-            self?.activateLocalization("en")
+-        }
+-        self.controller.startMessagingInAlternativeLanguage = { [weak self] code in
+-            if let code = code {
+-                self?.activateLocalization(code)
+-            }
+-        }
+-        
+-        self.startButton.pressed = { [weak self] in
+-            self?.activateLocalization("en")
+-        }
+-        
+-        self.controller.createStartButton = { [weak self] width in
+-            let _ = self?.startButton.updateLayout(width: width, transition: .immediate)
+-            return self?.startButton.view
++        self.statusBar.statusBarStyle = .White
++
++        self.introView.startPressed = { [weak self] in
++            self?.startPressed()
+         }
+     }
+-    
++
+     required init(coder aDecoder: NSCoder) {
+         fatalError("init(coder:) has not been implemented")
+     }
+-    
+-    deinit {
+-        self.activateLocalizationDisposable.dispose()
+-    }
+-    
++
+     public override func loadDisplayNode() {
+         self.displayNode = AuthorizationSequenceSplashControllerNode(theme: self.theme)
++        self.displayNode.backgroundColor = Rentgen.bg
+         self.displayNodeDidLoad()
++        self.displayNode.view.addSubview(self.introView)
+     }
+-    
++
+     func animateIn() {
+-        self.controller.animateIn()
++        self.introView.animateIn()
+     }
+-    
+-    // The intro view may sit in a band (iPhone Duo's side strip, see introFrame(layout:)); these frames are
+-    // handed to the next screen's node, which fills the window, so they are offset out of the intro view.
++
++    // Кадры передаются следующему экрану (ввод номера), который занимает всё окно, поэтому — в координатах окна.
+     var buttonFrame: CGRect {
+-        return self.startButton.frame.offsetBy(dx: self.controller.defaultFrame.minX, dy: self.controller.defaultFrame.minY)
++        return self.introView.startButton.frame.offsetBy(dx: self.introView.frame.minX, dy: self.introView.frame.minY)
+     }
+-    
++
+     var buttonTitle: String {
+-        return self.startButton.title ?? ""
++        return self.introView.startButton.title(for: .normal) ?? ""
+     }
+-    
++
+     var animationSnapshot: UIView? {
+-        let snapshotView: UIView? = self.controller.createAnimationSnapshot()
+-        guard let snapshot = snapshotView else {
++        guard let snapshot = self.introView.iconView.snapshotView(afterScreenUpdates: false) else {
+             return nil
+         }
+-        snapshot.frame = snapshot.frame.offsetBy(dx: self.controller.defaultFrame.minX, dy: self.controller.defaultFrame.minY)
++        snapshot.frame = self.introView.iconView.frame.offsetBy(dx: self.introView.frame.minX, dy: self.introView.frame.minY)
+         return snapshot
+     }
+-    
++
+     var textSnaphot: UIView? {
+-        let snapshotView: UIView? = self.controller.createTextSnapshot()
+-        guard let snapshot = snapshotView else {
++        let titleFrame = self.introView.titleLabel.frame.union(self.introView.subtitleLabel.frame)
++        guard let snapshot = self.introView.resizableSnapshotView(from: titleFrame, afterScreenUpdates: false, withCapInsets: .zero) else {
+             return nil
+         }
+-        snapshot.frame = snapshot.frame.offsetBy(dx: self.controller.defaultFrame.minX, dy: self.controller.defaultFrame.minY)
++        snapshot.frame = titleFrame.offsetBy(dx: self.introView.frame.minX, dy: self.introView.frame.minY)
+         return snapshot
+     }
+-    
+-    // iPhone Duo: beside a side strip the intro (logo, pages, Start Messaging) keeps to the band between the
+-    // side insets, centered on the full width on the unfolded screen (authorizationContentBand). With equal insets
+-    // (every other phone) it fills the window as before.
++
++    // iPhone Duo: рядом с боковой полосой вступление держится в полосе между боковыми отступами
++    // (authorizationContentBand); на остальных телефонах — на всё окно.
+     private func introFrame(layout: ContainerViewLayout) -> CGRect {
+         let (bandMinX, bandWidth) = authorizationContentBand(layout: layout)
+         return CGRect(origin: CGPoint(x: bandMinX, y: 0.0), size: CGSize(width: bandWidth, height: layout.size.height))
+     }
+-    
+-    private func addControllerIfNeeded() {
+-        if !self.controller.isViewLoaded || self.controller.view.superview == nil {
+-            self.displayNode.view.addSubview(self.controller.view)
+-            if let layout = self.validLayout {
+-                controller.view.frame = self.introFrame(layout: layout)
+-            }
+-            self.controller.viewDidAppear(false)
+-        }
+-    }
+-    
+-    public override func viewWillAppear(_ animated: Bool) {
+-        super.viewWillAppear(animated)
+-        self.addControllerIfNeeded()
+-        self.controller.viewWillAppear(false)
+-    }
+-    
++
+     public override func viewDidAppear(_ animated: Bool) {
+         super.viewDidAppear(animated)
+-        
+-        controller.viewDidAppear(animated)
+-    }
+-    
+-    public override func viewWillDisappear(_ animated: Bool) {
+-        super.viewWillDisappear(animated)
+-        
+-        controller.viewWillDisappear(animated)
+-    }
+-    
+-    public override func viewDidDisappear(_ animated: Bool) {
+-        super.viewDidDisappear(animated)
+-        
+-        controller.viewDidDisappear(animated)
++        self.introView.playBeamIfNeeded()
+     }
+-    
++
+     public override func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
+         super.containerLayoutUpdated(layout, transition: transition)
+-        
++
+         self.validLayout = layout
+-        let controllerFrame = self.introFrame(layout: layout)
+-        self.controller.defaultFrame = controllerFrame
+-        
+         self.controllerNode.containerLayoutUpdated(layout, navigationBarHeight: 0.0, transition: transition)
+-        
+-        self.addControllerIfNeeded()
++        let frame = self.introFrame(layout: layout)
+         if case .immediate = transition {
+-            self.controller.view.frame = controllerFrame
++            self.introView.frame = frame
+         } else {
+             UIView.animate(withDuration: 0.3, animations: {
+-                self.controller.view.frame = controllerFrame
++                self.introView.frame = frame
+             })
+         }
++        self.introView.setNeedsLayout()
+     }
+-    
+-    private func activateLocalization(_ code: String) {
+-        let currentCode = self.accountManager.transaction { transaction -> String in
+-            if let current = transaction.getSharedData(SharedDataKeys.localizationSettings)?.get(LocalizationSettings.self) {
+-                return current.primaryComponent.languageCode
+-            } else {
+-                return "en"
+-            }
+-        }
+-        let suggestedCode = self.suggestedLocalization.get()
+-        |> map { localization -> String? in
+-            return localization?.availableLocalizations.first?.languageCode
+-        }
+-        
+-        let _ = (combineLatest(currentCode, suggestedCode)
+-        |> take(1)
+-        |> deliverOnMainQueue).start(next: { [weak self] currentCode, suggestedCode in
+-            guard let strongSelf = self else {
+-                return
+-            }
+-            
+-            if let suggestedCode = suggestedCode {
+-                _ = TelegramEngineUnauthorized(account: strongSelf.account).localization.markSuggestedLocalizationAsSeenInteractively(languageCode: suggestedCode).start()
+-            }
+-            
+-            if currentCode == code {
+-                strongSelf.pressNext(strings: nil)
+-                return
+-            }
+-            
+-            strongSelf.controller.isEnabled = false
+-            strongSelf.startButton.alpha = 0.6
+-            let accountManager = strongSelf.accountManager
+-            
+-            strongSelf.activateLocalizationDisposable.set(TelegramEngineUnauthorized(account: strongSelf.account).localization.downloadAndApplyLocalization(accountManager: accountManager, languageCode: code).start(completed: {
+-                let _ = (accountManager.transaction { transaction -> PresentationStrings? in
+-                    let localizationSettings: LocalizationSettings?
+-                    if let current = transaction.getSharedData(SharedDataKeys.localizationSettings)?.get(LocalizationSettings.self) {
+-                        localizationSettings = current
+-                    } else {
+-                        localizationSettings = nil
+-                    }
+-                    let stringsValue: PresentationStrings
+-                    if let localizationSettings = localizationSettings {
+-                        stringsValue = PresentationStrings(primaryComponent: PresentationStrings.Component(languageCode: localizationSettings.primaryComponent.languageCode, localizedName: localizationSettings.primaryComponent.localizedName, pluralizationRulesCode: localizationSettings.primaryComponent.customPluralizationCode, dict: dictFromLocalization(localizationSettings.primaryComponent.localization)), secondaryComponent: localizationSettings.secondaryComponent.flatMap({ PresentationStrings.Component(languageCode: $0.languageCode, localizedName: $0.localizedName, pluralizationRulesCode: $0.customPluralizationCode, dict: dictFromLocalization($0.localization)) }), groupingSeparator: "")
+-                    } else {
+-                        stringsValue = defaultPresentationStrings
+-                    }
+-                    return stringsValue
+-                }
+-                |> deliverOnMainQueue).start(next: { strings in
+-                    self?.controller.isEnabled = true
+-                    self?.startButton.alpha = 1.0
+-                    self?.pressNext(strings: strings)
+-                })
+-            }))
+-        })
+-    }
+-    
+-    private func pressNext(strings: PresentationStrings?) {
++
++    private func startPressed() {
++        let language = self.introView.language
++        XraygramIntro.chosenLanguage = language
++        // Пакет строк Telegram для русского — после подключения через XRAY (сеть до этого заблокирована).
++        XraygramIntro.pendingLanguage = language == "ru" ? "ru" : nil
+         if let navigationController = self.navigationController, navigationController.viewControllers.last === self {
+-            self.nextPressed?(strings)
++            self.nextPressed?(nil)
+         }
+     }
+ }
+diff --git a/submodules/LegacyComponents/Sources/TGLocalization.m b/submodules/LegacyComponents/Sources/TGLocalization.m
+index 05dd9f6e..12e83817 100644
+--- a/submodules/LegacyComponents/Sources/TGLocalization.m
++++ b/submodules/LegacyComponents/Sources/TGLocalization.m
+@@ -50,27 +50,9 @@ - (instancetype)initWithVersion:(int32_t)version code:(NSString *)code dict:(NSD
+     if (self != nil) {
+         _version = version;
+         _code = code;
+-        NSString *appTitle = [[[NSBundle mainBundle] localizedInfoDictionary] objectForKey:@"CFBundleDisplayName"];
+-        if (appTitle == nil) {
+-            appTitle = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleDisplayName"];
+-        }
+-        if (appTitle == nil) {
+-            appTitle = @"Telegram";
+-        }
+-        NSString *originalTitle = @"Telegram";
+-        if (![appTitle isEqualToString:originalTitle]) {
+-            NSMutableDictionary *updatedDict = [[NSMutableDictionary alloc] initWithDictionary:dict];
+-            for (NSString *key in dict.keyEnumerator) {
+-                NSString *value = dict[key];
+-                if ([value rangeOfString:originalTitle].location != NSNotFound) {
+-                    value = [value stringByReplacingOccurrencesOfString:originalTitle withString:appTitle];
+-                    updatedDict[key] = value;
+-                }
+-            }
+-            _dict = updatedDict;
+-        } else {
+-            _dict = dict;
+-        }
++        // Xraygram (FEAT-19): словарь приходит из PresentationStrings, где «Telegram» уже подменён по списку ключей;
++        // прежняя глобальная замена на CFBundleDisplayName портила «Telegram Premium», «аккаунт Telegram» и т. п.
++        _dict = dict;
+         _isActive = isActive;
+         
+         NSString *rawCode = code;
 diff --git a/submodules/MtProtoKit/Sources/MTContext.m b/submodules/MtProtoKit/Sources/MTContext.m
 index 91d362c6..ed5ae106 100644
 --- a/submodules/MtProtoKit/Sources/MTContext.m
@@ -298,7 +1538,7 @@ index 6b9bc4d2..b91006a8 100644
      
      NSMutableData *reqData = [[NSMutableData alloc] init];
 diff --git a/submodules/QrCodeUI/Sources/QrCodeScreen.swift b/submodules/QrCodeUI/Sources/QrCodeScreen.swift
-index 292c57eb..8042aa73 100644
+index 292c57eb..01286f47 100644
 --- a/submodules/QrCodeUI/Sources/QrCodeScreen.swift
 +++ b/submodules/QrCodeUI/Sources/QrCodeScreen.swift
 @@ -561,6 +561,9 @@ public final class QrCodeScreen: ViewControllerComponentContainer {
@@ -311,6 +1551,35 @@ index 292c57eb..8042aa73 100644
                  }
                  return link
              }
+@@ -576,7 +579,8 @@ public final class QrCodeScreen: ViewControllerComponentContainer {
+         var icon: QrCodeIcon {
+             switch self {
+             case .peer, .invite, .chatFolder:
+-                return .custom(UIImage(bundleImageName: "Chat/Links/QrLogo"))
++                // Xraygram (FEAT-19 §3, F19-19): то, что уходит другим, — без знака Telegram и без нашего.
++                return .none
+             case .proxy:
+                 return .proxy
+             }
+@@ -697,7 +701,7 @@ private final class QrCodeComponent: Component {
+             }
+ 
+             if previousComponent?.subject != component.subject {
+-                self.imageNode.setSignal(qrCode(string: component.subject.link, color: .black, backgroundColor: .white, icon: isProxy ? .proxy : .cutout, ecl: component.subject.ecl) |> beforeNext { [weak self] size, _ in
++                self.imageNode.setSignal(qrCode(string: component.subject.link, color: .black, backgroundColor: .white, icon: isProxy ? .proxy : .none, ecl: component.subject.ecl) |> beforeNext { [weak self] size, _ in
+                     guard let self else {
+                         return
+                     }
+@@ -717,7 +721,8 @@ private final class QrCodeComponent: Component {
+             let imageFrame = CGRect(origin: CGPoint(x: (size.width - imageSize.width) / 2.0, y: (size.height - imageSize.height) / 2.0), size: imageSize)
+             self.imageNode.frame = imageFrame
+             
+-            if !isProxy, let qrCodeSize = self.qrCodeSize {
++            // Xraygram (F19-19): без самолётика в центре QR.
++            if !"".isEmpty, !isProxy, let qrCodeSize = self.qrCodeSize {
+                 let (_, cutoutFrame, _) = qrCodeCutout(size: qrCodeSize, dimensions: imageSize, scale: nil)
+                 
+                 let _ = self.icon.update(
 diff --git a/submodules/SettingsUI/BUILD b/submodules/SettingsUI/BUILD
 index 40742e6e..511003ee 100644
 --- a/submodules/SettingsUI/BUILD
@@ -991,6 +2260,19 @@ index 9094737b..5d7d31db 100644
                  titleAttributedString.append(NSAttributedString(string: ":\(item.server.port)", font: titleFont, textColor: item.theme.list.itemSecondaryTextColor))
              }
              let statusAttributedString = NSAttributedString(string: item.label, font: statusFont, textColor: item.labelAccent ? item.theme.list.itemAccentColor : item.theme.list.itemSecondaryTextColor)
+diff --git a/submodules/SettingsUI/Sources/Data and Storage/WebBrowserItem.swift b/submodules/SettingsUI/Sources/Data and Storage/WebBrowserItem.swift
+index a07fd8d4..c1a199ea 100644
+--- a/submodules/SettingsUI/Sources/Data and Storage/WebBrowserItem.swift	
++++ b/submodules/SettingsUI/Sources/Data and Storage/WebBrowserItem.swift	
+@@ -156,7 +156,7 @@ private final class WebBrowserItemNode: ListViewItemNode {
+                     } else {
+                         let icons = item.context.sharedContext.applicationBindings.getAvailableAlternateIcons()
+                         let current = item.context.sharedContext.applicationBindings.getAlternateIconName()
+-                        let currentIcon = icons.first(where: { $0.name == current })?.imageName ?? "BlueIcon"
++                        let currentIcon = icons.first(where: { $0.name == current })?.imageName ?? "XraygramLaunchIcon" // Xraygram (FEAT-19): не иконка Telegram
+                         if let image = UIImage(named: currentIcon, in: getAppBundle(), compatibleWith: nil) {
+                             updatedIconSignal = openInAppIcon(engine: item.context.engine, appIcon: .image(image: image))
+                         }
 diff --git a/submodules/SettingsUI/Sources/Data and Storage/XraygramGateController.swift b/submodules/SettingsUI/Sources/Data and Storage/XraygramGateController.swift
 new file mode 100644
 index 00000000..bac50072
@@ -2397,11 +3679,40 @@ index 116004c3..5505708c 100644
          "//submodules/WebProxyTransport:WebProxyTransport",
          "//submodules/MtProtoKit:MtProtoKit",
          "//submodules/TelegramPresentationData:TelegramPresentationData",
+diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
+index bd33bb7f..a55c4c17 100644
+--- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
++++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/BUILD
+@@ -96,6 +96,7 @@ swift_library(
+         "//submodules/PhotoResources",
+         "//submodules/PremiumUI",
+         "//submodules/PresentationDataUtils",
++        "//submodules/XraygramKit:XraygramKit",
+         "//submodules/QrCode",
+         "//submodules/QrCodeUI",
+         "//submodules/RadialStatusNode",
 diff --git a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoSettingsItems.swift b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoSettingsItems.swift
-index 8e3f9d25..d28e9a33 100644
+index 8e3f9d25..bd84b413 100644
 --- a/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoSettingsItems.swift
 +++ b/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoSettingsItems.swift
-@@ -185,6 +185,8 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
+@@ -13,6 +13,8 @@ import DeviceAccess
+ import TelegramStringFormatting
+ import PeerNameColorItem
+ import WalletContext
++import XraygramKit
++import PresentationDataUtils
+ 
+ enum SettingsSection: Int, CaseIterable {
+     case edit
+@@ -27,6 +29,7 @@ enum SettingsSection: Int, CaseIterable {
+     case payment
+     case extra
+     case support
++    case xraygramVersion
+ }
+ 
+ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentationData: PresentationData, interaction: PeerInfoInteraction, isExpanded: Bool) -> [(AnyHashable, [PeerInfoScreenItem])] {
+@@ -185,6 +188,8 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
                      proxyType = presentationData.strings.SocksProxySetup_ProxyWeb
                  case .socks5:
                      proxyType = presentationData.strings.SocksProxySetup_ProxySocks5
@@ -2410,6 +3721,30 @@ index 8e3f9d25..d28e9a33 100644
                  }
              } else {
                  proxyType = presentationData.strings.Settings_ProxyDisabled
+@@ -357,6 +362,23 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
+         interaction.openSettings(.tips)
+     }))
+     
++    // Xraygram (FEAT-19 §4, PAR-21): «О приложении» — строка версии внизу настроек; нажатие — диалог с полным
++    // текстом и ссылкой на исходники (GPL).
++    do {
++        let xs = XrayStrings(appLanguageCode: presentationData.strings.primaryComponent.languageCode)
++        let version = (Bundle.main.infoDictionary?["CFBundleVersion"] as? String) ?? "?"
++        let upstreamVersion = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "?"
++        items[.xraygramVersion]!.append(PeerInfoScreenCommentItem(id: 0, text: "[\(xs.versionRow(version: version))]()", linkAction: { _ in
++            let alert = textAlertController(sharedContext: context.sharedContext, title: xs.aboutTitle(version: version), text: xs.aboutText(upstreamVersion: upstreamVersion), actions: [
++                TextAlertAction(type: .genericAction, title: xs.aboutSourceCode, action: {
++                    context.sharedContext.applicationBindings.openUrl(XraygramIntro.sourceCodeURL)
++                }),
++                TextAlertAction(type: .defaultAction, title: xs.ok, action: {})
++            ])
++            context.sharedContext.mainWindow?.present(alert, on: .root)
++        }))
++    }
++    
+     var result: [(AnyHashable, [PeerInfoScreenItem])] = []
+     for section in SettingsSection.allCases {
+         if let sectionItems = items[section], !sectionItems.isEmpty {
 diff --git a/submodules/TelegramUI/Components/ProxyServerPreviewScreen/Sources/ProxyServerPreviewScreen.swift b/submodules/TelegramUI/Components/ProxyServerPreviewScreen/Sources/ProxyServerPreviewScreen.swift
 index ae5cd541..356c8588 100644
 --- a/submodules/TelegramUI/Components/ProxyServerPreviewScreen/Sources/ProxyServerPreviewScreen.swift
@@ -2424,8 +3759,63 @@ index ae5cd541..356c8588 100644
                  tableItems.append(.init(
                      id: "secret",
                      title: strings.SocksProxySetup_Secret,
+diff --git a/submodules/TelegramUI/Components/QrStudioScreen/Sources/QrStudioCodePaths.swift b/submodules/TelegramUI/Components/QrStudioScreen/Sources/QrStudioCodePaths.swift
+index e1d997a4..981c5f57 100644
+--- a/submodules/TelegramUI/Components/QrStudioScreen/Sources/QrStudioCodePaths.swift
++++ b/submodules/TelegramUI/Components/QrStudioScreen/Sources/QrStudioCodePaths.swift
+@@ -46,7 +46,13 @@ struct QrStudioCodePaths {
+         )
+     }
+ 
++    // Xraygram (FEAT-19 §3, F19-19): QR профиля уходит другим людям — без самолётика и без окна под него.
++    static let xraygramHasLogo = false
++
+     static func isInLogo(x: Int, y: Int, size: Int) -> Bool {
++        guard self.xraygramHasLogo else {
++            return false
++        }
+         let center = CGFloat(size - 1) / 2.0
+         return hypot(CGFloat(x) - center, CGFloat(y) - center) < self.logoRadius(size: size) + 0.5
+     }
+@@ -116,7 +122,7 @@ struct QrStudioCodePaths {
+         self.body = body
+         self.frames = frames
+         self.balls = balls
+-        self.logoDiameter = size > 0 ? side * (QrStudioCodePaths.logoRadius(size: size) * 2.0 - 1.3) / CGFloat(size) : 0.0
++        self.logoDiameter = (size > 0 && QrStudioCodePaths.xraygramHasLogo) ? side * (QrStudioCodePaths.logoRadius(size: size) * 2.0 - 1.3) / CGFloat(size) : 0.0
+     }
+ }
+ 
+diff --git a/submodules/TelegramUI/Components/QrStudioScreen/Sources/QrStudioCodeView.swift b/submodules/TelegramUI/Components/QrStudioScreen/Sources/QrStudioCodeView.swift
+index d0969aa7..d1388168 100644
+--- a/submodules/TelegramUI/Components/QrStudioScreen/Sources/QrStudioCodeView.swift
++++ b/submodules/TelegramUI/Components/QrStudioScreen/Sources/QrStudioCodeView.swift
+@@ -536,7 +536,7 @@ final class QrStudioCodeView: UIView {
+         }
+         self.planeHostView.bounds = CGRect(x: 0.0, y: 0.0, width: planeSide, height: planeSide)
+         self.planeHostView.center = CGPoint(x: size.width * 0.5, y: size.height * 0.5 - 1.0)
+-        self.planeHostView.isHidden = !hasCode
++        self.planeHostView.isHidden = !hasCode || !QrStudioCodePaths.xraygramHasLogo
+         if self.planeLayer.superlayer == nil {
+             self.planeHostView.layer.addSublayer(self.planeLayer)
+         }
+diff --git a/submodules/TelegramUI/Components/QrStudioScreen/Sources/QrStudioExportStickers.swift b/submodules/TelegramUI/Components/QrStudioScreen/Sources/QrStudioExportStickers.swift
+index 5e3f9fb8..8812a3a7 100644
+--- a/submodules/TelegramUI/Components/QrStudioScreen/Sources/QrStudioExportStickers.swift
++++ b/submodules/TelegramUI/Components/QrStudioScreen/Sources/QrStudioExportStickers.swift
+@@ -32,6 +32,10 @@ final class QrStudioExportSticker {
+ }
+ 
+ func qrStudioDecodeExportPlane(pixelSide: Int) -> QrStudioExportSticker? {
++    // Xraygram (F19-19): в экспорт QR самолётик не кладём.
++    if !QrStudioCodePaths.xraygramHasLogo {
++        return nil
++    }
+     guard pixelSide > 0, let url = getAppBundle().url(forResource: "PlaneLogoPlain", withExtension: "tgs"), let data = try? Data(contentsOf: url), let unpacked = TGGUnzipData(data, 5 * 1024 * 1024), let instance = makeLottieInstance(data: unpacked, fitzModifier: .none, colorReplacements: nil), instance.frameCount > 0 else {
+         return nil
+     }
 diff --git a/submodules/TelegramUI/Sources/AppDelegate.swift b/submodules/TelegramUI/Sources/AppDelegate.swift
-index cf304286..dd8305c1 100644
+index cf304286..7bd88291 100644
 --- a/submodules/TelegramUI/Sources/AppDelegate.swift
 +++ b/submodules/TelegramUI/Sources/AppDelegate.swift
 @@ -54,6 +54,7 @@ import WalletSendScreen
@@ -2447,7 +3837,72 @@ index cf304286..dd8305c1 100644
      private var buildConfig: BuildConfig?
      let episodeId = arc4random()
      
-@@ -1192,6 +1197,50 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
+@@ -429,20 +434,9 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
+         let statusBarHost = ApplicationStatusBarHost(scene: window.windowScene)
+         self.statusBarHost = statusBarHost
+         self.mainWindow = Window1(hostView: hostView, statusBarHost: statusBarHost)
+-        if let traitCollection = window.rootViewController?.traitCollection {
+-            if #available(iOS 13.0, *) {
+-                switch traitCollection.userInterfaceStyle {
+-                case .light, .unspecified:
+-                    hostView.containerView.backgroundColor = UIColor.white
+-                default:
+-                    hostView.containerView.backgroundColor = UIColor.black
+-                }
+-            } else {
+-                hostView.containerView.backgroundColor = UIColor.white
+-            }
+-        } else {
+-            hostView.containerView.backgroundColor = UIColor.white
+-        }
++        // Xraygram (FEAT-19 §1): фон окна как у заставки (#0B1220), чтобы между заставкой и вступлением не было
++        // белой вспышки.
++        hostView.containerView.backgroundColor = UIColor(rgb: 0x0B1220)
+         self.window = window
+         self.nativeWindow = window
+         
+@@ -995,29 +989,8 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
+         }, dismissNativeController: {
+             self.window?.rootViewController?.dismiss(animated: true, completion: nil)
+         }, getAvailableAlternateIcons: {
+-            if #available(iOS 10.3, *) {
+-                var icons = [
+-                    PresentationAppIcon(name: "BlueIcon", imageName: "BlueIcon", isDefault: buildConfig.isAppStoreBuild),
+-                    PresentationAppIcon(name: "New2", imageName: "New2"),
+-                    PresentationAppIcon(name: "New1", imageName: "New1"),
+-                    PresentationAppIcon(name: "BlackIcon", imageName: "BlackIcon"),
+-                    PresentationAppIcon(name: "BlueClassicIcon", imageName: "BlueClassicIcon"),
+-                    PresentationAppIcon(name: "BlackClassicIcon", imageName: "BlackClassicIcon"),
+-                    PresentationAppIcon(name: "BlueFilledIcon", imageName: "BlueFilledIcon"),
+-                    PresentationAppIcon(name: "BlackFilledIcon", imageName: "BlackFilledIcon")
+-                ]
+-                if buildConfig.isInternalBuild {
+-                    icons.append(PresentationAppIcon(name: "WhiteFilledIcon", imageName: "WhiteFilledIcon"))
+-                }
+-                
+-                icons.append(PresentationAppIcon(name: "Premium", imageName: "Premium", isPremium: true))
+-                icons.append(PresentationAppIcon(name: "PremiumTurbo", imageName: "PremiumTurbo", isPremium: true))
+-                icons.append(PresentationAppIcon(name: "PremiumBlack", imageName: "PremiumBlack", isPremium: true))
+-                
+-                return icons
+-            } else {
+-                return []
+-            }
++            // Xraygram (FEAT-19, F19-20): альтернативные иконки — это иконки Telegram; выбора нет.
++            return []
+         }, getAlternateIconName: {
+             if #available(iOS 10.3, *) {
+                 return application.alternateIconName
+@@ -1126,7 +1099,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
+         }
+         |> deliverOnMainQueue
+         |> mapToSignal { [self] accountManager, initialPresentationDataAndSettings -> Signal<(SharedApplicationContext, LoggingSettings), NoError> in
+-            self.mainWindow?.hostView.containerView.backgroundColor =  initialPresentationDataAndSettings.presentationData.theme.chatList.backgroundColor
++            // Xraygram (FEAT-19 §1): фон окна не перекрашиваем в цвет темы — иначе белая вспышка перед вступлением.
+             
+             let legacyBasePath = appGroupUrl.path
+             
+@@ -1192,6 +1165,55 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                  }
                  strongSelf.mainWindow.present(c, on: .root)
              }
@@ -2481,6 +3936,11 @@ index cf304286..dd8305c1 100644
 +            }
 +            #endif
 +            
++            // Xraygram (FEAT-19, F19-20): альтернативные иконки — иконки Telegram; если такая выбрана — вернуть основную.
++            if application.alternateIconName != nil {
++                application.setAlternateIconName(nil, completionHandler: nil)
++            }
++            
 +            // Xraygram: пока нет ни одной XRAY-записи и не выбрано «напрямую», сеть заблокирована
 +            // (ProxySettings.effectiveActiveServer = «чёрная дыра»), а поверх всего — экран XRAY.
 +            self.xraygramGateDisposable.set((accountManager.sharedData(keys: [SharedDataKeys.proxySettings])
@@ -2498,7 +3958,7 @@ index cf304286..dd8305c1 100644
              sharedContext.presentCrossfadeController = { [weak self] in
                  guard let strongSelf = self else {
                      return
-@@ -2108,7 +2157,69 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
+@@ -2108,7 +2130,121 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
          })
      }
  
@@ -2509,7 +3969,10 @@ index cf304286..dd8305c1 100644
 +            // показывается на .root позже, — подождать, пока хозяин появится.
 +            let hostReady: Bool
 +            if let authContext = self.authContextValue {
-+                hostReady = authContext.rootController.isViewLoaded && authContext.rootController.view.window != nil
++                // FEAT-19 §2: порядок «вступление → «Начать» → экран XRAY → номер». Пока на экране вступление,
++                // экран XRAY не показываем (сеть всё равно заблокирована с запуска).
++                let introOnScreen = authContext.rootController.viewControllers.last is AuthorizationSequenceSplashController
++                hostReady = !introOnScreen && authContext.rootController.isViewLoaded && authContext.rootController.view.window != nil
 +            } else if self.contextValue != nil {
 +                hostReady = self.mainWindow.viewController != nil
 +            } else {
@@ -2538,6 +4001,8 @@ index cf304286..dd8305c1 100644
 +                controller.presentationArguments = ViewControllerPresentationArguments(presentationAnimation: .modalSheet)
 +                self.xraygramGate = controller
 +                Logger.shared.log("Xraygram", "network blocked: presenting XRAY gate")
++                // Под экраном XRAY может быть ввод номера с открытой клавиатурой — она перекрыла бы экран XRAY.
++                self.window?.endEditing(true)
 +                self.mainWindow.present(controller, on: .root)
 +                // При старте окно может ещё не иметь корневого контроллера, и показ теряется —
 +                // проверить через секунду, что экран действительно в окне.
@@ -2560,6 +4025,53 @@ index cf304286..dd8305c1 100644
 +            self.xraygramGate = nil
 +            controller.dismiss()
 +        }
++        if !self.xraygramGateBlocked {
++            self.xraygramApplyPendingLanguage(sharedContext: sharedContext)
++        }
++    }
++    
++    // FEAT-19 §2: во вступлении выбран русский, а пакет строк Telegram без сети не скачать — скачать и применить,
++    // когда сеть разблокирована (XRAY-запись или «напрямую»), как это делала кнопка «Продолжить на русском».
++    private let xraygramLanguageDisposable = MetaDisposable()
++    private func xraygramApplyPendingLanguage(sharedContext: SharedAccountContextImpl) {
++        guard let code = XraygramIntro.pendingLanguage else {
++            return
++        }
++        guard let authContext = self.authContextValue else {
++            if self.contextValue == nil {
++                // При запуске сеть разблокируется раньше, чем появится экран входа, — подождать его.
++                Queue.mainQueue().after(1.0) { [weak self, weak sharedContext] in
++                    guard let self, let sharedContext, !self.xraygramGateBlocked else {
++                        return
++                    }
++                    self.xraygramApplyPendingLanguage(sharedContext: sharedContext)
++                }
++            } else {
++                // Уже вошли — язык выбирают в настройках, выбор вступления не нужен.
++                XraygramIntro.pendingLanguage = nil
++            }
++            return
++        }
++        Logger.shared.log("Xraygram", "applying intro language \(code)")
++        let accountManager = sharedContext.accountManager
++        self.xraygramLanguageDisposable.set((TelegramEngineUnauthorized(account: authContext.account).localization.downloadAndApplyLocalization(accountManager: accountManager, languageCode: code)
++        |> deliverOnMainQueue).start(error: { _ in
++            Logger.shared.log("Xraygram", "intro language \(code): download failed, will retry on next unblock")
++        }, completed: {
++            Logger.shared.log("Xraygram", "intro language \(code) applied")
++            let _ = (sharedContext.presentationData
++            |> filter { $0.strings.primaryComponent.languageCode == code }
++            |> take(1)
++            |> deliverOnMainQueue).start(next: { presentationData in
++                // take(1): короткоживущая подписка, сильная ссылка допустима.
++                authContext.rootController.xraygramUpdateStrings(presentationData.strings)
++            })
++            if XraygramIntro.pendingLanguage == code {
++                XraygramIntro.pendingLanguage = nil
++                // Язык приложения теперь сам русский — выбор вступления больше не нужен для XrayStrings.
++                XraygramIntro.chosenLanguage = nil
++            }
++        }))
 +    }
 +    
      func handleWillEnterForeground() {
@@ -2568,6 +4080,34 @@ index cf304286..dd8305c1 100644
          if self.isActiveValue {
              self.isInForegroundValue = true
              self.isInForegroundPromise.set(true)
+diff --git a/submodules/TelegramUI/Sources/ApplicationShortcutItem.swift b/submodules/TelegramUI/Sources/ApplicationShortcutItem.swift
+index cbaac75d..affcff56 100644
+--- a/submodules/TelegramUI/Sources/ApplicationShortcutItem.swift
++++ b/submodules/TelegramUI/Sources/ApplicationShortcutItem.swift
+@@ -52,8 +52,8 @@ func applicationShortcutItems(strings: PresentationStrings, otherAccountName: St
+         return [
+             ApplicationShortcutItem(type: .search, title: strings.Common_Search, subtitle: nil),
+             ApplicationShortcutItem(type: .compose, title: strings.Compose_NewMessage, subtitle: nil),
+-            ApplicationShortcutItem(type: .savedMessages, title: strings.Conversation_SavedMessages, subtitle: nil),
+-            ApplicationShortcutItem(type: .appIcon, title: strings.Shortcut_AppIcon, subtitle: nil)
++            ApplicationShortcutItem(type: .savedMessages, title: strings.Conversation_SavedMessages, subtitle: nil)
++            // Xraygram (FEAT-19, F19-20): выбора альтернативных иконок нет — ярлык «Иконка приложения» не нужен.
+         ]
+     }
+ }
+diff --git a/submodules/TelegramUI/Sources/Chat/ChatControllerOpenPhoneContextMenu.swift b/submodules/TelegramUI/Sources/Chat/ChatControllerOpenPhoneContextMenu.swift
+index b7dd5f35..9a06ec29 100644
+--- a/submodules/TelegramUI/Sources/Chat/ChatControllerOpenPhoneContextMenu.swift
++++ b/submodules/TelegramUI/Sources/Chat/ChatControllerOpenPhoneContextMenu.swift
+@@ -115,7 +115,7 @@ extension ChatControllerImpl: MFMessageComposeViewControllerDelegate {
+                 }
+             } else {
+                 items.append(
+-                    .action(ContextMenuActionItem(text: self.presentationData.strings.Chat_Context_Phone_InviteToTelegram, icon: { theme in return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Telegram"), color: theme.contextMenu.primaryColor) }, action: { [weak self]  _, f in
++                    .action(ContextMenuActionItem(text: self.presentationData.strings.Chat_Context_Phone_InviteToTelegram, icon: { theme in return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/AddUser"), color: theme.contextMenu.primaryColor) } /* Xraygram (FEAT-19): без логотипа Telegram */, action: { [weak self]  _, f in
+                         f(.default)
+                         
+                         guard let self else {
 diff --git a/submodules/TelegramVoip/Sources/OngoingCallContext.swift b/submodules/TelegramVoip/Sources/OngoingCallContext.swift
 index 852d6a70..d9b0d95b 100644
 --- a/submodules/TelegramVoip/Sources/OngoingCallContext.swift

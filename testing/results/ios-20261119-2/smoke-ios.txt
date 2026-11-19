@@ -1,0 +1,42 @@
+# Смоук Xraygram iOS (симулятор): ios-20261119-2
+# 2026-11-19 10:17:59, бандл upstream/xraygram-ios/dist/Xraygram-ios-20261119-2-sim.app, io.github.vizacv.xraygram 13.2
+
+## B — бандл
+PASS  B1  bundle id не телеграмовский (io.github.vizacv.xraygram)
+PASS  B2  имя: CFBundleDisplayName=Xraygram, CFBundleName=Xraygram
+PASS  B3  схемы: xraygram
+WARN  B4  схема vless:// не зарегистрирована (FEAT-08)
+      инфо: устройство Xraygram QA CB41D887-5D96-4D2B-85FF-EA2073B9F50F загружено
+PASS  I1  установка .app
+
+## G — FEAT-03: первый запуск
+PASS  G1  приложение запущено (pid 33190)
+      скриншот: testing/results/ios-20261119-2/ios-gate.png
+PASS  G2  120 с (F03-01): ни одного внешнего соединения/UDP
+PASS  G3  xray не слушает (записей нет)
+SKIP  G4  маркера экрана XRAY нет — сборка с вступлением FEAT-19 (экран XRAY после «Начать»); блокировку проверяют G2/G5
+PASS  G5  все MTTcpConnection через «чёрную дыру» 127.0.0.1:1 ( 207 via 127.0.0.1:1;)
+
+## X — подключение через XRAY (тестовый сервер 127.0.0.1:10443, Reality)
+PASS  X1  запись добавлена из окружения, xray слушает: 127.0.0.1:51149 
+PASS  X2  маркер «adding XRAY entry from environment» в логе
+PASS  X3  30 с после подключения: процесс только на 127.0.0.1
+PASS  X4  тестовый сервер принял соединения к DC ( 3 149.154.167.91:443; 4 149.154.175.50:443; 2 95.161.76.100:443; 1 [2001:67c:4e8:f004::a]:443;)
+PASS  X5  нет CONNECT к 1.0.0.0/3.0.0.0; IPv6 DC идут как [2001:…]
+      инфо: MTTcpConnection:  207 via 127.0.0.1:1; 10 via 127.0.0.1:51149 using xg;
+PASS  X6  холодный старт: xray поднялся сам (127.0.0.1:51201 )
+PASS  X7  холодный старт, 20 с: только 127.0.0.1
+
+## E — завершение
+PASS  E1  процесс приложения завершён
+# устройство Xraygram QA оставлено включённым (CB41D887-5D96-4D2B-85FF-EA2073B9F50F)
+
+# Итог: 16 PASS, 0 FAIL, 1 WARN, 1 SKIP
+
+## Ручной просмотр QA (инструмент симулятора, чистая установка)
+PASS  F19-02  вступление: иконка, XRAYGRAM, подпись, «Start», «Русский · English» (ios-intro-en.png)
+PASS  F19-04  «Русский» → подпись и кнопка «Начать» сразу по-русски (ios-intro-ru.png)
+PASS  F19-05  «Начать» → экран XRAY на русском (ios-gate-ru.png); до этого сеть заблокирована (G2/G5)
+PASS  F07     иконка-обезьянка и подпись «Xraygram» на домашнем экране (ios-home-icon.png)
+INFO  подсказка «кнопкой «Вставить»», а системная UIPasteControl подписана «Paste»: на устройстве QA английская система; на русском телефоне будет «Вставить»
+INFO  первый прогон: на симуляторе упал SpringBoard (FBDisplayManager без дисплея, SpringBoard-2026-11-19-101741.ips) — сбой симулятора, после перезагрузки устройства всё прошло

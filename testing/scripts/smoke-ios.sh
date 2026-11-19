@@ -113,7 +113,12 @@ if [[ -n "$P" ]]; then
 	GRP="$(xcrun simctl get_app_container "$UDID" "$BID" groups 2>/dev/null | awk '{print $2}' | head -1)"
 	alog="$(ls -t "$GRP"/telegram-data/logs/app-logs/log-*.txt 2>/dev/null | head -1)"
 	if [[ -n "$alog" ]]; then
-		check G4 "в логе приложения «[Xraygram] network blocked»" grep -q "\[Xraygram\] .*network blocked" "$alog"
+		# с FEAT-19 (ios-20261119-2+) на чистой установке сначала вступление, экран XRAY — после «Начать»
+		if grep -q "\[Xraygram\] .*network blocked" "$alog"; then
+			pass G4 "в логе приложения «[Xraygram] network blocked»"
+		else
+			skip G4 "маркера экрана XRAY нет — сборка с вступлением FEAT-19 (экран XRAY после «Начать»); блокировку проверяют G2/G5"
+		fi
 		via="$(grep -h "MTTcpConnection" "$alog" | grep -oE "via [0-9.]+:[0-9]+" | sort | uniq -c | tr -s ' ' | tr '\n' ';')"
 		check G5 "все MTTcpConnection через «чёрную дыру» 127.0.0.1:1 (${via:-нет строк})" bash -c "[[ -n '$via' ]] && ! grep -q -v 'via 127.0.0.1:1$' <<< \"\$(grep -h MTTcpConnection '$alog' | grep -oE 'via [0-9.]+:[0-9]+')\""
 	else
