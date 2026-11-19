@@ -1,5 +1,5 @@
 diff --git a/TMessagesProj/build.gradle b/TMessagesProj/build.gradle
-index 445081154..352245d67 100644
+index 445081154..2a2748483 100644
 --- a/TMessagesProj/build.gradle
 +++ b/TMessagesProj/build.gradle
 @@ -42,6 +42,9 @@ configurations.all {
@@ -12,7 +12,7 @@ index 445081154..352245d67 100644
      implementation 'androidx.core:core:1.16.0'
      implementation 'androidx.palette:palette:1.0.0'
      implementation 'androidx.exifinterface:exifinterface:1.3.6'
-@@ -152,6 +155,12 @@ android {
+@@ -152,6 +155,14 @@ android {
  
          multiDexEnabled true
  
@@ -21,6 +21,8 @@ index 445081154..352245d67 100644
 +        // Xraygram: FCM only when built with our own Firebase project (.secrets/google-services.json), see XrayPush
 +        buildConfigField "boolean", "XRAYGRAM_FCM", (project.findProperty("XRAYGRAM_FCM") ?: "false").toString()
 +        buildConfigField "String", "XRAYGRAM_API_HASH", "\"" + (project.findProperty("XRAYGRAM_API_HASH") ?: "") + "\""
++        // Xraygram (FEAT-19): build ID (android-YYYYMMDD-N) for «About», set by android/scripts/build-local.sh
++        buildConfigField "String", "XRAYGRAM_BUILD", "\"" + (project.findProperty("XRAYGRAM_BUILD") ?: "dev") + "\""
 +
          externalNativeBuild {
              cmake {
@@ -54,7 +56,7 @@ index a76770e63..f53936ca3 100644
  -keep class org.webrtc.audio.* { *; }
  -keep class org.webrtc.voiceengine.* { *; }
 diff --git a/TMessagesProj/src/main/AndroidManifest.xml b/TMessagesProj/src/main/AndroidManifest.xml
-index 99f64adbf..7a38ba42a 100644
+index 99f64adbf..a433a83cf 100644
 --- a/TMessagesProj/src/main/AndroidManifest.xml
 +++ b/TMessagesProj/src/main/AndroidManifest.xml
 @@ -62,6 +62,9 @@
@@ -78,24 +80,24 @@ index 99f64adbf..7a38ba42a 100644
 -                <data android:scheme="tonsite" />
 -            </intent-filter>
 -            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:priority="1">
--                <action android:name="android.intent.action.VIEW" />
--                <category android:name="android.intent.category.BROWSABLE" />
--                <category android:name="android.intent.category.DEFAULT" />
--                <data android:scheme="tg" />
--            </intent-filter>
--            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:priority="1">
 +            <!-- Xraygram (BUG-13): tonsite:// is Telegram's, not registered -->
 +            <!-- Xraygram (BUG-13): tg:// is Telegram's, not registered -->
 +            <!-- Xraygram: share links open the "add proxy" sheet -->
-+            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round">
++            <intent-filter android:icon="@mipmap/xraygram_launcher" android:roundIcon="@mipmap/xraygram_launcher_round">
                  <action android:name="android.intent.action.VIEW" />
--                <category android:name="android.intent.category.DEFAULT" />
                  <category android:name="android.intent.category.BROWSABLE" />
+                 <category android:name="android.intent.category.DEFAULT" />
+-                <data android:scheme="tg" />
+-            </intent-filter>
+-            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:priority="1">
+-                <action android:name="android.intent.action.VIEW" />
+-                <category android:name="android.intent.category.DEFAULT" />
+-                <category android:name="android.intent.category.BROWSABLE" />
 -                <data android:scheme="ton" android:host="transfer" android:pathPrefix="/" />
 -            </intent-filter>
 -            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:priority="1">
 -                <action android:name="android.intent.action.VIEW" />
-                 <category android:name="android.intent.category.DEFAULT" />
+-                <category android:name="android.intent.category.DEFAULT" />
 -                <category android:name="android.intent.category.BROWSABLE" />
 -                <data android:scheme="tc" />
 +                <data android:scheme="vless" />
@@ -123,6 +125,42 @@ index 99f64adbf..7a38ba42a 100644
          </activity>
          <activity
              android:name="org.telegram.ui.ExternalActionActivity"
+@@ -342,7 +331,7 @@
+             android:hardwareAccelerated="true"
+             android:windowSoftInputMode="adjustPan"
+             android:exported="true">
+-            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round">
++            <intent-filter android:icon="@mipmap/xraygram_launcher" android:roundIcon="@mipmap/xraygram_launcher_round">
+                 <action android:name="org.telegram.passport.AUTHORIZE"/>
+                 <category android:name="android.intent.category.DEFAULT"/>
+             </intent-filter>
+@@ -353,7 +342,7 @@
+             android:hardwareAccelerated="true"
+             android:windowSoftInputMode="adjustPan"
+             android:exported="true">
+-            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round">
++            <intent-filter android:icon="@mipmap/xraygram_launcher" android:roundIcon="@mipmap/xraygram_launcher_round">
+                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE"/>
+             </intent-filter>
+         </activity>
+@@ -363,7 +352,7 @@
+             android:hardwareAccelerated="true"
+             android:windowSoftInputMode="adjustPan"
+             android:exported="true">
+-            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round">
++            <intent-filter android:icon="@mipmap/xraygram_launcher" android:roundIcon="@mipmap/xraygram_launcher_round">
+                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE"/>
+             </intent-filter>
+         </activity>
+@@ -372,7 +361,7 @@
+ <!--            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|uiMode"-->
+ <!--            android:hardwareAccelerated="true"-->
+ <!--            android:windowSoftInputMode="adjustPan">-->
+-<!--            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round">-->
++<!--            <intent-filter android:icon="@mipmap/xraygram_launcher" android:roundIcon="@mipmap/xraygram_launcher_round">-->
+ <!--                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE"/>-->
+ <!--            </intent-filter>-->
+ <!--        </activity>-->
 @@ -494,8 +483,10 @@
              android:name=".NotificationsService"
              android:enabled="true"
@@ -235,32 +273,117 @@ index ca821813f..81453035d 100644
  
      static {
          if (ApplicationLoader.applicationContext != null) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/ContactsController.java b/TMessagesProj/src/main/java/org/telegram/messenger/ContactsController.java
+index 41ce86e17..80c45170b 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/ContactsController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/ContactsController.java
+@@ -53,6 +53,11 @@ import java.util.regex.Pattern;
+ 
+ public class ContactsController extends BaseController {
+ 
++    // Xraygram (BUG-20): own system account type; "org.telegram.messenger" belongs to the official app, and Android keeps
++    // only one authenticator per type, so with both apps installed contact sync broke for the second one.
++    public static final String XRAYGRAM_ACCOUNT_TYPE = "io.github.xraygram.account";
++
++
+     private Account systemAccount;
+     private boolean loadingContacts;
+     private final Object loadContactsSync = new Object();
+@@ -391,7 +396,7 @@ public class ContactsController extends BaseController {
+         Utilities.globalQueue.postRunnable(() -> {
+             AccountManager am = AccountManager.get(ApplicationLoader.applicationContext);
+             try {
+-                Account[] accounts = am.getAccountsByType("org.telegram.messenger");
++                Account[] accounts = am.getAccountsByType(XRAYGRAM_ACCOUNT_TYPE);
+                 for (int a = 0; a < accounts.length; a++) {
+                     Account acc = accounts[a];
+                     boolean found = false;
+@@ -423,7 +428,7 @@ public class ContactsController extends BaseController {
+                 readContacts();
+                 if (systemAccount == null) {
+                     try {
+-                        systemAccount = new Account("" + getUserConfig().getClientUserId(), "org.telegram.messenger");
++                        systemAccount = new Account("" + getUserConfig().getClientUserId(), XRAYGRAM_ACCOUNT_TYPE);
+                         am.addAccountExplicitly(systemAccount, "", null);
+                     } catch (Exception ignore) {
+ 
+@@ -437,7 +442,7 @@ public class ContactsController extends BaseController {
+         try {
+             systemAccount = null;
+             AccountManager am = AccountManager.get(ApplicationLoader.applicationContext);
+-            Account[] accounts = am.getAccountsByType("org.telegram.messenger");
++            Account[] accounts = am.getAccountsByType(XRAYGRAM_ACCOUNT_TYPE);
+             for (int a = 0; a < accounts.length; a++) {
+                 Account acc = accounts[a];
+                 boolean found = false;
+@@ -513,7 +518,7 @@ public class ContactsController extends BaseController {
+                 AndroidUtilities.runOnUIThread(() -> {
+                     AccountManager am = AccountManager.get(ApplicationLoader.applicationContext);
+                     try {
+-                        Account[] accounts = am.getAccountsByType("org.telegram.messenger");
++                        Account[] accounts = am.getAccountsByType(XRAYGRAM_ACCOUNT_TYPE);
+                         systemAccount = null;
+                         for (int a = 0; a < accounts.length; a++) {
+                             Account acc = accounts[a];
+@@ -531,7 +536,7 @@ public class ContactsController extends BaseController {
+ 
+                     }
+                     try {
+-                        systemAccount = new Account("" + getUserConfig().getClientUserId(), "org.telegram.messenger");
++                        systemAccount = new Account("" + getUserConfig().getClientUserId(), XRAYGRAM_ACCOUNT_TYPE);
+                         am.addAccountExplicitly(systemAccount, "", null);
+                     } catch (Exception ignore) {
+ 
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/FilesMigrationService.java b/TMessagesProj/src/main/java/org/telegram/messenger/FilesMigrationService.java
+index 28d73e413..cd265e199 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/FilesMigrationService.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/FilesMigrationService.java
+@@ -62,7 +62,7 @@ public class FilesMigrationService extends Service {
+         Notification notification = new Notification.Builder(this, NotificationsController.OTHER_NOTIFICATIONS_CHANNEL)
+                 .setContentTitle(LocaleController.getString(R.string.MigratingFiles))
+                 .setAutoCancel(false)
+-                .setSmallIcon(R.drawable.notification)
++                .setSmallIcon(R.drawable.ic_stat_xraygram)
+                 .build();
+ 
+         isRunning = true;
+@@ -181,7 +181,7 @@ public class FilesMigrationService extends Service {
+                 Notification notification = new Notification.Builder(FilesMigrationService.this, NotificationsController.OTHER_NOTIFICATIONS_CHANNEL)
+                         .setContentTitle(LocaleController.getString(R.string.MigratingFiles))
+                         .setContentText(String.format("%s/%s", currentCount, totalFilesCount))
+-                        .setSmallIcon(R.drawable.notification)
++                        .setSmallIcon(R.drawable.ic_stat_xraygram)
+                         .setAutoCancel(false)
+                         .setProgress(totalFilesCount, currentCount, false)
+                         .build();
 diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/LocaleController.java b/TMessagesProj/src/main/java/org/telegram/messenger/LocaleController.java
-index 3a5413ce1..e649504bf 100644
+index 3a5413ce1..cdc1c343a 100644
 --- a/TMessagesProj/src/main/java/org/telegram/messenger/LocaleController.java
 +++ b/TMessagesProj/src/main/java/org/telegram/messenger/LocaleController.java
-@@ -4780,14 +4780,44 @@ public class LocaleController {
+@@ -4779,30 +4779,60 @@ public class LocaleController {
+         return localizationInternal.getByResName(key);
      }
  
-     @Nullable
-+    // Xraygram (FEAT-06): prompts where "Telegram" means this app itself (permissions on the login screen etc.)
-+    private static java.util.HashSet<Integer> xraygramAppNameRes;
-+    private static String xraygramAppName(int res, String value) {
-+        if (xraygramAppNameRes == null) {
-+            xraygramAppNameRes = new java.util.HashSet<>(java.util.Arrays.asList(
-+                    R.string.AllowReadCall, R.string.AllowReadCallAndLog, R.string.AllowReadCallLog, R.string.AllowFillNumber,
-+                    R.string.NotificationsPermissionAlertSubtitle, R.string.QRCodePermissionNoCameraWithHint,
-+                    R.string.PermissionStorageWithHint, R.string.PermissionNoAudioWithHint, R.string.PermissionNoBluetoothWithHint,
-+                    R.string.PermissionNoAudioVideoWithHint, R.string.PermissionNoCameraWithHint, R.string.PermissionNoCameraMicVideo,
-+                    R.string.PermissionNoLocation, R.string.PermissionNoLocationStory));
+-    @Nullable
++    // Xraygram (FEAT-19, PAR-20): "Telegram" → "Xraygram" by key list, see org.telegram.utils.proxy.XrayBranding
++    private static final java.util.concurrent.ConcurrentHashMap<Integer, String> xraygramResNames = new java.util.concurrent.ConcurrentHashMap<>();
++    private static String xraygramBrand(String key, int res, String value) {
++        if (value == null) {
++            return null;
 +        }
-+        if (res == R.string.ContactsPermissionAlert) {
-+            return value.replace("**Telegram**", "**Xraygram**"); // the second "Telegram" is the cloud service
++        String name = key;
++        if (name == null && res != 0) {
++            name = xraygramResNames.get(res);
++            if (name == null) {
++                try {
++                    name = ApplicationLoader.applicationContext.getResources().getResourceEntryName(res);
++                } catch (Throwable e) {
++                    name = "";
++                }
++                xraygramResNames.put(res, name);
++            }
 +        }
-+        if (res != 0 && xraygramAppNameRes.contains(res)) {
-+            return value.replace("Telegram", "Xraygram").replace("Телеграм", "Xraygram");
-+        }
-+        return value;
++        return org.telegram.utils.proxy.XrayBranding.apply(name, value);
 +    }
 +
      private String getStringV2(String key, @StringRes int stringRes, String fallback) {
@@ -281,21 +404,84 @@ index 3a5413ce1..e649504bf 100644
              value = localizationExternal.getByResNameOrResId(context, key, stringRes);
              if (value != null) {
 -                return value;
-+                return xraygramAppName(stringRes, value);
++                return xraygramBrand(key, stringRes, value);
              }
  
              value = localizationExternal.getByResName(fallback);
-@@ -4799,7 +4829,7 @@ public class LocaleController {
+             if (value != null) {
+-                return value;
++                return xraygramBrand(fallback, 0, value);
+             }
+         }
+ 
          checkLocalizationInternal();
          value = localizationInternal.getByResNameOrResId(context, key, stringRes);
          if (value != null) {
 -            return value;
-+            return xraygramAppName(stringRes, value);
++            return xraygramBrand(key, stringRes, value);
          }
  
-         return localizationInternal.getByResName(fallback);
+-        return localizationInternal.getByResName(fallback);
++        return xraygramBrand(fallback, 0, localizationInternal.getByResName(fallback));
+     }
+ 
+ 
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsController.java b/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsController.java
+index 9881370ed..4a16bf75a 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsController.java
+@@ -404,7 +404,7 @@ public class NotificationsController extends BaseController implements Notificat
+                 PendingIntent contentIntent = PendingIntent.getActivity(ApplicationLoader.applicationContext,
+                         currentAccount, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                 NotificationCompat.Builder builder = new NotificationCompat.Builder(ApplicationLoader.applicationContext, channelId)
+-                        .setSmallIcon(R.drawable.notification)
++                        .setSmallIcon(R.drawable.ic_stat_xraygram)
+                         .setContentTitle(LocaleController.getString(R.string.AppName))
+                         .setContentText(message)
+                         .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
+@@ -4654,7 +4654,7 @@ public class NotificationsController extends BaseController implements Notificat
+             PendingIntent contentIntent = PendingIntent.getActivity(ApplicationLoader.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_ONE_SHOT);
+ 
+             mBuilder.setContentTitle(name)
+-                    .setSmallIcon(R.drawable.notification)
++                    .setSmallIcon(R.drawable.ic_stat_xraygram)
+                     .setAutoCancel(true)
+                     .setNumber(total_unread_count)
+                     .setContentIntent(contentIntent)
+@@ -4662,7 +4662,7 @@ public class NotificationsController extends BaseController implements Notificat
+                     .setGroupSummary(true)
+                     .setShowWhen(true)
+                     .setWhen(((long) lastMessageObject.messageOwner.date) * 1000)
+-                    .setColor(0xff11acfa);
++                    .setColor(0xff3EF2C8) /* Xraygram (FEAT-19): accent */;
+ 
+             long[] vibrationPattern = null;
+             Uri sound = null;
+@@ -5657,11 +5657,11 @@ public class NotificationsController extends BaseController implements Notificat
+ 
+             NotificationCompat.Builder builder = new NotificationCompat.Builder(ApplicationLoader.applicationContext)
+                     .setContentTitle(name)
+-                    .setSmallIcon(R.drawable.notification)
++                    .setSmallIcon(R.drawable.ic_stat_xraygram)
+                     .setContentText(text.toString())
+                     .setAutoCancel(true)
+                     .setNumber(dialogKey.story ? storyPushMessages.size() : messageObjects.size())
+-                    .setColor(0xff11acfa)
++                    .setColor(0xff3EF2C8) /* Xraygram (FEAT-19): accent */
+                     .setGroupSummary(false)
+                     .setWhen(date)
+                     .setShowWhen(true)
+@@ -5890,7 +5890,7 @@ public class NotificationsController extends BaseController implements Notificat
+ 
+     public static Person.Builder loadRoundAvatar(long dialogId, File avatar, Person.Builder personBuilder) {
+         if (dialogId == UserObject.OAUTH) {
+-            personBuilder.setIcon(IconCompat.createWithResource(ApplicationLoader.applicationContext, R.drawable.ic_launcher_dr));
++            personBuilder.setIcon(IconCompat.createWithResource(ApplicationLoader.applicationContext, R.mipmap.xraygram_launcher));
+             return personBuilder;
+         }
+         if (avatar != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
 diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsService.java b/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsService.java
-index a32cd26b4..8109be507 100644
+index a32cd26b4..077764d6c 100644
 --- a/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsService.java
 +++ b/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsService.java
 @@ -8,6 +8,12 @@
@@ -332,7 +518,7 @@ index a32cd26b4..8109be507 100644
 +                manager.createNotificationChannel(channel);
 +            }
 +            Notification notification = new Notification.Builder(this, channelId)
-+                    .setSmallIcon(R.drawable.notification)
++                    .setSmallIcon(R.drawable.ic_stat_xraygram)
 +                    .setContentTitle(org.telegram.utils.proxy.XrayPush.keepAliveNotificationText())
 +                    .setOngoing(true)
 +                    .build();
@@ -437,10 +623,56 @@ index 85ab1d8a3..d82b1d4c2 100644
      }
  
      public static void checkSaveToGalleryFiles() {
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/TelegramQRCodeWriter.java b/TMessagesProj/src/main/java/org/telegram/messenger/TelegramQRCodeWriter.java
+index d08b2fc79..ed366fc2d 100755
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/TelegramQRCodeWriter.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/TelegramQRCodeWriter.java
+@@ -55,6 +55,8 @@ public final class TelegramQRCodeWriter {
+ 
+   private int imageSize;
+   private Drawable centerDrawable;
++  /** Xraygram (FEAT-19 §3): QR codes go to other people — neither Telegram's nor Xraygram's mark in the middle. */
++  public static final boolean PLAIN = true;
+ 
+   public void setCenterDrawable(Drawable drawable) {
+     centerDrawable = drawable;
+@@ -128,8 +130,11 @@ public final class TelegramQRCodeWriter {
+     if (imageBloks % 2 != inputWidth % 2) {
+       imageBloks++;
+     }
++    if (PLAIN) {
++      imageBloks = 0; // Xraygram: no hole for a logo
++    }
+     imageBlockX = (inputWidth - imageBloks) / 2;
+-    imageSize = imageBloks * multiple - 24;
++    imageSize = PLAIN ? 0 : imageBloks * multiple - 24;
+     int imageX = (size - imageSize) / 2;
+     if (includeSideQuads) {
+       blackPaint.setColor(color);
+@@ -190,7 +195,9 @@ public final class TelegramQRCodeWriter {
+       }
+     }
+ 
+-    if (centerDrawable != null) {
++    if (PLAIN) {
++      // Xraygram (FEAT-19 §3, F19-19): no logo in the middle, full modules
++    } else if (centerDrawable != null) {
+       centerDrawable.setBounds(imageX, imageX, imageX + imageSize, imageX + imageSize);
+       centerDrawable.draw(canvas);
+     } else {
 diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPGroupNotification.java b/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPGroupNotification.java
-index bd41c9f1c..b73749f68 100644
+index bd41c9f1c..bcb4b5f9b 100644
 --- a/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPGroupNotification.java
 +++ b/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPGroupNotification.java
+@@ -279,7 +279,7 @@ public class VoIPGroupNotification {
+             builder.setShowWhen(false);
+         }
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+-            builder.setColor(0xff2ca5e0);
++            builder.setColor(0xff3EF2C8); // Xraygram (FEAT-19): accent
+             builder.setVibrate(new long[0]);
+             builder.setCategory(Notification.CATEGORY_CALL);
+             builder.setFullScreenIntent(PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_MUTABLE), true);
 @@ -360,7 +360,12 @@ public class VoIPGroupNotification {
  
          final TLRPC.TL_inputGroupCallInviteMessage call = new TLRPC.TL_inputGroupCallInviteMessage();
@@ -455,8 +687,21 @@ index bd41c9f1c..b73749f68 100644
      }
  
      public static void decline(Context context, int account, int msg_id) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPPreNotificationService.java b/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPPreNotificationService.java
+index a09c4d4d7..40d398097 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPPreNotificationService.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPPreNotificationService.java
+@@ -239,7 +239,7 @@ public class VoIPPreNotificationService { // } extends Service implements AudioM
+             builder.setShowWhen(false);
+         }
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+-            builder.setColor(0xff2ca5e0);
++            builder.setColor(0xff3EF2C8); // Xraygram (FEAT-19): accent
+             builder.setVibrate(new long[0]);
+             builder.setCategory(Notification.CATEGORY_CALL);
+             builder.setFullScreenIntent(PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_MUTABLE), true);
 diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPService.java b/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPService.java
-index 415aff0b5..d6bdbe084 100755
+index 415aff0b5..8e15d51d5 100755
 --- a/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPService.java
 +++ b/TMessagesProj/src/main/java/org/telegram/messenger/voip/VoIPService.java
 @@ -1159,7 +1159,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
@@ -534,6 +779,15 @@ index 415aff0b5..d6bdbe084 100755
  				if (sharedInstance == null || privateCall == null) {
  					return;
  				}
+@@ -4170,7 +4202,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
+ 			builder.setColor(0xff282e31);
+ 			builder.setColorized(true);
+ 		} else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+-			builder.setColor(0xff2ca5e0);
++			builder.setColor(0xff3EF2C8); // Xraygram (FEAT-19): accent
+ 		}
+ 		if (Build.VERSION.SDK_INT >= 26) {
+ 			NotificationsController.checkOtherNotificationsChannel();
 @@ -4517,7 +4549,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
  				req1.protocol.udp_p2p = req1.protocol.udp_reflector = true;
  				req1.protocol.min_layer = CALL_MIN_LAYER;
@@ -543,6 +797,24 @@ index 415aff0b5..d6bdbe084 100755
  				ConnectionsManager.getInstance(currentAccount).sendRequest(req1, (response1, error1) -> AndroidUtilities.runOnUIThread(() -> {
  					if (error1 == null) {
  						if (BuildVars.LOGS_ENABLED) {
+@@ -5432,7 +5464,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
+ 			builder.setShowWhen(false);
+ 		}
+ 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+-			builder.setColor(0xff2ca5e0);
++			builder.setColor(0xff3EF2C8); // Xraygram (FEAT-19): accent
+ 			builder.setVibrate(new long[0]);
+ 			builder.setCategory(Notification.CATEGORY_CALL);
+ 			builder.setFullScreenIntent(PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_MUTABLE), true);
+@@ -5850,7 +5882,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
+ 		PhoneAccountHandle handle = new PhoneAccountHandle(new ComponentName(this, TelegramConnectionService.class), "" + self.id);
+ 		PhoneAccount account = new PhoneAccount.Builder(handle, ContactsController.formatName(self.first_name, self.last_name))
+ 				.setCapabilities(PhoneAccount.CAPABILITY_SELF_MANAGED)
+-				.setIcon(Icon.createWithResource(this, R.drawable.ic_launcher_dr))
++				.setIcon(Icon.createWithResource(this, R.mipmap.xraygram_launcher))
+ 				.setHighlightColor(0xff2ca5e0)
+ 				.addSupportedUriScheme("sip")
+ 				.build();
 diff --git a/TMessagesProj/src/main/java/org/telegram/tgnet/ConnectionsManager.java b/TMessagesProj/src/main/java/org/telegram/tgnet/ConnectionsManager.java
 index ab54ee378..0d11528b6 100644
 --- a/TMessagesProj/src/main/java/org/telegram/tgnet/ConnectionsManager.java
@@ -651,6 +923,152 @@ index ab54ee378..0d11528b6 100644
          }
  
          for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/InstantCameraVideoEncoderOverlayHelper.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/InstantCameraVideoEncoderOverlayHelper.java
+index 07de161c9..f324c53cf 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/InstantCameraVideoEncoderOverlayHelper.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/InstantCameraVideoEncoderOverlayHelper.java
+@@ -23,6 +23,7 @@ public class InstantCameraVideoEncoderOverlayHelper {
+     private static final int TEXTURE_INDEX_DOWN_SAMPLE_TMP = 2;
+     private static final int TEXTURE_INDEX_WATERMARK_TEXT = 3;
+     private static final int TEXTURE_INDEX_WATERMARK_LOGO = 4;
++    private static final boolean WATERMARK = false; // Xraygram (FEAT-19 §3): nothing of Telegram or Xraygram on sent content
+     
+     private static final int VERTEX_BUFFER_NORMAL_POSITION = 0;
+     private static final int VERTEX_BUFFER_WATERMARK_TEXT_POSITION = 12;
+@@ -237,7 +238,7 @@ public class InstantCameraVideoEncoderOverlayHelper {
+             GLES20.glUseProgram(0);
+         }
+ 
+-        {
++        if (WATERMARK) { // Xraygram (FEAT-19 §3, F19-18): no watermark in sent round videos
+             final Program program = programRenderWatermark;
+ 
+             GLES20.glEnable(GLES20.GL_BLEND);
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/QRCodeBottomSheet.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/QRCodeBottomSheet.java
+index 3c4f5606c..446309332 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/QRCodeBottomSheet.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/QRCodeBottomSheet.java
+@@ -95,6 +95,9 @@ public class QRCodeBottomSheet extends BottomSheet {
+         };
+         frameLayout.addView(imageView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+         frameLayout.addView(iconImage, LayoutHelper.createFrame(60, 60, Gravity.CENTER));
++        if (TelegramQRCodeWriter.PLAIN) {
++            iconImage.setVisibility(View.GONE); // Xraygram (FEAT-19 §3): plain QR
++        }
+         linearLayout.addView(frameLayout, LayoutHelper.createLinear(220, 220, Gravity.CENTER_HORIZONTAL, 30, 0,30 ,0));
+ 
+         help = new TextView(context);
+@@ -165,6 +168,9 @@ public class QRCodeBottomSheet extends BottomSheet {
+     }
+ 
+     public void setCenterAnimation(int resId) {
++        if (TelegramQRCodeWriter.PLAIN) {
++            return; // Xraygram (FEAT-19 §3, F19-19): plain QR, no logo in the middle
++        }
+         iconImage.setAutoRepeat(true);
+         iconImage.setAnimation(resId, 60, 60);
+         iconImage.playAnimation();
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/TermsOfServiceView.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/TermsOfServiceView.java
+index 1fd3b36c1..868d8be66 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/TermsOfServiceView.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/TermsOfServiceView.java
+@@ -59,8 +59,9 @@ public class TermsOfServiceView extends FrameLayout {
+         linearLayout.setOrientation(LinearLayout.VERTICAL);
+ 
+         ImageView imageView = new ImageView(context);
+-        imageView.setImageResource(R.drawable.logo_middle);
+-        linearLayout.addView(imageView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT, 0, 28, 0, 0));
++        imageView.setImageResource(R.mipmap.xraygram_launcher); // Xraygram (FEAT-19): own icon instead of the Telegram logo
++        imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
++        linearLayout.addView(imageView, LayoutHelper.createLinear(72, 72, Gravity.LEFT, 0, 28, 0, 0));
+ 
+         titleTextView = new TextView(context);
+         ThemeBind.textColor(titleTextView, Theme.key_windowBackgroundWhiteBlackText);
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/XraygramWordmarkDrawable.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/XraygramWordmarkDrawable.java
+new file mode 100644
+index 000000000..9169c5f81
+--- /dev/null
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/XraygramWordmarkDrawable.java
+@@ -0,0 +1,79 @@
++package org.telegram.ui.Components;
++
++import android.graphics.Canvas;
++import android.graphics.ColorFilter;
++import android.graphics.Paint;
++import android.graphics.PixelFormat;
++import android.graphics.Rect;
++import android.graphics.drawable.Drawable;
++import android.text.TextPaint;
++
++import androidx.annotation.NonNull;
++import androidx.annotation.Nullable;
++
++import org.telegram.messenger.AndroidUtilities;
++
++/**
++ * Xraygram (FEAT-19, PAR-19): the "Xraygram" title drawn as text, a drop-in replacement for the Telegram wordmark
++ * vector (R.drawable.telegram_logo_2) in the chat list title and the stories header. Drawn white, so the callers'
++ * MULTIPLY color filter tints it exactly like the upstream vector.
++ */
++public class XraygramWordmarkDrawable extends Drawable {
++
++    private static final String TEXT = "Xraygram";
++
++    private final TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
++    private final int width;
++    private final int height;
++    private final float ascent;
++
++    public XraygramWordmarkDrawable() {
++        paint.setColor(0xFFFFFFFF);
++        paint.setTypeface(AndroidUtilities.bold());
++        paint.setTextSize(AndroidUtilities.dp(20));
++        Paint.FontMetrics fm = paint.getFontMetrics();
++        ascent = -fm.ascent;
++        width = (int) Math.ceil(paint.measureText(TEXT));
++        height = (int) Math.ceil(fm.descent - fm.ascent);
++    }
++
++    @Override
++    public void draw(@NonNull Canvas canvas) {
++        Rect b = getBounds();
++        float scale = b.height() > 0 ? Math.min(1f, b.height() / (float) height) : 1f;
++        canvas.save();
++        canvas.translate(b.left, b.top);
++        if (scale < 1f) {
++            canvas.scale(scale, scale);
++        }
++        canvas.drawText(TEXT, 0, ascent, paint);
++        canvas.restore();
++    }
++
++    @Override
++    public int getIntrinsicWidth() {
++        return width;
++    }
++
++    @Override
++    public int getIntrinsicHeight() {
++        return height;
++    }
++
++    @Override
++    public void setAlpha(int alpha) {
++        paint.setAlpha(alpha);
++        invalidateSelf();
++    }
++
++    @Override
++    public void setColorFilter(@Nullable ColorFilter colorFilter) {
++        paint.setColorFilter(colorFilter);
++        invalidateSelf();
++    }
++
++    @Override
++    public int getOpacity() {
++        return PixelFormat.TRANSLUCENT;
++    }
++}
 diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/voip/VoIPHelper.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/voip/VoIPHelper.java
 index cb6f2e2a7..eecadaf3c 100644
 --- a/TMessagesProj/src/main/java/org/telegram/ui/Components/voip/VoIPHelper.java
@@ -680,6 +1098,19 @@ index cb6f2e2a7..eecadaf3c 100644
  
  		if (VoIPService.getSharedInstance() != null) {
  			VoIPService.getSharedInstance().hangUp(() -> {
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java
+index e6478ee82..79b4cbebb 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java
+@@ -3436,7 +3436,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
+             } else {
+                 statusDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(null, dp(26));
+                 statusDrawable.center = true;
+-                logoDrawable = context.getResources().getDrawable(R.drawable.telegram_logo_2).mutate();
++                logoDrawable = new org.telegram.ui.Components.XraygramWordmarkDrawable(); // Xraygram (FEAT-19): no Telegram wordmark
+                 logoDrawable.setBounds(0, dp(2), logoDrawable.getIntrinsicWidth(), dp(2) + logoDrawable.getIntrinsicHeight());
+                 // a new drawable (also when the view is recreated after a theme switch made elsewhere): remember its tint, the
+                 // theme hook only recolors when the color differs from the last one applied
 diff --git a/TMessagesProj/src/main/java/org/telegram/ui/IntroActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/IntroActivity.java
 index 9f8f0977b..6ec013a6e 100644
 --- a/TMessagesProj/src/main/java/org/telegram/ui/IntroActivity.java
@@ -694,9 +1125,27 @@ index 9f8f0977b..6ec013a6e 100644
  
  
 diff --git a/TMessagesProj/src/main/java/org/telegram/ui/LaunchActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/LaunchActivity.java
-index 1dd2ffee8..3ab37f99a 100644
+index 1dd2ffee8..d08ffaf4a 100644
 --- a/TMessagesProj/src/main/java/org/telegram/ui/LaunchActivity.java
 +++ b/TMessagesProj/src/main/java/org/telegram/ui/LaunchActivity.java
+@@ -1123,7 +1123,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
+         if (LoginActivity.loadCurrentState(false, currentAccount).getInt("currentViewNum", 0) != 0) {
+             return new LoginActivity();
+         }
+-        return new IntroActivity();
++        return new XrayIntroActivity(); // Xraygram (FEAT-19): own intro
+     }
+ 
+     public FireworksOverlay getFireworksOverlay() {
+@@ -1292,7 +1292,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
+                 layersActionBarLayout.rebuildLogout();
+                 rightActionBarLayout.rebuildLogout();
+             }
+-            presentFragment(new IntroActivity().setOnLogout());
++            presentFragment(new XrayIntroActivity()); // Xraygram (FEAT-19): own intro
+         }
+     }
+ 
 @@ -6118,6 +6118,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
  
      private boolean firstAppUpdateCheck = true;
@@ -718,6 +1167,24 @@ index 1dd2ffee8..3ab37f99a 100644
          WidgetMedia.onAppPaused(false);
          isResumed = true;
          PipCoordinator.getInstance().onActivityResume(this);
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/LauncherIconController.java b/TMessagesProj/src/main/java/org/telegram/ui/LauncherIconController.java
+index 49bf82153..9ce4f02eb 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/LauncherIconController.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/LauncherIconController.java
+@@ -9,6 +9,13 @@ import org.telegram.messenger.R;
+ 
+ public class LauncherIconController {
+     public static void tryFixLauncherIconIfNeeded() {
++        // Xraygram (FEAT-19 §3, F19-20): alternative icons are Telegram's; back to the main icon if one was chosen
++        for (LauncherIcon icon : LauncherIcon.values()) {
++            if (icon != LauncherIcon.DEFAULT && isEnabled(icon)) {
++                setIcon(LauncherIcon.DEFAULT);
++                return;
++            }
++        }
+         for (LauncherIcon icon : LauncherIcon.values()) {
+             if (isEnabled(icon)) {
+                 return;
 diff --git a/TMessagesProj/src/main/java/org/telegram/ui/LoginActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/LoginActivity.java
 index dac59c13a..58be902a7 100644
 --- a/TMessagesProj/src/main/java/org/telegram/ui/LoginActivity.java
@@ -1257,6 +1724,97 @@ index 84ffe29b2..78d8cd759 100644
          }
      }
  
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/QrShare/QrCodeLayer.java b/TMessagesProj/src/main/java/org/telegram/ui/QrShare/QrCodeLayer.java
+index b9b5fcb69..ec0e4f8f4 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/QrShare/QrCodeLayer.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/QrShare/QrCodeLayer.java
+@@ -127,7 +127,7 @@ public final class QrCodeLayer {
+             c.mask.prepareToDraw(); // the GPU upload starts now, off the open's first frame
+             c.maskSrc.set(0, 0, c.size, c.size);
+             c.imageSize = writer.getImageSize();
+-            final int logo = Math.round(writer.getImageSize() / c.cell) + 2;
++            final int logo = writer.getImageSize() <= 0 ? 0 : Math.round(writer.getImageSize() / c.cell) + 2; // Xraygram: plain QR
+             c.logoFrom = (c.n - logo) / 2;
+             c.logoTo = c.logoFrom + logo;
+             return c;
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/QrShare/QrShareView.java b/TMessagesProj/src/main/java/org/telegram/ui/QrShare/QrShareView.java
+index 50bc0a5c6..9924f22a4 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/QrShare/QrShareView.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/QrShare/QrShareView.java
+@@ -3810,7 +3810,7 @@ public class QrShareView extends View {
+         final float bp = qr.buildProgress();
+         final float lp = 1f; // logo: part of the card (scales with it)
+         final float ls = elemScale(lp);
+-        if (lp > 0.004f) {
++        if (lp > 0.004f && lr > 0.5f) { // Xraygram (FEAT-19 §3): plain QR — no logo circle, no plane
+             c.save();
+             c.scale(ls, ls, lcx, lcy);
+             if (lp < 1f) c.saveLayerAlpha(lcx - lr - 2, lcy - lr - 2, lcx + lr + 2, lcy + lr + 2, (int) (255 * lp));
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/SettingsActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/SettingsActivity.java
+index e2b917be3..9d4838dd6 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/SettingsActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/SettingsActivity.java
+@@ -462,17 +462,11 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
+         versionView.setPadding(dp(21), dp(10), dp(21), dp(10));
+         versionView.setGravity(Gravity.CENTER);
+         ThemeBind.selectorBackground(versionView, Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_ALL), null, ThemeBind.of(Theme.key_listSelector), getResourceProvider());
+-        versionView.setOnClickListener(v -> {
+-            versionViewPressCount++;
+-            if (versionViewPressCount < 2 && !BuildVars.DEBUG_PRIVATE_VERSION) {
+-                try {
+-                    Toast.makeText(getParentActivity(), getString(R.string.DebugMenuLongPress), Toast.LENGTH_SHORT).show();
+-                } catch (Exception e) {
+-                    FileLog.e(e);
+-                }
+-                return;
+-            }
++        // Xraygram (FEAT-19, PAR-21): tap → «About»; long press → upstream debug menu
++        versionView.setOnClickListener(v -> org.telegram.utils.proxy.XrayBranding.showAbout(getParentActivity()));
++        versionView.setOnLongClickListener(v -> {
+             presentFragment(new DebugSettingsActivity());
++            return true;
+         });
+ 
+         navigationBar = new View(context);
+@@ -538,7 +532,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
+         }
+         subtitleView.setText(sb);
+ 
+-        versionView.setText(getVersionName());
++        versionView.setText(org.telegram.utils.proxy.XrayBranding.settingsVersionText()); // Xraygram (FEAT-19)
+     }
+ 
+ 
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Stories/DialogStoriesCell.java b/TMessagesProj/src/main/java/org/telegram/ui/Stories/DialogStoriesCell.java
+index 81ccaa52a..eca1d753e 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Stories/DialogStoriesCell.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Stories/DialogStoriesCell.java
+@@ -335,8 +335,8 @@ public class DialogStoriesCell extends FrameLayout implements NotificationCenter
+ 
+         telegramLogoView = new ImageView(context);
+         telegramLogoView.setContentDescription(getString(R.string.AppName));
+-        telegramLogoView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+-        telegramLogoView.setImageResource(R.drawable.telegram_logo_2);
++        telegramLogoView.setScaleType(ImageView.ScaleType.FIT_START);
++        telegramLogoView.setImageDrawable(new org.telegram.ui.Components.XraygramWordmarkDrawable()); // Xraygram (FEAT-19)
+         telegramLogoView.setColorFilter(getTextLogoColor(), PorterDuff.Mode.MULTIPLY);
+         telegramLogoView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+         telegramLogoView.setFocusableInTouchMode(true);
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ThemeActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ThemeActivity.java
+index c964b5469..60de588ba 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ThemeActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ThemeActivity.java
+@@ -778,9 +778,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
+             chatListRow = rowCount++;
+             chatListInfoRow = rowCount++;
+ 
+-            appIconHeaderRow = rowCount++;
+-            appIconSelectorRow = rowCount++;
+-            appIconShadowRow = rowCount++;
++            // Xraygram (FEAT-19): no alternative app icons (all of them are Telegram's)
+ 
+             swipeGestureHeaderRow = rowCount++;
+             swipeGestureRow = rowCount++;
 diff --git a/TMessagesProj/src/main/java/org/telegram/ui/VoIPFragment.java b/TMessagesProj/src/main/java/org/telegram/ui/VoIPFragment.java
 index 496f76966..62c4c9261 100644
 --- a/TMessagesProj/src/main/java/org/telegram/ui/VoIPFragment.java
@@ -1606,6 +2164,367 @@ index 000000000..a83ff5e9b
 +        return null;
 +    }
 +}
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/XrayIntroActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/XrayIntroActivity.java
+new file mode 100644
+index 000000000..bb8fbac17
+--- /dev/null
++++ b/TMessagesProj/src/main/java/org/telegram/ui/XrayIntroActivity.java
+@@ -0,0 +1,355 @@
++package org.telegram.ui;
++
++import android.animation.ValueAnimator;
++import android.content.Context;
++import android.graphics.Bitmap;
++import android.graphics.BitmapFactory;
++import android.graphics.BlurMaskFilter;
++import android.graphics.Canvas;
++import android.graphics.LinearGradient;
++import android.graphics.Paint;
++import android.graphics.Path;
++import android.graphics.Rect;
++import android.graphics.RectF;
++import android.graphics.Shader;
++import android.graphics.drawable.GradientDrawable;
++import android.provider.Settings;
++import android.util.TypedValue;
++import android.view.Gravity;
++import android.view.View;
++import android.view.animation.LinearInterpolator;
++import android.widget.FrameLayout;
++import android.widget.LinearLayout;
++import android.widget.ScrollView;
++import android.widget.TextView;
++
++import org.telegram.messenger.AndroidUtilities;
++import org.telegram.messenger.LocaleController;
++import org.telegram.messenger.R;
++import org.telegram.messenger.UserConfig;
++import org.telegram.ui.ActionBar.BaseFragment;
++import org.telegram.ui.Components.LayoutHelper;
++import org.telegram.utils.proxy.XrayBranding;
++import org.telegram.utils.proxy.XrayGate;
++
++import static org.telegram.messenger.AndroidUtilities.dp;
++import static org.telegram.utils.proxy.XrayTransport.str;
++
++/**
++ * Xraygram (FEAT-19 §2, PAR-18): the intro, one screen instead of the upstream slides.
++ * Icon with an X-ray beam passing top to bottom once (1.2 s; none with animations off), "XRAYGRAM" in monospace,
++ * the unofficial-client line, «Начать», «Русский · English». Always in «Рентген» colors (FEAT-20 tokens).
++ * Order for a new user: splash → this → «Начать» → «Подключение через XRAY» (if the gate is closed) → phone number.
++ * Needs no network.
++ */
++public class XrayIntroActivity extends BaseFragment {
++
++    private static final int BG = 0xFF0B1220;
++    private static final int TEXT = 0xFFE6F1FF;
++    private static final int TEXT_2 = 0xFF8EA3BF;
++    private static final int ACCENT = 0xFF3EF2C8;
++    private static final int ACCENT_HI = 0xFF8FFBE0;
++    private static final int ON_ACCENT = 0xFF04211B;
++
++    private boolean pendingLogin;
++    private boolean started;
++
++    private TextView subtitleView;
++    private TextView startButton;
++    private TextView ruView;
++    private TextView enView;
++
++    @Override
++    public View createView(Context context) {
++        if (actionBar != null) {
++            actionBar.setAddToContainer(false);
++        }
++
++        FrameLayout root = new FrameLayout(context);
++        root.setBackgroundColor(BG);
++
++        ScrollView scroll = new ScrollView(context);
++        scroll.setFillViewport(true);
++        root.addView(scroll, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
++
++        LinearLayout column = new LinearLayout(context);
++        column.setOrientation(LinearLayout.VERTICAL);
++        column.setGravity(Gravity.CENTER_HORIZONTAL);
++        scroll.addView(column, new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.MATCH_PARENT));
++
++        View topSpace = new View(context);
++        column.addView(topSpace, new LinearLayout.LayoutParams(1, 0, 1f));
++
++        BeamIconView icon = new BeamIconView(context);
++        column.addView(icon, LayoutHelper.createLinear(240, 240, Gravity.CENTER_HORIZONTAL));
++
++        TextView title = new TextView(context);
++        title.setText("XRAYGRAM");
++        title.setTextColor(TEXT);
++        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 28);
++        title.setTypeface(AndroidUtilities.getTypeface(AndroidUtilities.TYPEFACE_ROBOTO_MONO));
++        title.setLetterSpacing(6f / 28f);
++        title.setGravity(Gravity.CENTER);
++        title.setSingleLine();
++        column.addView(title, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 12, 0, 0));
++
++        subtitleView = new TextView(context);
++        subtitleView.setTextColor(TEXT_2);
++        subtitleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
++        subtitleView.setGravity(Gravity.CENTER);
++        subtitleView.setLineSpacing(dp(2), 1f);
++        column.addView(subtitleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 40, 14, 40, 0));
++
++        View bottomSpace = new View(context);
++        column.addView(bottomSpace, new LinearLayout.LayoutParams(1, 0, 1f));
++
++        startButton = new TextView(context) {
++            @Override
++            protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
++                int size = MeasureSpec.getSize(widthMeasureSpec);
++                if (size > dp(320)) {
++                    widthMeasureSpec = MeasureSpec.makeMeasureSpec(dp(320), MeasureSpec.EXACTLY);
++                }
++                super.onMeasure(widthMeasureSpec, heightMeasureSpec);
++            }
++        };
++        GradientDrawable buttonBg = new GradientDrawable();
++        buttonBg.setColor(ACCENT);
++        buttonBg.setCornerRadius(dp(12));
++        startButton.setBackground(buttonBg);
++        startButton.setTextColor(ON_ACCENT);
++        startButton.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
++        startButton.setTypeface(AndroidUtilities.bold());
++        startButton.setGravity(Gravity.CENTER);
++        startButton.setOnClickListener(v -> onStartPressed());
++        column.addView(startButton, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 50, Gravity.CENTER_HORIZONTAL, 24, 24, 24, 0));
++
++        LinearLayout langs = new LinearLayout(context);
++        langs.setOrientation(LinearLayout.HORIZONTAL);
++        langs.setGravity(Gravity.CENTER);
++        ruView = langView(context, "Русский", "ru");
++        enView = langView(context, "English", "en");
++        TextView dot = new TextView(context);
++        dot.setText("·");
++        dot.setTextColor(TEXT_2);
++        dot.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
++        langs.addView(ruView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 40));
++        langs.addView(dot, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 2, 0, 2, 0));
++        langs.addView(enView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 40));
++        column.addView(langs, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 12, 0, 20));
++
++        updateTexts();
++        fragmentView = root;
++        return fragmentView;
++    }
++
++    private TextView langView(Context context, String label, String code) {
++        TextView view = new TextView(context);
++        view.setText(label);
++        view.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
++        view.setGravity(Gravity.CENTER);
++        view.setPadding(dp(10), 0, dp(10), 0);
++        view.setOnClickListener(v -> switchLanguage(code));
++        return view;
++    }
++
++    private static boolean isRussian() {
++        return "Русский".equals(str("Русский", "English"));
++    }
++
++    private void updateTexts() {
++        if (subtitleView == null) {
++            return;
++        }
++        subtitleView.setText(XrayBranding.aboutLine());
++        startButton.setText(str("Начать", "Start"));
++        boolean ru = isRussian();
++        ruView.setTextColor(ru ? ACCENT : TEXT_2);
++        enView.setTextColor(ru ? TEXT_2 : ACCENT);
++        ruView.setTypeface(ru ? AndroidUtilities.bold() : null);
++        enView.setTypeface(ru ? null : AndroidUtilities.bold());
++    }
++
++    /** Xraygram screens switch at once; Telegram strings follow when the language pack loads through XRAY. */
++    private void switchLanguage(String code) {
++        if (started || (code.equals("ru") == isRussian())) {
++            return;
++        }
++        LocaleController.LocaleInfo info = LocaleController.getInstance().getLanguageFromDict(code);
++        if (info == null) {
++            return;
++        }
++        LocaleController.getInstance().applyLanguage(info, true, false, currentAccount);
++        updateTexts();
++    }
++
++    private void onStartPressed() {
++        if (started) {
++            return;
++        }
++        if (XrayGate.isBlocked()) {
++            pendingLogin = true;
++            XrayGate.present(getParentActivity());
++            return;
++        }
++        openLogin();
++    }
++
++    private void openLogin() {
++        openLogin(0);
++    }
++
++    /** presentFragment is refused while another transition runs (e.g. the gate closing) — then try again shortly. */
++    private void openLogin(int attempt) {
++        if (started || isFinishing() || getParentLayout() == null) {
++            return;
++        }
++        if (presentFragment(new LoginActivity(), true)) {
++            started = true;
++            pendingLogin = false;
++        } else if (attempt < 20) {
++            AndroidUtilities.runOnUIThread(() -> openLogin(attempt + 1), 150);
++        }
++    }
++
++    @Override
++    public void onResume() {
++        super.onResume();
++        updateTexts();
++        // back from «Подключение через XRAY» with the gate open → phone number
++        if (pendingLogin && !XrayGate.isBlocked() && !UserConfig.getInstance(currentAccount).isClientActivated()) {
++            AndroidUtilities.runOnUIThread(this::openLogin, 200);
++        }
++    }
++
++    @Override
++    public boolean isLightStatusBar() {
++        return false;
++    }
++
++    @Override
++    public int getNavigationBarColor() {
++        return BG;
++    }
++
++    @Override
++    public boolean isSwipeBackEnabled(android.view.MotionEvent event) {
++        return false;
++    }
++
++    /** The icon (rounded 40/176, soft accent glow) and the beam. */
++    private static final class BeamIconView extends View {
++
++        private final Bitmap icon;
++        private final Paint iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
++        private final Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
++        private final Paint bandPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
++        private final Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
++        private final RectF rect = new RectF();
++        private final Rect src = new Rect();
++        private final Path clip = new Path();
++        private float progress = -1f; // -1: no beam
++        private boolean canvasIcon;
++        private boolean played;
++
++        BeamIconView(Context context) {
++            super(context);
++            setLayerType(LAYER_TYPE_SOFTWARE, null); // BlurMaskFilter
++            Bitmap b = null;
++            try {
++                b = BitmapFactory.decodeResource(getResources(), R.drawable.xraygram_splash); // branding/launch: 176/240, glow
++            } catch (Throwable ignore) {
++            }
++            if (b == null) {
++                try {
++                    b = BitmapFactory.decodeResource(getResources(), R.mipmap.xraygram_launcher);
++                } catch (Throwable ignore) {
++                }
++            }
++            icon = b;
++            canvasIcon = b != null && b.getWidth() > 400; // the launch canvas (icon + glow) vs. a bare launcher icon
++            glowPaint.setColor(ACCENT);
++            glowPaint.setAlpha((int) (255 * 0.25f));
++            glowPaint.setMaskFilter(new BlurMaskFilter(dp(24), BlurMaskFilter.Blur.OUTER));
++            linePaint.setColor(ACCENT_HI);
++            linePaint.setStrokeWidth(Math.max(1, dp(1.5f)));
++            setContentDescription("Xraygram");
++        }
++
++        private static boolean animationsOff(Context context) {
++            try {
++                return Settings.Global.getFloat(context.getContentResolver(), Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
++                        || Settings.Global.getFloat(context.getContentResolver(), Settings.Global.TRANSITION_ANIMATION_SCALE, 1f) == 0f;
++            } catch (Throwable e) {
++                return false;
++            }
++        }
++
++        @Override
++        protected void onAttachedToWindow() {
++            super.onAttachedToWindow();
++            if (played || animationsOff(getContext())) {
++                return;
++            }
++            played = true;
++            ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
++            animator.setDuration(1200);
++            animator.setStartDelay(250);
++            animator.setInterpolator(new LinearInterpolator());
++            animator.addUpdateListener(a -> {
++                progress = (float) a.getAnimatedValue();
++                invalidate();
++            });
++            animator.addListener(new android.animation.AnimatorListenerAdapter() {
++                @Override
++                public void onAnimationEnd(android.animation.Animator animation) {
++                    progress = -1f;
++                    invalidate();
++                }
++            });
++            animator.start();
++        }
++
++        @Override
++        protected void onDraw(Canvas canvas) {
++            final float size = dp(176);
++            final float left = (getWidth() - size) / 2f, top = (getHeight() - size) / 2f;
++            final float radius = size * 40f / 176f;
++            rect.set(left, top, left + size, top + size);
++            if (icon != null && canvasIcon) {
++                // the launch asset already has the rounded corners and the glow: 176 dp icon on a 240 dp canvas
++                final float c = dp(240);
++                final float cl = (getWidth() - c) / 2f, ct = (getHeight() - c) / 2f;
++                src.set(0, 0, icon.getWidth(), icon.getHeight());
++                canvas.drawBitmap(icon, src, new RectF(cl, ct, cl + c, ct + c), iconPaint);
++                canvas.save();
++                clip.rewind();
++                clip.addRoundRect(rect, radius, radius, Path.Direction.CW);
++                canvas.clipPath(clip);
++            } else {
++                canvas.drawRoundRect(rect, radius, radius, glowPaint);
++                canvas.save();
++                clip.rewind();
++                clip.addRoundRect(rect, radius, radius, Path.Direction.CW);
++                canvas.clipPath(clip);
++                if (icon != null) {
++                    src.set(0, 0, icon.getWidth(), icon.getHeight());
++                    canvas.drawBitmap(icon, src, rect, iconPaint);
++                } else {
++                    iconPaint.setColor(0xFF121B2E);
++                    canvas.drawRect(rect, iconPaint);
++                }
++            }
++            if (progress >= 0f) {
++                // a soft band (accent 55 % in the middle, blurred edges) and a thin accent-hi line, top → bottom
++                final float band = size * 0.28f;
++                final float y = top - band / 2f + (size + band) * progress;
++                bandPaint.setShader(new LinearGradient(0, y - band / 2f, 0, y + band / 2f,
++                        new int[]{0x003EF2C8, 0x8C3EF2C8, 0x003EF2C8}, new float[]{0f, 0.5f, 1f}, Shader.TileMode.CLAMP));
++                canvas.drawRect(left, y - band / 2f, left + size, y + band / 2f, bandPaint);
++                canvas.drawLine(left, y, left + size, y, linePaint);
++            }
++            canvas.restore();
++        }
++    }
++}
 diff --git a/TMessagesProj/src/main/java/org/telegram/ui/XrayShareSheet.java b/TMessagesProj/src/main/java/org/telegram/ui/XrayShareSheet.java
 new file mode 100644
 index 000000000..a3463907c
@@ -1894,6 +2813,236 @@ index 1914e5c9b..cb8fe3792 100644
          }
          return Type.SOCKS5;
      }
+diff --git a/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayBranding.java b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayBranding.java
+new file mode 100644
+index 000000000..d34af01f7
+--- /dev/null
++++ b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayBranding.java
+@@ -0,0 +1,224 @@
++package org.telegram.utils.proxy;
++
++import android.app.Activity;
++import android.content.Context;
++import android.text.SpannableStringBuilder;
++import android.text.Spanned;
++import android.text.method.LinkMovementMethod;
++import android.text.style.ClickableSpan;
++import android.util.TypedValue;
++import android.view.Gravity;
++import android.view.View;
++import android.widget.ImageView;
++import android.widget.LinearLayout;
++import android.widget.TextView;
++
++import androidx.annotation.NonNull;
++
++import org.telegram.messenger.AndroidUtilities;
++import org.telegram.messenger.ApplicationLoader;
++import org.telegram.messenger.BuildConfig;
++import org.telegram.messenger.R;
++import org.telegram.messenger.browser.Browser;
++import org.telegram.ui.ActionBar.AlertDialog;
++import org.telegram.ui.ActionBar.Theme;
++import org.telegram.ui.Components.LayoutHelper;
++
++import java.util.Arrays;
++import java.util.HashSet;
++import java.util.concurrent.ConcurrentHashMap;
++import java.util.regex.Pattern;
++
++import static org.telegram.utils.proxy.XrayTransport.str;
++
++/**
++ * Xraygram (FEAT-19, PAR-20/21): "Telegram" → "Xraygram" where a string is about this app on this device, and «About».
++ *
++ * Replacement is by key only (FEAT-19 rule): keys from {@link #APP_KEYS}, nothing else. Inside those strings the
++ * protected phrases about the service ("Telegram's … servers", "Telegram Premium", "серверы Telegram", "аккаунт
++ * Telegram"…) stay. Works for built-in resources and cloud language packs alike (LocaleController.getStringV2).
++ * The key list is documented in android/decisions.md (FEAT-19) for QA (F19-09…12).
++ */
++public final class XrayBranding {
++
++    private XrayBranding() {
++    }
++
++    public static final String SOURCE_URL = "https://github.com/vizacv/xraygram";
++    private static final String SOURCE_TEXT = "github.com/vizacv/xraygram";
++
++    /** Keys whose "Telegram" means this app. Grouped as in android/rebrand-inventory.md §3.3. */
++    private static final HashSet<String> APP_KEYS = new HashSet<>(Arrays.asList(
++            // app name, welcome, update, unsupported-on-this-version
++            "AppNameBeta", "NoChats", "AppUpdate", "AppUpdateBeta", "UpdateTelegram", "UpdateAppAlert",
++            "UnsupportedMedia2", "UnsupportedBlockMessage", "UnsupportedMessageMessage", "StoryUnsupported",
++            "Gift2ExportTONUpdateRequiredText",
++            // runtime permission explanations
++            "NotificationsPermissionAlertSubtitle", "ContactsPermissionAlert", "QRCodePermissionNoCameraWithHint",
++            "AllowReadCall", "AllowReadCallAndLog", "AllowReadCallLog", "AllowFillNumber",
++            "PermissionStorageWithHint", "PermissionNoAudioWithHint", "PermissionNoBluetoothWithHint",
++            "PermissionNoAudioVideoWithHint", "PermissionNoCameraWithHint", "PermissionNoCameraMicVideo",
++            "PermissionNoLocation", "PermissionNoLocationStory", "PermissionNoLocationFriends",
++            "PermissionNoLocationNavigation", "PermissionNoContactsSharing", "PermissionNoContactsSaving",
++            "PermissionNoStorageAvatar", "PermissionNoAudioStorageStory", "PermissionDrawAboveOtherApps",
++            "PermissionDrawAboveOtherAppsGroupCall", "PermissionXiaomiLockscreen", "PermissionFSILockscreen",
++            "PermissionBackgroundLocation", "VoipNeedMicPermissionWithHint", "VoipNeedMicCameraPermissionWithHint",
++            "VoipNeedCameraPermission", "AgeVerificationNeedCameraPermission",
++            // calls as the app
++            "VoipInCallBranding", "VoipInVideoCallBranding", "VoipInConferenceCallBranding", "VoipOutgoingCall",
++            "CallViaTelegram", "VideoCallViaTelegram", "VoiceCallViaTelegram", "VoipInCallBrandingWithName",
++            "VoipInVideoCallBrandingWithName", "VoipRateCallAlert", "VoipErrorUnknown",
++            "AllowBackgroundActivityInfo", "AllowBackgroundActivityInfoOneUIBelowS", "AllowBackgroundActivityInfoOneUIAboveS",
++            "IncomingCallsSystemSettingDescription",
++            // notifications shown by the app
++            "NotificationHiddenName", "NotificationHiddenChatName", "SecretChatName", "ProfilePopupNotificationInfo",
++            "LiveLocationPausedText",
++            // storage, cache, database on this device
++            "ClearTelegramCache", "TelegramCacheSize", "LocalDatabaseSize", "LocalDatabaseInfo", "StorageUsageTelegram",
++            "StorageUsageTelegramLess", "LowDiskSpaceMessage", "ClearingCacheDescription", "SdCardAlert",
++            "SdCardErrorDescription", "OptimizingTelegram", "MigrateOldFolderDescription", "ImportImportingInfo",
++            // passcode, app lock, screen capture
++            "ChangePasscodeInfo", "EnterYourPasscodeInfo", "EnterYourTelegramPasscode", "CreatePasscodeInfoPIN",
++            "CreatePasscodeInfoPassword", "UnlockToUse", "AppLocked", "ScreenCaptureAlert",
++            "WalletAuthorizeTransactionPasscode",
++            // in-app browser, themes
++            "OpenInTelegramBrowser", "BrowserSettingsCustomTabs", "BrowserSettingsNoCustomTabsInfo",
++            "BrowserSettingsEnableInfo", "BrowserSettingsCookiesInfo", "BrowserExternalRestricted", "CreateNewThemeAlert",
++            // upstream intro slides (no longer shown, kept consistent)
++            "Page2Message", "Page3Message", "Page4Message", "Page5Message", "Page6Message"
++    ));
++
++    /** "Telegram" and Russian forms, unless the phrase is about the service (FEAT-19 rule, п. 2). */
++    private static final Pattern APP_WORD = Pattern.compile(
++            "(?<!(?:серверы|серверах|серверов|сервера|серверами|облаке|облако|облака|облаком|облачных|облачным|облачными|аккаунт|аккаунта|аккаунте|аккаунтом"
++                    + "|пользователи|пользователей|пользователям|модераторы|поддержка) )"
++                    + "(?:Telegram|Телеграмм?(?:а|е|у|ом)?)"
++                    + "(?!['’]|\\s+(?:Premium|Stars|Business|Passport|Gateway|Ads|Wallet|account|accounts|cloud|servers?|API"
++                    + "|users?|contacts|moderators|Support|FAQ|Features|News)\\b)");
++
++    private static final ConcurrentHashMap<String, String> cache = new ConcurrentHashMap<>();
++
++    /** LocaleController hook: value of {@code key} as Xraygram shows it. */
++    public static String apply(String key, String value) {
++        if (key == null || value == null) {
++            return value;
++        }
++        if ("TelegramVersion".equals(key)) {
++            return "Xraygram " + version() + " · Telegram Android %1$s"; // debug/crash info line
++        }
++        if (!APP_KEYS.contains(key) || value.indexOf('T') < 0 && value.indexOf('Т') < 0) {
++            return value;
++        }
++        String cached = cache.get(value);
++        if (cached != null) {
++            return cached;
++        }
++        String result = APP_WORD.matcher(value).replaceAll("Xraygram");
++        if (cache.size() < 512) {
++            cache.put(value, result);
++        }
++        return result;
++    }
++
++    public static boolean isAppKey(String key) {
++        return APP_KEYS.contains(key);
++    }
++
++    // ------------------------------------------------------------------ About (FEAT-19 §4)
++
++    /** Xraygram version: the build ID without the platform prefix, e.g. "20261119-2". */
++    public static String version() {
++        String id = BuildConfig.XRAYGRAM_BUILD;
++        return id != null && id.startsWith("android-") ? id.substring("android-".length()) : String.valueOf(id);
++    }
++
++    public static String upstreamVersion() {
++        try {
++            Context c = ApplicationLoader.applicationContext;
++            return c.getPackageManager().getPackageInfo(c.getPackageName(), 0).versionName;
++        } catch (Throwable e) {
++            return "";
++        }
++    }
++
++    public static String aboutTitle() {
++        return "Xraygram " + version();
++    }
++
++    public static String aboutLine() {
++        return str("Неофициальный клиент Telegram, который подключается через ваш сервер XRAY.",
++                "An unofficial Telegram client that connects through your own XRAY server.");
++    }
++
++    public static String aboutSmall() {
++        return str("На основе Telegram Android " + upstreamVersion() + ". Исходный код: " + SOURCE_TEXT,
++                "Based on Telegram Android " + upstreamVersion() + ". Source code: " + SOURCE_TEXT);
++    }
++
++    /** The version row under the Settings list (FEAT-19 §4); a tap opens {@link #showAbout}. */
++    public static String settingsVersionText() {
++        return str("Xraygram для Android " + version() + " · неофициальный клиент Telegram",
++                "Xraygram for Android " + version() + " · unofficial Telegram client");
++    }
++
++    /** «About» window: icon, name and version, the unofficial-client line, upstream version and source link. */
++    public static void showAbout(Activity activity) {
++        if (activity == null || activity.isFinishing()) {
++            return;
++        }
++        LinearLayout layout = new LinearLayout(activity);
++        layout.setOrientation(LinearLayout.VERTICAL);
++        layout.setPadding(AndroidUtilities.dp(24), AndroidUtilities.dp(20), AndroidUtilities.dp(24), AndroidUtilities.dp(4));
++
++        ImageView icon = new ImageView(activity);
++        icon.setImageResource(R.mipmap.xraygram_launcher_round);
++        layout.addView(icon, LayoutHelper.createLinear(72, 72, Gravity.CENTER_HORIZONTAL));
++
++        TextView title = new TextView(activity);
++        title.setText(aboutTitle());
++        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
++        title.setTypeface(AndroidUtilities.bold());
++        title.setGravity(Gravity.CENTER);
++        title.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
++        layout.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 12, 0, 0));
++
++        TextView line = new TextView(activity);
++        line.setText(aboutLine());
++        line.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
++        line.setGravity(Gravity.CENTER);
++        line.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
++        layout.addView(line, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 8, 0, 0));
++
++        TextView small = new TextView(activity);
++        String smallText = aboutSmall();
++        SpannableStringBuilder ssb = new SpannableStringBuilder(smallText);
++        int at = smallText.indexOf(SOURCE_TEXT);
++        if (at >= 0) {
++            ssb.setSpan(new ClickableSpan() {
++                @Override
++                public void onClick(@NonNull View widget) {
++                    Browser.openUrl(activity, SOURCE_URL);
++                }
++            }, at, at + SOURCE_TEXT.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
++        }
++        small.setText(ssb);
++        small.setMovementMethod(LinkMovementMethod.getInstance());
++        small.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
++        small.setGravity(Gravity.CENTER);
++        small.setTextColor(Theme.getColor(Theme.key_dialogTextGray3));
++        small.setLinkTextColor(Theme.getColor(Theme.key_dialogTextLink));
++        layout.addView(small, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 10, 0, 0));
++
++        new AlertDialog.Builder(activity)
++                .setView(layout)
++                .setPositiveButton(str("Закрыть", "Close"), null)
++                .show();
++    }
++
++    // For tests / QA dumps: the key list as text.
++    public static String keysForQa() {
++        String[] keys = APP_KEYS.toArray(new String[0]);
++        Arrays.sort(keys);
++        return String.join("\n", keys);
++    }
++}
 diff --git a/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayCalls.java b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayCalls.java
 new file mode 100644
 index 000000000..628b96d2b
@@ -2001,10 +3150,10 @@ index 000000000..628b96d2b
 +}
 diff --git a/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayGate.java b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayGate.java
 new file mode 100644
-index 000000000..a20a5518a
+index 000000000..6c12e9e4c
 --- /dev/null
 +++ b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayGate.java
-@@ -0,0 +1,242 @@
+@@ -0,0 +1,255 @@
 +package org.telegram.utils.proxy;
 +
 +import android.app.Activity;
@@ -2241,7 +3390,20 @@ index 000000000..a20a5518a
 +            return;
 +        }
 +        final BaseFragment last = launchActivity.getActionBarLayout().getLastFragment();
-+        if (last instanceof XrayGateActivity) {
++        if (last instanceof XrayGateActivity || last instanceof org.telegram.ui.XrayIntroActivity) {
++            return; // FEAT-19: intro first, the gate opens on «Начать»
++        }
++        launchActivity.presentFragment(new XrayGateActivity());
++    }
++
++    /** «Начать» on the intro (FEAT-19): show the gate now. */
++    public static void present(Activity activity) {
++        if (!(activity instanceof LaunchActivity) || !isBlocked()) {
++            return;
++        }
++        final LaunchActivity launchActivity = (LaunchActivity) activity;
++        if (launchActivity.getActionBarLayout() == null
++                || launchActivity.getActionBarLayout().getLastFragment() instanceof XrayGateActivity) {
 +            return;
 +        }
 +        launchActivity.presentFragment(new XrayGateActivity());
@@ -3037,6 +4199,308 @@ index 000000000..08c75ccd3
 +        return lang != null && lang.toLowerCase(Locale.US).startsWith("ru") ? ru : en;
 +    }
 +}
+diff --git a/TMessagesProj/src/main/java/org/telegram/utils/recorder/round/RoundVideoOverlayRenderer.java b/TMessagesProj/src/main/java/org/telegram/utils/recorder/round/RoundVideoOverlayRenderer.java
+index bd6d025f5..b0b73b0cb 100644
+--- a/TMessagesProj/src/main/java/org/telegram/utils/recorder/round/RoundVideoOverlayRenderer.java
++++ b/TMessagesProj/src/main/java/org/telegram/utils/recorder/round/RoundVideoOverlayRenderer.java
+@@ -583,6 +583,7 @@ final class RoundVideoOverlayRenderer {
+     }
+ 
+     private void renderWatermarks() {
++        if (true) return; // Xraygram (FEAT-19 §3, F19-18): no watermark in sent round videos
+         if (!compositionEnabled || watermarkProgram == null) return;
+         GLES20.glEnable(GLES20.GL_BLEND);
+         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+diff --git a/TMessagesProj/src/main/res/drawable/call_custom_notification_icon.xml b/TMessagesProj/src/main/res/drawable/call_custom_notification_icon.xml
+index a7d66e006..9f5a6cb23 100644
+--- a/TMessagesProj/src/main/res/drawable/call_custom_notification_icon.xml
++++ b/TMessagesProj/src/main/res/drawable/call_custom_notification_icon.xml
+@@ -4,11 +4,11 @@
+         android:width="40dp"
+         android:height="40dp">
+         <shape android:shape="oval">
+-            <solid android:color="#2ca5e0" />
++            <solid android:color="#3EF2C8" />
+         </shape>
+     </item>
+     <item
+-        android:drawable="@drawable/notification"
++        android:drawable="@drawable/ic_stat_xraygram"
+ 		android:gravity="center"
+         android:left="-2dp"
+         android:width="24dp"
+diff --git a/TMessagesProj/src/main/res/drawable/xraygram_launch_background.xml b/TMessagesProj/src/main/res/drawable/xraygram_launch_background.xml
+new file mode 100644
+index 000000000..d29cf09d8
+--- /dev/null
++++ b/TMessagesProj/src/main/res/drawable/xraygram_launch_background.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Xraygram (FEAT-19 §1, PAR-17): launch window before LaunchActivity draws: bg #0B1220 + branding/launch icon
++     (176 dp, rounded 40, accent glow, on a 240 dp canvas; copied to drawable-nodpi by android/scripts/build-local.sh) -->
++<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
++    <item android:drawable="@color/xraygram_bg" />
++    <item
++        android:width="240dp"
++        android:height="240dp"
++        android:gravity="center"
++        android:drawable="@drawable/xraygram_splash" />
++</layer-list>
+diff --git a/TMessagesProj/src/main/res/drawable/xraygram_splash_icon.xml b/TMessagesProj/src/main/res/drawable/xraygram_splash_icon.xml
+new file mode 100644
+index 000000000..1ddb3cc1f
+--- /dev/null
++++ b/TMessagesProj/src/main/res/drawable/xraygram_splash_icon.xml
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Xraygram (FEAT-19 §1, PAR-17): Android 12+ system splash icon. The system scales it to 288 dp and masks a 192 dp
++     circle; the inset keeps the rounded icon (176 of 240) whole inside that circle. -->
++<inset xmlns:android="http://schemas.android.com/apk/res/android"
++    android:drawable="@drawable/xraygram_splash"
++    android:inset="13%" />
+diff --git a/TMessagesProj/src/main/res/values-ar/strings.xml b/TMessagesProj/src/main/res/values-ar/strings.xml
+index 8b8700432..68a460038 100644
+--- a/TMessagesProj/src/main/res/values-ar/strings.xml
++++ b/TMessagesProj/src/main/res/values-ar/strings.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="AppName">تيليجرام</string>
++    <string name="AppName">Xraygram</string>
+     <string name="AppNameBeta">(Beta) تيليجرام</string>
+     <string name="LanguageName">العربية</string>
+     <string name="English">الإنجليزية</string>
+@@ -1191,7 +1191,7 @@
+     <string name="TosUpdateDecline">للأسف، لا توجد خيارات أخرى. على عكس التطبيقات الأخرى؛ لا تستخدم تيليجرام بيانات المستخدمين لاستهدافهم بالإعلانات أو لأغراض تجارية أخرى. يخزن تيليجرام فقط المعلومات التي يحتاجها للعمل كخدمة سحابية غنية بالميزات. يمكنك ضبط كيفية استخدام بياناتك في إعدادات الخصوصية والأمان.\n\nإذا لم تكن مرتاحًا لاحتياجات تيليجرام المتواضعة؛ لن نتمكن من تزويدك بهذه الخدمة.</string>
+     <string name="TosDeclineDeleteAccount">تحذير، سيؤدي هذا إلى حذف حسابك في تيليجرام بشكل نهائي بالإضافة لجميع البيانات التي تخزنها في سحابة تيليجرام.\n\nهام: يمكنك الإلغاء الآن وتصدير بياناتك قبل حذف حسابك عوضًا عن خسارتها كلها. (للقيام بذلك، افتح النسخة الأخيرة من تيليجرام لسطح المكتب وتوجه إلى الإعدادات &gt; إعدادات متقدمة &gt; تصدير بيانات تيليجرام).</string>
+     <!--Intro view-->
+-    <string name="Page1Title">تيليجرام</string>
++    <string name="Page1Title">Xraygram</string>
+     <string name="Page2Title">سريع</string>
+     <string name="Page3Title">مجاني</string>
+     <string name="Page4Title">آمن</string>
+diff --git a/TMessagesProj/src/main/res/values-de/strings.xml b/TMessagesProj/src/main/res/values-de/strings.xml
+index 9054784ad..4a77715c5 100644
+--- a/TMessagesProj/src/main/res/values-de/strings.xml
++++ b/TMessagesProj/src/main/res/values-de/strings.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="AppName">Telegram</string>
++    <string name="AppName">Xraygram</string>
+     <string name="AppNameBeta">Telegram Beta</string>
+     <string name="LanguageName">Deutsch</string>
+     <string name="English">Englisch</string>
+diff --git a/TMessagesProj/src/main/res/values-es/strings.xml b/TMessagesProj/src/main/res/values-es/strings.xml
+index 4779808ea..fc29faf8b 100644
+--- a/TMessagesProj/src/main/res/values-es/strings.xml
++++ b/TMessagesProj/src/main/res/values-es/strings.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="AppName">Telegram</string>
++    <string name="AppName">Xraygram</string>
+     <string name="AppNameBeta">Telegram Beta</string>
+     <string name="LanguageName">Español</string>
+     <string name="English">Inglés</string>
+@@ -1258,7 +1258,7 @@
+     <string name="PermissionDrawAboveOtherAppsTitle">Modo imagen en imagen</string>
+     <string name="PermissionDrawAboveOtherAppsGroupCallTitle">Superposición del videochat</string>
+     <!--Intro view-->
+-    <string name="Page1Title">Telegram</string>
++    <string name="Page1Title">Xraygram</string>
+     <string name="Page2Title">Rápido</string>
+     <string name="Page3Title">Gratuito</string>
+     <string name="Page4Title">Seguro</string>
+diff --git a/TMessagesProj/src/main/res/values-it/strings.xml b/TMessagesProj/src/main/res/values-it/strings.xml
+index 3e7688d9d..ac70bdd96 100644
+--- a/TMessagesProj/src/main/res/values-it/strings.xml
++++ b/TMessagesProj/src/main/res/values-it/strings.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="AppName">Telegram</string>
++    <string name="AppName">Xraygram</string>
+     <string name="AppNameBeta">Telegram Beta</string>
+     <string name="LanguageName">Italiano</string>
+     <string name="English">Inglese</string>
+diff --git a/TMessagesProj/src/main/res/values-ko/strings.xml b/TMessagesProj/src/main/res/values-ko/strings.xml
+index 6f75e2efd..9c4a5f303 100644
+--- a/TMessagesProj/src/main/res/values-ko/strings.xml
++++ b/TMessagesProj/src/main/res/values-ko/strings.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="AppName">텔레그램</string>
++    <string name="AppName">Xraygram</string>
+     <string name="AppNameBeta">텔레그램</string>
+     <string name="LanguageName">한국어</string>
+     <string name="English">영어</string>
+diff --git a/TMessagesProj/src/main/res/values-night/styles.xml b/TMessagesProj/src/main/res/values-night/styles.xml
+index e5a85d925..fe7b75714 100644
+--- a/TMessagesProj/src/main/res/values-night/styles.xml
++++ b/TMessagesProj/src/main/res/values-night/styles.xml
+@@ -11,20 +11,21 @@
+ 
+     <!--THEMES-->
+ 
++    <!-- Xraygram (FEAT-19, PAR-17): launch window and splash in «Рентген» colors -->
+     <style name="Theme.TMessages.Start" parent="Theme.AppCompat.DayNight">
+         <item name="android:windowActionBar">false</item>
+         <item name="android:windowNoTitle">true</item>
+         <item name="android:actionBarStyle">@style/ActionBar.Transparent.TMessages.Start</item>
+-        <item name="android:colorBackground">#1f2732</item>
+-        <item name="android:windowBackground">#1f2732</item>
++        <item name="android:colorBackground">@color/xraygram_bg</item>
++        <item name="android:windowBackground">@drawable/xraygram_launch_background</item>
+         <item name="android:windowContentOverlay">@null</item>
+-        <item name="android:colorPrimaryDark">#1c242e</item>
+-        <item name="android:colorPrimary">#232d3a</item>
++        <item name="android:colorPrimaryDark">@color/xraygram_bg</item>
++        <item name="android:colorPrimary">@color/xraygram_surface</item>
+         <item name="android:navigationBarColor">#000000</item>
+         <item name="android:forceDarkAllowed">false</item>
+-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/tg_splash_320</item>
++        <item name="android:windowSplashScreenAnimatedIcon">@drawable/xraygram_splash_icon</item>
+         <item name="android:windowSplashScreenAnimationDuration">@integer/splash_screen_duration</item>
+-        <item name="android:windowSplashScreenBackground">#1f2732</item>
++        <item name="android:windowSplashScreenBackground">@color/xraygram_bg</item>
+     </style>
+ 
+     <style name="ActionBar.Transparent.TMessages.Start" parent="android:style/Widget.Material.Light.ActionBar">
+diff --git a/TMessagesProj/src/main/res/values-nl/strings.xml b/TMessagesProj/src/main/res/values-nl/strings.xml
+index f3df87e85..d18b32da2 100644
+--- a/TMessagesProj/src/main/res/values-nl/strings.xml
++++ b/TMessagesProj/src/main/res/values-nl/strings.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="AppName">Telegram</string>
++    <string name="AppName">Xraygram</string>
+     <string name="AppNameBeta">Telegram-bèta</string>
+     <string name="LanguageName">Nederlands</string>
+     <string name="English">Engels</string>
+diff --git a/TMessagesProj/src/main/res/values-pt-rBR/strings.xml b/TMessagesProj/src/main/res/values-pt-rBR/strings.xml
+index 03d0ba337..3a672fff4 100644
+--- a/TMessagesProj/src/main/res/values-pt-rBR/strings.xml
++++ b/TMessagesProj/src/main/res/values-pt-rBR/strings.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="AppName">Telegram</string>
++    <string name="AppName">Xraygram</string>
+     <string name="AppNameBeta">Telegram Beta</string>
+     <string name="LanguageName">Português (Brasil)</string>
+     <string name="English">Inglês</string>
+@@ -1192,7 +1192,7 @@
+     <string name="PermissionDrawAboveOtherAppsTitle">Picture-in-Picture</string>
+     <string name="PermissionDrawAboveOtherAppsGroupCallTitle">Chat de vídeo flutuante</string>
+     <!--Intro view-->
+-    <string name="Page1Title">Telegram</string>
++    <string name="Page1Title">Xraygram</string>
+     <string name="Page2Title">Rápido</string>
+     <string name="Page3Title">Gratuito</string>
+     <string name="Page4Title">Seguro</string>
+diff --git a/TMessagesProj/src/main/res/values-ru/strings.xml b/TMessagesProj/src/main/res/values-ru/strings.xml
+index 24c562920..2f8151e4c 100644
+--- a/TMessagesProj/src/main/res/values-ru/strings.xml
++++ b/TMessagesProj/src/main/res/values-ru/strings.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="AppName">Telegram</string>
++    <string name="AppName">Xraygram</string>
+     <string name="AppNameBeta">Telegram Beta</string>
+     <string name="LanguageName">Русский</string>
+     <string name="English">Английский</string>
+@@ -209,7 +209,7 @@
+     <string name="CheckYourNewEmailSubtitle">Введите код, который пришёл на указанный Вами адрес %1$s.</string>
+     <string name="LoginOrSingInWithGoogle">или</string>
+     <!--Intro view-->
+-    <string name="Page1Title">Telegram</string>
++    <string name="Page1Title">Xraygram</string>
+     <string name="Page2Title">Быстрый</string>
+     <string name="Page3Title">Бесплатный</string>
+     <string name="Page4Title">Безопасный</string>
+diff --git a/TMessagesProj/src/main/res/values-uk/strings.xml b/TMessagesProj/src/main/res/values-uk/strings.xml
+index d46834430..d12d1fe26 100644
+--- a/TMessagesProj/src/main/res/values-uk/strings.xml
++++ b/TMessagesProj/src/main/res/values-uk/strings.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="AppName">Telegram</string>
++    <string name="AppName">Xraygram</string>
+     <string name="AppNameBeta">Telegram Beta</string>
+     <string name="LanguageName">Українська</string>
+     <string name="English">Англійська</string>
+@@ -222,7 +222,7 @@
+     <string name="CheckYourNewEmailSubtitle">Введіть код, який ми щойно надіслали на вашу нову е-пошту %1$s.</string>
+     <string name="LoginOrSingInWithGoogle">або</string>
+     <!--Intro view-->
+-    <string name="Page1Title">Telegram</string>
++    <string name="Page1Title">Xraygram</string>
+     <string name="Page2Title">Швидкий</string>
+     <string name="Page3Title">Безплатний</string>
+     <string name="Page4Title">Захищений</string>
+diff --git a/TMessagesProj/src/main/res/values-v21/styles.xml b/TMessagesProj/src/main/res/values-v21/styles.xml
+index 23b8f95b9..19f84c15a 100644
+--- a/TMessagesProj/src/main/res/values-v21/styles.xml
++++ b/TMessagesProj/src/main/res/values-v21/styles.xml
+@@ -11,15 +11,16 @@
+ 
+     <!--THEMES-->
+ 
++    <!-- Xraygram (FEAT-19, PAR-17): launch window and splash in «Рентген» colors -->
+     <style name="Theme.TMessages.Start" parent="Theme.AppCompat.Light">
+         <item name="android:windowActionBar">false</item>
+         <item name="android:windowNoTitle">true</item>
+         <item name="android:actionBarStyle">@style/ActionBar.Transparent.TMessages.Start</item>
+-        <item name="android:colorBackground">@android:color/white</item>
+-        <item name="android:windowBackground">@android:color/white</item>
++        <item name="android:colorBackground">@color/xraygram_bg</item>
++        <item name="android:windowBackground">@drawable/xraygram_launch_background</item>
+         <item name="android:windowContentOverlay">@null</item>
+-        <item name="android:colorPrimaryDark">#426482</item>
+-        <item name="android:colorPrimary">#527da3</item>
++        <item name="android:colorPrimaryDark">@color/xraygram_bg</item>
++        <item name="android:colorPrimary">@color/xraygram_surface</item>
+         <item name="android:navigationBarColor">#000000</item>
+         <item name="android:textViewStyle">@style/MyTextViewStyle</item>
+         <item name="android:forceDarkAllowed">false</item>
+diff --git a/TMessagesProj/src/main/res/values-v31/styles.xml b/TMessagesProj/src/main/res/values-v31/styles.xml
+index acec6de2c..093a0effe 100644
+--- a/TMessagesProj/src/main/res/values-v31/styles.xml
++++ b/TMessagesProj/src/main/res/values-v31/styles.xml
+@@ -16,21 +16,22 @@
+ 
+ <resources>
+ 
++    <!-- Xraygram (FEAT-19, PAR-17): launch window and splash in «Рентген» colors -->
+     <style name="Theme.TMessages.Start" parent="Theme.AppCompat.Light">
+         <item name="android:windowActionBar">false</item>
+         <item name="android:windowNoTitle">true</item>
+         <item name="android:actionBarStyle">@style/ActionBar.Transparent.TMessages.Start</item>
+-        <item name="android:colorBackground">@android:color/white</item>
+-        <item name="android:windowBackground">@android:color/white</item>
++        <item name="android:colorBackground">@color/xraygram_bg</item>
++        <item name="android:windowBackground">@drawable/xraygram_launch_background</item>
+         <item name="android:windowContentOverlay">@null</item>
+-        <item name="android:colorPrimaryDark">#426482</item>
+-        <item name="android:colorPrimary">#527da3</item>
++        <item name="android:colorPrimaryDark">@color/xraygram_bg</item>
++        <item name="android:colorPrimary">@color/xraygram_surface</item>
+         <item name="android:navigationBarColor">#000000</item>
+         <item name="android:textViewStyle">@style/MyTextViewStyle</item>
+         <item name="android:forceDarkAllowed">false</item>
+-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/tg_splash_320</item>
++        <item name="android:windowSplashScreenAnimatedIcon">@drawable/xraygram_splash_icon</item>
+         <item name="android:windowSplashScreenAnimationDuration">@integer/splash_screen_duration</item>
+-        <item name="android:windowSplashScreenBackground">?android:windowBackground</item>
++        <item name="android:windowSplashScreenBackground">@color/xraygram_bg</item>
+     </style>
+ 
+     <style name="Theme.TMessages" parent="Theme.AppCompat.Light">
 diff --git a/TMessagesProj/src/main/res/values/strings.xml b/TMessagesProj/src/main/res/values/strings.xml
 index e4f8cf67b..449927b40 100644
 --- a/TMessagesProj/src/main/res/values/strings.xml
@@ -3058,8 +4522,89 @@ index e4f8cf67b..449927b40 100644
      <string name="Page2Title">Fast</string>
      <string name="Page3Title">Free</string>
      <string name="Page4Title">Secure</string>
+diff --git a/TMessagesProj/src/main/res/values/styles.xml b/TMessagesProj/src/main/res/values/styles.xml
+index 2e97ad7be..dd7ea4a06 100644
+--- a/TMessagesProj/src/main/res/values/styles.xml
++++ b/TMessagesProj/src/main/res/values/styles.xml
+@@ -3,12 +3,13 @@
+ 
+     <!--THEMES-->
+ 
++    <!-- Xraygram (FEAT-19, PAR-17): launch window and splash in «Рентген» colors -->
+     <style name="Theme.TMessages.Start" parent="Theme.AppCompat.Light">
+         <item name="android:windowActionBar">false</item>
+         <item name="android:windowNoTitle">true</item>
+         <item name="android:actionBarStyle">@style/ActionBar.Transparent.TMessages.Start</item>
+-        <item name="android:colorBackground">@android:color/white</item>
+-        <item name="android:windowBackground">@android:color/white</item>
++        <item name="android:colorBackground">@color/xraygram_bg</item>
++        <item name="android:windowBackground">@drawable/xraygram_launch_background</item>
+         <item name="android:windowContentOverlay">@null</item>
+         <item name="android:textViewStyle">@style/MyTextViewStyle</item>
+     </style>
+diff --git a/TMessagesProj/src/main/res/values/xraygram_colors.xml b/TMessagesProj/src/main/res/values/xraygram_colors.xml
+new file mode 100644
+index 000000000..61cefbc22
+--- /dev/null
++++ b/TMessagesProj/src/main/res/values/xraygram_colors.xml
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Xraygram (FEAT-19/20): theme «Рентген» tokens used before the app theme loads (branding/theme-rentgen.md) -->
++<resources>
++    <color name="xraygram_bg">#0B1220</color>
++    <color name="xraygram_surface">#121B2E</color>
++    <color name="xraygram_accent">#3EF2C8</color>
++</resources>
+diff --git a/TMessagesProj/src/main/res/xml/auth.xml b/TMessagesProj/src/main/res/xml/auth.xml
+index 4dc99f271..dbeffeb45 100644
+--- a/TMessagesProj/src/main/res/xml/auth.xml
++++ b/TMessagesProj/src/main/res/xml/auth.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ 
+ <account-authenticator xmlns:android="http://schemas.android.com/apk/res/android"
+-    android:accountType="org.telegram.messenger"
++    android:accountType="io.github.xraygram.account"
+     android:icon="@drawable/ic_launcher_dr"
+     android:smallIcon="@drawable/ic_launcher_dr"
+     android:label="@string/AppName"
+diff --git a/TMessagesProj/src/main/res/xml/contacts.xml b/TMessagesProj/src/main/res/xml/contacts.xml
+index 4e094023d..7ee22a0ce 100644
+--- a/TMessagesProj/src/main/res/xml/contacts.xml
++++ b/TMessagesProj/src/main/res/xml/contacts.xml
+@@ -1,16 +1,16 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <ContactsAccountType xmlns:android="http://schemas.android.com/apk/res/android">
+-    <ContactsDataKind android:icon="@drawable/ic_launcher_dr"
++    <ContactsDataKind android:icon="@mipmap/xraygram_launcher"
+         android:mimeType="vnd.android.cursor.item/vnd.org.telegram.messenger.android.profile"
+         android:summaryColumn="data2"
+         android:detailColumn="data3"
+         android:detailSocialSummary="true"/>
+-    <ContactsDataKind android:icon="@drawable/ic_launcher_dr"
++    <ContactsDataKind android:icon="@mipmap/xraygram_launcher"
+         android:mimeType="vnd.android.cursor.item/vnd.org.telegram.messenger.android.call"
+         android:summaryColumn="data2"
+         android:detailColumn="data3"
+         android:detailSocialSummary="true"/>
+-    <ContactsDataKind android:icon="@drawable/ic_launcher_dr"
++    <ContactsDataKind android:icon="@mipmap/xraygram_launcher"
+         android:mimeType="vnd.android.cursor.item/vnd.org.telegram.messenger.android.call.video"
+         android:summaryColumn="data2"
+         android:detailColumn="data3"
+diff --git a/TMessagesProj/src/main/res/xml/sync_contacts.xml b/TMessagesProj/src/main/res/xml/sync_contacts.xml
+index 9e9962e68..2763a8614 100644
+--- a/TMessagesProj/src/main/res/xml/sync_contacts.xml
++++ b/TMessagesProj/src/main/res/xml/sync_contacts.xml
+@@ -1,3 +1,3 @@
+ <sync-adapter xmlns:android="http://schemas.android.com/apk/res/android"
+     android:contentAuthority="com.android.contacts"
+-    android:accountType="org.telegram.messenger"/>
+\ No newline at end of file
++    android:accountType="io.github.xraygram.account"/>
+\ No newline at end of file
 diff --git a/TMessagesProj_AppStandalone/build.gradle b/TMessagesProj_AppStandalone/build.gradle
-index 155126924..e3767fa43 100644
+index 155126924..c3c2e3f7e 100644
 --- a/TMessagesProj_AppStandalone/build.gradle
 +++ b/TMessagesProj_AppStandalone/build.gradle
 @@ -21,6 +21,7 @@ dependencies {
@@ -3093,7 +4638,11 @@ index 155126924..e3767fa43 100644
          }
      }
  
-@@ -86,7 +95,6 @@ android {
+@@ -83,10 +92,10 @@ android {
+         }
+         standalone {
+             matchingFallbacks = ['release']
++            crunchPngs false // Xraygram (F07-04): launcher icons byte-identical to branding/
              debuggable false
              jniDebuggable false
              signingConfig signingConfigs.release
@@ -3101,7 +4650,7 @@ index 155126924..e3767fa43 100644
              minifyEnabled true
              shrinkResources true
              multiDexEnabled true
-@@ -107,7 +115,8 @@ android {
+@@ -107,7 +116,8 @@ android {
      productFlavors {
          afat {
              ndk {

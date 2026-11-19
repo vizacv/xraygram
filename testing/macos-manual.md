@@ -47,7 +47,7 @@ cd ~/xraygram && testing/scripts/net-watch.sh
    Повторите команду из шага 1 после звонка. Байты выросли? ____
    Куда именно идёт UDP (во время звонка, в третьем окне):
    ```bash
-   nettop -m udp -n -L 1 -p $(pgrep -f 'Xraygram.app/Contents/MacOS/Telegram$')
+   nettop -m udp -n -L 1 -p $(pgrep -f 'Xraygram.app/Contents/MacOS/(Xraygram|Telegram)$')
    ```
    Адреса `91.108.*` или `149.154.*` — серверы Telegram, другие — прямое соединение с собеседником (P2P).
 4. [ ] CALL-04: то же с видео.

@@ -16,7 +16,11 @@ mkdir -p "$XG_PATCHES"
 git diff --cached --binary "$TG_REF" -- . ':!TMessagesProj/libs/libXray.aar' \
 	':!TMessagesProj_AppStandalone/src/main/res/mipmap-*/ic_launcher_sa.png' \
 	':!TMessagesProj_AppStandalone/src/main/res/mipmap-xxxhdpi/xraygram_icon_*.png' \
-	':!TMessagesProj_AppStandalone/src/main/res/mipmap-anydpi-v26/ic_launcher_sa.xml' > "$OUT"
+	':!TMessagesProj_AppStandalone/src/main/res/mipmap-anydpi-v26/ic_launcher_sa.xml' \
+	':!TMessagesProj_AppStandalone/src/main/res/mipmap-anydpi-v33/ic_launcher_sa.xml' \
+	':!TMessagesProj/src/main/res/mipmap-*/xraygram_launcher*.png' \
+	':!TMessagesProj/src/main/res/drawable-*/ic_stat_xraygram.png' \
+	':!TMessagesProj/src/main/res/drawable-nodpi/xraygram_*.png' > "$OUT"
 xg_log "$(basename "$OUT"): $(grep -c '^diff --git' "$OUT") файлов, $(wc -l < "$OUT" | tr -d ' ') строк"
 # Проверка на чистом дереве TG_REF.
 tmp="$(mktemp -d "$XG_WORK/patchcheck.XXXX")"

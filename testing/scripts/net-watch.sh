@@ -67,7 +67,7 @@ app_pids() {
 			[[ "$cmd" == *"-workdir $WORKDIR"* ]] || continue
 		fi
 		echo "$pid"
-	done < <(ps -axo pid=,command= | grep -E 'Xraygram\.app/Contents/MacOS/Telegram|Telegram\.app/Contents/MacOS/Telegram -workdir' | grep -v grep | grep -iv '/Applications/Telegram.app')
+	done < <(ps -axo pid=,command= | grep -E 'Xraygram[^/]*\.app/Contents/MacOS/(Xraygram|Telegram)( |$)|Telegram\.app/Contents/MacOS/Telegram -workdir' | grep -v grep | grep -iv '/Applications/Telegram.app')
 }
 core_pids() { local p; for p in "$@"; do pgrep -P "$p" xraygram-core; done; }
 # WebKit-процессы (XPC) не дети приложения; узнаём их по открытым файлам с id бандла.

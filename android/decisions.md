@@ -219,3 +219,79 @@ Pump прокси не принимает вовсе. Если всё же вы�
 Upstream собирает 4 ABI (`afat`). Для теста хватает `arm64-v8a`: это все современные телефоны и эмулятор на M-маке.
 Нативная часть (tgnet, webrtc, ffmpeg, …) и libXray собираются только под выбранные ABI — вдвое-вчетверо быстрее и
 APK меньше. Другие ABI: `XRAYGRAM_ABIS=arm64-v8a,armeabi-v7a`.
+
+## 2026-11-19 — Ребрендинг без Telegram (FEAT-19, PAR-17…21) и F07-04
+
+Инвентаризация — `rebrand-inventory.md`. Сделано в сборке после `android-20261119-1`:
+
+- **Имя (§0.1 инвентаризации).** `AppName` = Xraygram во всех `values-*`. До этого на телефоне с русским языком под
+  иконкой, в «Недавних» и в «Аккаунтах» было «Telegram».
+- **Заставка (PAR-17).** `Theme.TMessages.Start` (values, -v21, -v31, -night): фон `#0B1220`, иконка из
+  `branding/launch/android-splash-xxxhdpi.png` (176 dp, скругление 40, свечение, холст 240 dp). Своей заставки у
+  upstream нет: окно запуска — `drawable/xraygram_launch_background.xml`. Системная заставка Android 12+ — та же
+  картинка с отступом 13 %, чтобы скруглённая иконка целиком влезла в круглую маску системы (круг — допустимое
+  отличие).
+- **Вступление (PAR-18).** Новый `XrayIntroActivity` вместо `IntroActivity`, который больше не открывается (файл и
+  GL-рендер upstream остались). Один экран в цветах «Рентген», луч кодом 1,2 с; без луча при «Удалить анимацию»
+  (масштаб анимации 0). Язык: «Русский · English», `applyLanguage` встроенного/облачного пакета. Порядок: вступление →
+  «Начать» → экран XRAY (`XrayGate.present`) → номер. `XrayGate.showIfNeeded` не перекрывает вступление.
+- **Иконки (PAR-19).**
+  - Шторка: `ic_stat_xraygram` из `branding/glyph/android` (копируется при сборке). Цвет уведомлений и звонков —
+    акцент `#3EF2C8`. Monochrome-слой адаптивной иконки (тематические иконки Android 13+) —
+    `branding/glyph/android/ic_launcher_monochrome.png`, `mipmap-anydpi-v33/ic_launcher_sa.xml`.
+  - Заголовок списка чатов и шапка историй: надпись «Xraygram» текстом (`XraygramWordmarkDrawable`) вместо картинки
+    «Telegram».
+  - Иконка в системных контактах, звонке, окне «Поделиться», окне условий: `@mipmap/xraygram_launcher`, копируется из
+    `branding/android` при сборке.
+  - QR (решение продукта: всё, что уходит другим, — без знака Telegram и без нашего): `TelegramQRCodeWriter.PLAIN` —
+    без дырки и логотипа в центре; `QRCodeBottomSheet` (группы, папки, звонки, прокси) и `QrShareView`/`QrCodeLayer`
+    (профиль) — без логотипа.
+  - Водяной знак (самолётик) в видео-кружочках убран: `InstantCameraVideoEncoderOverlayHelper`,
+    `RoundVideoOverlayRenderer` (F19-18).
+  - Выбор альтернативных иконок (все в стиле Telegram) скрыт; если такая уже выбрана — при запуске возвращается
+    основная (`LauncherIconController.tryFixLauncherIconIfNeeded`).
+  - В значках пунктов настроек логотипа Telegram нет (лампочка, облачко, вопрос, щит) — менять нечего (F19-13 n/a).
+- **«О приложении» (PAR-21).** Внизу настроек строка «Xraygram для Android <версия> · неофициальный клиент Telegram»;
+  по нажатию — диалог: иконка, «Xraygram <версия>», «Неофициальный клиент…», «На основе Telegram Android <версия>.
+  Исходный код: github.com/vizacv/xraygram» (ссылка открывается).
+  Долгое нажатие — меню отладки upstream. Версия Xraygram = ID сборки без префикса (`20261119-2`):
+  `BuildConfig.XRAYGRAM_BUILD`, его ставит `build-local.sh`, тот же ID получает файл APK.
+- **Строки (PAR-20).** `XrayBranding.apply` из `LocaleController.getStringV2`: работает для встроенных ресурсов,
+  облачных пакетов и фолбэка. Подмена только в ключах списка. Внутри них защищённые словосочетания не трогаются:
+  «Telegram's», «Telegram Premium/Stars/… servers/cloud/account/users», «серверы/облако/аккаунт/пользователи Telegram».
+  `TelegramVersion` → «Xraygram <версия> · Telegram Android <версия>».
+  Не подменяются (сервис, правило п. 2): вход и коды (`SentAppCode*`, `CallText`, `OtherLoginCode`), «на Telegram»,
+  приглашения (`InviteText2`, `InviteTextNum_*`, `ShareTelegram2`), Premium/звёзды/бусты, Passport,
+  FAQ/Features/Ask a Question, `SessionsListInfo`, хранение в облаке (`StorageCleared2`, `StorageUsageInfo`,
+  `DownloadedFilesMessage`), модераторы, `NotificationsServiceConnectionInfo` (соединение с сервисом),
+  `RoundVideoCompositionInfo` (ждёт решения про водяной знак).
+  Ключи подмены (95), для F19-09…12:
+  `AppNameBeta NoChats AppUpdate AppUpdateBeta UpdateTelegram UpdateAppAlert UnsupportedMedia2 UnsupportedBlockMessage
+  UnsupportedMessageMessage StoryUnsupported Gift2ExportTONUpdateRequiredText NotificationsPermissionAlertSubtitle
+  ContactsPermissionAlert QRCodePermissionNoCameraWithHint AllowReadCall AllowReadCallAndLog AllowReadCallLog
+  AllowFillNumber PermissionStorageWithHint PermissionNoAudioWithHint PermissionNoBluetoothWithHint
+  PermissionNoAudioVideoWithHint PermissionNoCameraWithHint PermissionNoCameraMicVideo PermissionNoLocation
+  PermissionNoLocationStory PermissionNoLocationFriends PermissionNoLocationNavigation PermissionNoContactsSharing
+  PermissionNoContactsSaving PermissionNoStorageAvatar PermissionNoAudioStorageStory PermissionDrawAboveOtherApps
+  PermissionDrawAboveOtherAppsGroupCall PermissionXiaomiLockscreen PermissionFSILockscreen PermissionBackgroundLocation
+  VoipNeedMicPermissionWithHint VoipNeedMicCameraPermissionWithHint VoipNeedCameraPermission
+  AgeVerificationNeedCameraPermission VoipInCallBranding VoipInVideoCallBranding VoipInConferenceCallBranding
+  VoipOutgoingCall CallViaTelegram VideoCallViaTelegram VoiceCallViaTelegram VoipInCallBrandingWithName
+  VoipInVideoCallBrandingWithName VoipRateCallAlert VoipErrorUnknown AllowBackgroundActivityInfo
+  AllowBackgroundActivityInfoOneUIBelowS AllowBackgroundActivityInfoOneUIAboveS IncomingCallsSystemSettingDescription
+  NotificationHiddenName NotificationHiddenChatName SecretChatName ProfilePopupNotificationInfo LiveLocationPausedText
+  ClearTelegramCache TelegramCacheSize LocalDatabaseSize LocalDatabaseInfo StorageUsageTelegram StorageUsageTelegramLess
+  LowDiskSpaceMessage ClearingCacheDescription SdCardAlert SdCardErrorDescription OptimizingTelegram
+  MigrateOldFolderDescription ImportImportingInfo ChangePasscodeInfo EnterYourPasscodeInfo EnterYourTelegramPasscode
+  CreatePasscodeInfoPIN CreatePasscodeInfoPassword UnlockToUse AppLocked ScreenCaptureAlert
+  WalletAuthorizeTransactionPasscode OpenInTelegramBrowser BrowserSettingsCustomTabs BrowserSettingsNoCustomTabsInfo
+  BrowserSettingsEnableInfo BrowserSettingsCookiesInfo BrowserExternalRestricted CreateNewThemeAlert Page2Message
+  Page3Message Page4Message Page5Message Page6Message` + `TelegramVersion` (свой текст), `AppName`/`Page1Title`
+  (всегда «Xraygram»).
+- **F07-04.** `crunchPngs false` у `standalone`: PNG иконок в APK байт-в-байт как в `branding/`.
+- **BUG-20.** Свой тип системного аккаунта `io.github.xraygram.account` (`auth.xml`, `sync_contacts.xml`,
+  `ContactsController.XRAYGRAM_ACCOUNT_TYPE`). Mime-типы данных контакта (`vnd.org.telegram.messenger.android.*`) не
+  трогаем: от них зависит сопоставление контактов и открытие чата из системной книги. При установленном официальном
+  Telegram «Написать» из книги может предложить выбор приложения.
+- **Не трогаем (решения продукта):** папка `Pictures/Telegram` и сохранение в галерею; пограничные строки (см. выше);
+  утёнок на пустых экранах; метка «Telegram» у контакта в системной книге.

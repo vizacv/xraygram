@@ -40,11 +40,12 @@ while getopts "a:b:kqh" opt; do
 done
 APP="$(cd "$APP" && pwd)" || { echo "нет бандла $APP"; exit 2; }
 [[ -n "$BUILD" ]] || BUILD="$(basename "$APP" .app)"
-EXE="$APP/Contents/MacOS/Telegram"
+bundle_exe() { /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$1/Contents/Info.plist" 2>/dev/null || echo Telegram; }
+EXE="$APP/Contents/MacOS/$(bundle_exe "$APP")"   # с FEAT-20 — Xraygram, раньше — Telegram
 # GUI-шаги (G, S, X) — только в тихой QA-копии (bundle id *.qa, LSUIElement, macos/scripts/run-qa.sh), BUG-09.
 QAAPP="${APP%.app}-QA.app"
 [[ "$APP" == *-QA.app ]] && QAAPP="$APP"
-if (( ! QUICK )) && [[ ! -x "$QAAPP/Contents/MacOS/Telegram" ]]; then
+if (( ! QUICK )) && [[ ! -x "$QAAPP/Contents/MacOS/$(bundle_exe "$QAAPP")" ]]; then
 	echo "нет QA-копии $QAAPP — сделайте: macos/scripts/make-qa-app.sh $APP (или запустите с -q)"; exit 2
 fi
 CORE="$APP/Contents/MacOS/xraygram-core"
@@ -149,7 +150,7 @@ t0=$(now); kill -9 $PARENT; for i in $(seq 1 40); do kill -0 "$CH" 2>/dev/null |
 if kill -0 "$CH" 2>/dev/null; then kill "$CH"; fail C12 "core пережил смерть родителя (4 с)"; else pass C12 "смерть родителя → core вышел за $(since $t0) с"; fi
 
 # ---------------------------------------------------------------- запуск приложения
-app_pid() { pgrep -f "MacOS/Telegram -workdir $1/" | head -1; }
+app_pid() { pgrep -f "MacOS/(Xraygram|Telegram) -workdir $1/" | head -1; }
 launch() { # workdir — тихая QA-копия, без окна на переднем плане
 	bash "$ROOT/macos/scripts/run-qa.sh" "$QAAPP" "$1" > /dev/null
 	local i p
