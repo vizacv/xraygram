@@ -23,7 +23,7 @@ def circle(cx, cy, r):
     return box(cx - r, cy - r, cx + r, cy + r)
 
 
-def alpha_mask() -> Image.Image:
+def alpha_mask(detail: bool = True) -> Image.Image:
     a = Image.new("L", (S, S), 0)
     d = ImageDraw.Draw(a)
     # дужка наушников
@@ -43,9 +43,10 @@ def alpha_mask() -> Image.Image:
     # глаза
     d.ellipse(circle(9.9, 11.9, 1.05), fill=255)
     d.ellipse(circle(14.1, 11.9, 1.05), fill=255)
-    # ноздри
-    d.ellipse(circle(11.35, 14.1, 0.38), fill=255)
-    d.ellipse(circle(12.65, 14.1, 0.38), fill=255)
+    # ноздри (мелкие — не для значков ~22 px)
+    if detail:
+        d.ellipse(circle(11.35, 14.1, 0.38), fill=255)
+        d.ellipse(circle(12.65, 14.1, 0.38), fill=255)
     # улыбка (открытый рот)
     d.pieslice(box(10.0, 14.2, 14.0, 17.4), 0, 180, fill=255)
     return a
@@ -92,6 +93,13 @@ def main():
     # macOS: шаблон для меню-бара/трея (18 pt), чёрный + альфа, суффикс Template
     for scale in (1, 2):
         save(fit(black, 18 * scale, 18 * scale), f"macos/XraygramTemplate{'' if scale == 1 else '@2x'}.png")
+
+    # macOS: иконка трея tdesktop (альфа-маска, перекрашивается под строку меню), 22/44/66 px, без ноздрей
+    simple = colored(alpha_mask(detail=False), (0, 0, 0))
+    for scale in (1, 2, 3):
+        p = ROOT / "branding" / "macos" / "tray" / f"mac_tray_icon{'' if scale == 1 else f'@{scale}x'}.png"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        fit(simple, 22 * scale, 20 * scale).save(p, optimize=True)
 
     # превью: знак на фоне темы «Рентген» и на светлом
     prev = Image.new("RGBA", (720, 260), (11, 18, 32, 255))
