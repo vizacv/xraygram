@@ -174,6 +174,582 @@ index 99f64adbf..a433a83cf 100644
          <service
              android:name=".NotificationRepeat"
              android:exported="false"
+diff --git a/TMessagesProj/src/main/assets/rentgen.attheme b/TMessagesProj/src/main/assets/rentgen.attheme
+new file mode 100644
+index 000000000..25193fa6e
+--- /dev/null
++++ b/TMessagesProj/src/main/assets/rentgen.attheme
+@@ -0,0 +1,570 @@
++actionBarActionModeDefault=-15590610
++actionBarActionModeDefaultIcon=-1641985
++actionBarActionModeDefaultSelector=433913845
++actionBarActionModeDefaultTop=-15524816
++actionBarActionModeReaction=317125119
++actionBarActionModeReactionDot=-14866111
++actionBarActionModeReactionText=-1641985
++actionBarDefault=-15590610
++actionBarDefaultArchived=-15590610
++actionBarDefaultArchivedIcon=-1641985
++actionBarDefaultArchivedSearch=-1641985
++actionBarDefaultArchivedSelector=-14865854
++actionBarDefaultArchivedTitle=-1641985
++actionBarDefaultIcon=-1641985
++actionBarDefaultSearch=-1641985
++actionBarDefaultSearchPlaceholder=2028401151
++actionBarDefaultSelector=524219080
++actionBarDefaultSubmenuBackground=-15590610
++actionBarDefaultSubmenuItem=-1641985
++actionBarDefaultSubmenuItemIcon=-1641985
++actionBarDefaultSubmenuSeparator=-15977426
++actionBarDefaultSubtitle=2111700981
++actionBarDefaultTitle=-1641985
++actionBarTabActiveText=-12651832
++actionBarTabLine=-12651832
++actionBarTabSelector=924213331
++actionBarTabUnactiveText=-6639928
++actionBarWhiteSelector=283570687
++avatar_actionBarIconBlue=-1641985
++avatar_actionBarSelectorBlue=518451711
++avatar_actionBarSelectorGreen=-13746856
++avatar_background2Blue=-8408321
++avatar_background2Cyan=-12651832
++avatar_background2Green=-7413638
++avatar_background2Orange=-871618
++avatar_background2Pink=-881487
++avatar_background2Red=-881487
++avatar_background2Saved=-12651832
++avatar_background2Violet=-4940545
++avatar_backgroundActionBarBlue=-15590610
++avatar_backgroundArchived=-14339250
++avatar_backgroundBlue=-8408321
++avatar_backgroundCyan=-12651832
++avatar_backgroundGreen=-7413638
++avatar_backgroundInProfileBlue=-8408321
++avatar_backgroundOrange=-871618
++avatar_backgroundPink=-881487
++avatar_backgroundRed=-881487
++avatar_backgroundSaved=-12651832
++avatar_backgroundViolet=-4940545
++avatar_nameInMessageBlue=-10291501
++avatar_nameInMessageCyan=-11285306
++avatar_nameInMessageGreen=-8531855
++avatar_nameInMessageOrange=-871618
++avatar_nameInMessagePink=-38037
++avatar_nameInMessageRed=-38037
++avatar_nameInMessageViolet=-7565846
++avatar_subtitleInProfileBlue=-6639928
++avatar_text=-16051680
++bot_loadingIcon=518451711
++calls_callReceivedGreenIcon=-12001930
++chat_BlurAlpha=-1308622848
++chat_BlurAlphaSlow=-872415232
++chat_addContact=-7865634
++chat_adminSelectedText=-8914727
++chat_attachActiveTab=-8455717
++chat_attachAudioBackground=-38037
++chat_attachCheckBoxBackground=-12651832
++chat_attachCheckBoxCheck=-16506597
++chat_attachContactBackground=-871618
++chat_attachGalleryBackground=-10488110
++chat_attachPollBackground=-871618
++chat_attachUnactiveTab=-7297600
++chat_botKeyboardButtonBackground=-15261127
++chat_botKeyboardButtonBackgroundPressed=-14075822
++chat_botKeyboardButtonText=-1641985
++chat_botSwitchToInlineText=-7865634
++chat_compact_actionBackground=451342847
++chat_compact_actionIcon=-1641985
++chat_compact_actionText=-1641985
++chat_compact_backgroundGradient=0
++chat_compact_botButtonText=-1641985
++chat_compact_buttonGlassOutline=0
++chat_compact_fadeEdge=-15920093
++chat_compact_fadeMiddle=-1559423965
++chat_compact_glassHairline=0
++chat_compact_glassOutline=0
++chat_compact_glassShadow=0
++chat_compact_inAudioDuration=-1641985
++chat_compact_inTimeText=1821747652
++chat_compact_inTranscribeButton=-1641985
++chat_compact_inWaveform=-1641985
++chat_compact_inWaveformBackground=1306980863
++chat_compact_inputGlassOutline=0
++chat_compact_outAccent=-1641985
++chat_compact_outAccentBorder=870773247
++chat_compact_outAccentFill=-1641985
++chat_compact_outAccentIcon=-16249318
++chat_compact_outAccentLight=535228927
++chat_compact_outBackground=451342847
++chat_compact_outCheck=-1641985
++chat_compact_outReplyBackground=233239039
++chat_compact_outReplyLine=-1641985
++chat_compact_outReplyText=-1641985
++chat_compact_outSecondaryText=-2132348417
++chat_compact_outTimeText=-2132348417
++chat_compact_progress=-1641985
++chat_compact_pullingDownText=-1641985
++chat_compact_reactionBackground=451342847
++chat_compact_reactionBackgroundSelected=-1641985
++chat_compact_reactionText=-1641985
++chat_compact_reactionTextSelected=-16249318
++chat_compact_replyText=-2132348417
++chat_compact_sideButtonIcon=-1641985
++chat_compact_topicEmptyText=-1641985
++chat_compact_topicSeparatorText=-1641985
++chat_emojiPanelBackground=-15590610
++chat_emojiPanelBackspace=-9205851
++chat_emojiPanelBadgeBackground=-10160429
++chat_emojiPanelEmptyText=-7231807
++chat_emojiPanelIcon=-9205851
++chat_emojiPanelIconSelected=-9635882
++chat_emojiPanelShadowLine=-15326918
++chat_emojiPanelStickerPackSelector=181469170
++chat_emojiPanelTrendingDescription=-7231807
++chat_emojiPanelTrendingTitle=-1641985
++chat_fieldOverlayText=-9635882
++chat_goDownButton=-15590610
++chat_goDownButtonCounter=-16506597
++chat_goDownButtonCounterBackground=-12651832
++chat_inAudioCacheSeekbar=-12496274
++chat_inAudioDurationSelectedText=-8914727
++chat_inAudioDurationText=-7363392
++chat_inAudioPerfomerSelectedText=-8914727
++chat_inAudioPerfomerText=-7363392
++chat_inAudioProgress=-1641985
++chat_inAudioSeekbar=-12496274
++chat_inAudioSeekbarSelected=-7034684
++chat_inAudioSelectedProgress=-1641985
++chat_inAudioTitleText=-7865634
++chat_inBubble=-15195334
++chat_inBubbleSelected=-14536366
++chat_inBubbleShadow=855638016
++chat_inCodeBackground=-1641985
++chat_inContactBackground=-11340594
++chat_inContactIcon=-1641985
++chat_inContactNameText=-7865634
++chat_inContactPhoneSelectedText=-8914727
++chat_inContactPhoneText=-7363392
++chat_inFileBackground=-14997696
++chat_inFileBackgroundSelected=-15043229
++chat_inFileInfoSelectedText=-8914727
++chat_inFileInfoText=-7429185
++chat_inFileNameText=-1641985
++chat_inFileProgress=-1641985
++chat_inFileProgressSelected=-1641985
++chat_inForwardedNameText=-12651832
++chat_inInstant=-7865634
++chat_inInstantSelected=-5964570
++chat_inLoader=-11340594
++chat_inLoaderPhoto=-15392972
++chat_inLoaderSelected=-11340594
++chat_inLocationBackground=-14668474
++chat_inLocationIcon=-1641985
++chat_inMediaIcon=-1641985
++chat_inMediaIconSelected=-1641985
++chat_inMenu=2037905625
++chat_inMenuSelected=-1518864167
++chat_inPreviewInstantText=-7865634
++chat_inPreviewLine=-7865634
++chat_inQuote=-7865634
++chat_inReactionButtonText=-1641985
++chat_inReactionButtonTextSelected=-1641985
++chat_inReplyLine=-12651832
++chat_inReplyMediaMessageSelectedText=-8914727
++chat_inReplyMediaMessageText=-7363392
++chat_inReplyMessageText=-1641985
++chat_inReplyNameText=-12651832
++chat_inSentClock=-10126953
++chat_inSentClockSelected=-8914727
++chat_inSiteNameText=-7865634
++chat_inTextSelectionHighlight=1279193800
++chat_inTimeSelectedText=-8914727
++chat_inTimeText=-7429185
++chat_inVenueInfoSelectedText=-8914727
++chat_inVenueInfoText=-7363392
++chat_inViaBotNameText=-7865634
++chat_inViews=-7429185
++chat_inViewsSelected=-8914727
++chat_inVoiceSeekbar=-10126953
++chat_inVoiceSeekbarFill=-9635882
++chat_inVoiceSeekbarSelected=-7034684
++chat_inlineResultIcon=-7865634
++chat_linkSelectBackground=1077867208
++chat_lockIcon=-1641985
++chat_mediaMenu=-1641985
++chat_mediaSentClock=-1293487617
++chat_messageLinkIn=-12651832
++chat_messageLinkOut=-7341088
++chat_messagePanelBackground=-15590610
++chat_messagePanelCancelInlineBot=1692856831
++chat_messagePanelHint=1860042741
++chat_messagePanelIcons=1860628991
++chat_messagePanelSend=-12651832
++chat_messagePanelShadow=1124073472
++chat_messagePanelText=-1641985
++chat_messagePanelVoiceBackground=-12651832
++chat_messagePanelVoiceDelete=-1641985
++chat_messagePanelVoicePressed=-16506597
++chat_messageTextIn=-1641985
++chat_messageTextOut=-1641985
++chat_msgIvButtonDangerInText=-38037
++chat_msgIvButtonDefaultIn=-15195335
++chat_msgIvButtonDefaultInlineIn=422627236
++chat_msgIvButtonDefaultInlineInPressed=674285476
++chat_msgIvButtonDefaultInlineInText=-13580380
++chat_msgIvButtonPrimaryIn=-12850751
++chat_msgIvButtonPrimaryInPressed=-12389687
++chat_msgIvButtonPrimaryInText=-1641985
++chat_msgIvButtonPrimaryOut=-12850751
++chat_msgIvButtonPrimaryOutPressed=-12389687
++chat_msgIvButtonPrimaryOutText=-1641985
++chat_msgIvButtonSuccessInText=-8847493
++chat_muteIcon=1019412206
++chat_outAudioCacheSeekbar=-11865140
++chat_outAudioDurationSelectedText=-4194579
++chat_outAudioDurationText=-8193316
++chat_outAudioPerfomerSelectedText=-4194579
++chat_outAudioPerfomerText=-8193316
++chat_outAudioProgress=-1641985
++chat_outAudioSeekbar=-431295540
++chat_outAudioSeekbarFill=-7210015
++chat_outAudioSeekbarSelected=-10357038
++chat_outAudioSelectedProgress=-1641985
++chat_outAudioTitleText=-1641985
++chat_outBubble=-15712198
++chat_outBubbleGradient=-15712198
++chat_outBubbleGradientSelectedOverlay=350679551
++chat_outBubbleSelected=-15380152
++chat_outBubbleShadow=1279193800
++chat_outCodeBackground=856636727
++chat_outContactBackground=-10619439
++chat_outContactIcon=-1641985
++chat_outContactNameText=-1641985
++chat_outContactPhoneSelectedText=-4194579
++chat_outContactPhoneText=-8193316
++chat_outFileBackground=-14178165
++chat_outFileBackgroundSelected=-12916801
++chat_outFileInfoSelectedText=-4194579
++chat_outFileInfoText=-8398398
++chat_outFileNameText=-1641985
++chat_outFileProgress=-1641985
++chat_outFileProgressSelected=-1641985
++chat_outForwardedNameText=-7341088
++chat_outInstant=-6619933
++chat_outInstantSelected=-4194579
++chat_outLoader=-10619439
++chat_outLoaderSelected=-10619439
++chat_outLocationIcon=-1641985
++chat_outMediaIcon=-1641985
++chat_outMediaIconSelected=-1641985
++chat_outMenu=-10881584
++chat_outMenuSelected=-541065491
++chat_outPreviewInstantText=-5899034
++chat_outPreviewLine=-12651832
++chat_outReactionButtonBackground=-1641985
++chat_outReactionButtonText=-1641985
++chat_outReplyLine=-12651832
++chat_outReplyMediaMessageSelectedText=-1641985
++chat_outReplyMediaMessageText=-8193316
++chat_outReplyMessageText=-1641985
++chat_outReplyNameText=-12651832
++chat_outSentCheck=-8398398
++chat_outSentCheckRead=-12651832
++chat_outSentCheckSelected=-4194579
++chat_outSentClock=-8398398
++chat_outSentClockSelected=-4194579
++chat_outSiteNameText=-1641985
++chat_outTimeSelectedText=-4194579
++chat_outTimeText=-8398398
++chat_outVenueInfoSelectedText=-4194579
++chat_outVenueInfoText=-8193316
++chat_outViaBotNameText=-6619933
++chat_outViews=-8398398
++chat_outViewsSelected=-4194579
++chat_outVoiceSeekbar=-431295540
++chat_outVoiceSeekbarFill=-7210015
++chat_outVoiceSeekbarSelected=-9898027
++chat_recordTime=-1641985
++chat_recordVoiceCancel=-8849191
++chat_recordedVoiceDot=-38037
++chat_replyPanelClose=1860628991
++chat_replyPanelIcons=-12850751
++chat_replyPanelLine=1577520151
++chat_replyPanelName=-7865634
++chat_searchPanelIcons=-7865634
++chat_searchPanelText=-1641985
++chat_secretChatStatusText=-7363392
++chat_secretTimeText=-4522516
++chat_selectedBackground=710932178
++chat_sentError=-38037
++chat_serviceBackground=-2111754680
++chat_serviceBackgroundSelected=-1775254623
++chat_status=-12651832
++chat_stickersHintPanel=-14734267
++chat_textSelectBackground=1279193800
++chat_topPanelBackground=-15590610
++chat_topPanelClose=1860628991
++chat_topPanelLine=-11340594
++chat_topPanelMessage=1860628991
++chat_topPanelTitle=-9701419
++chat_unreadMessagesStartArrowIcon=-10719091
++chat_unreadMessagesStartBackground=-15392971
++chat_unreadMessagesStartText=-622398977
++chat_wallpaper=-16051680
++chats_actionBackground=-12651832
++chats_actionIcon=-16506597
++chats_actionMessage=-9898028
++chats_actionPressedBackground=-7341088
++chats_archiveBackground=-12127286
++chats_archivePinBackground=-14997696
++chats_attachMessage=-12651832
++chats_date=-7429185
++chats_draft=-38037
++chats_menuBackground=-16051680
++chats_menuItemCheck=-12651832
++chats_menuItemIcon=-7166270
++chats_menuItemText=-186191361
++chats_menuPhone=-1815356692
++chats_menuPhoneCats=-6968892
++chats_menuTopBackground=-15590610
++chats_menuTopBackgroundCats=-15590610
++chats_menuTopShadow=-1542969822
++chats_message=-7429185
++chats_message_threeLines=-7429185
++chats_muteIcon=-13351841
++chats_name=-1641985
++chats_nameMessage=-1641985
++chats_nameMessageArchived=-7231807
++chats_nameMessage_threeLines=-1641985
++chats_onlineCircle=-12651832
++chats_pinnedIcon=-10390126
++chats_pinnedOverlay=149352959
++chats_secretIcon=-9316522
++chats_secretName=-9316522
++chats_sentCheck=-12651832
++chats_sentClock=-13483427
++chats_sentReadCheck=-12651832
++chats_tabletSelectedOverlay=339669704
++chats_unreadCounter=-12651832
++chats_unreadCounterMuted=-10521711
++chats_unreadCounterText=-16506597
++chats_verifiedBackground=-12651832
++chats_verifiedCheck=-16506597
++checkbox=-12651832
++checkboxCheck=-16506597
++checkboxSquareBackground=-12651832
++checkboxSquareCheck=-16506597
++checkboxSquareDisabled=1680620630
++checkboxSquareUnchecked=-11377278
++code_comment=2145841663
++code_constant=-38037
++code_function=-38037
++code_keyword=-38037
++code_number=-10887465
++code_operator=2145841663
++code_string=-7806088
++color_blue=-9701419
++color_green=-12729793
++color_lightblue=-11865140
++color_lightgreen=-7352519
++color_orange=-881607
++color_purple=-7906078
++color_red=-38037
++color_yellow=-871618
++contextProgressInner1=1687398595
++contextProgressOuter1=-8914727
++dialogBackground=-15590610
++dialogBackgroundGray=-16051680
++dialogButton=-12651832
++dialogButtonSelector=-14602423
++dialogCardShadow=1073741824
++dialogCheckboxSquareBackground=-12651832
++dialogCheckboxSquareCheck=-16506597
++dialogCheckboxSquareDisabled=-13878186
++dialogCheckboxSquareUnchecked=-11377278
++dialogGrayLine=-16447473
++dialogIcon=-6442806
++dialogInputField=-14536630
++dialogInputFieldActivated=-12651832
++dialogLineProgress=-12651832
++dialogLineProgressBackground=-14734010
++dialogRadioBackground=-11377278
++dialogRadioBackgroundChecked=-12651832
++dialogRoundCheckBox=-12651832
++dialogRoundCheckBoxCheck=-16506597
++dialogSearchBackground=-15063747
++dialogSearchHint=-7363392
++dialogSearchIcon=-7889736
++dialogSearchText=-1641985
++dialogShadowLine=335544320
++dialogTextBlack=-1641985
++dialogTextBlue=-12651832
++dialogTextBlue2=-12651832
++dialogTextBlue4=-9635882
++dialogTextGray=-7429185
++dialogTextGray2=-7429185
++dialogTextGray3=-10521711
++dialogTextGray4=-7231807
++dialogTextHint=-10521711
++dialogTextLink=-12651832
++dialogTopBackground=-14775694
++dialog_inlineProgressBackground=-16177373
++dialog_liveLocationProgress=-10619439
++divider=-15326918
++emptyListPlaceholder=-7231807
++fastScrollInactive=-14207665
++featuredStickers_addButton=-12651832
++featuredStickers_addButtonPressed=-7341088
++featuredStickers_addedIcon=-9635882
++featuredStickers_buttonProgress=-16506597
++featuredStickers_buttonText=-16506597
++featuredStickers_unread=-12651832
++files_folderIcon=-1641985
++files_folderIconBackground=-10160429
++gift_ribbon=-14909333
++gift_ribbon_soldout=-8500415
++glass_defaultIcon=-1595477505
++glass_defaultText=-1595477505
++glass_targetMainTabs=-15977426
++glass_targetMainTopPanel=-15458765
++graySection=-16315369
++groupcreate_cursor=-9635882
++groupcreate_hintText=-7231807
++groupcreate_sectionText=-1712918017
++groupcreate_spanBackground=-14931904
++groupcreate_spanText=-1641985
++inappPlayerBackground=-15590610
++inappPlayerClose=1860628991
++inappPlayerPerformer=-1641985
++inappPlayerPlayPause=-9635882
++inappPlayerTitle=1860628991
++iv_background=-16777216
++iv_backgroundGray=-16183525
++iv_navigationBackground=-16777216
++key_chat_messagePanelVoiceLock=-1641985
++key_chat_messagePanelVoiceLockBackground=-14536630
++key_graySectionText=-7231807
++key_player_progressCachedBackground=-10521711
++key_sheet_other=1139208703
++key_sheet_scrollUp=635892223
++listSelectorSDK21=339669704
++location_liveLocationProgress=-10619439
++location_placeLocationBackground=-10619439
++location_sendLocationBackground=-10619439
++passport_authorizeBackground=-13447766
++passport_authorizeBackgroundSelected=-11996213
++picker_badge=-9898028
++picker_disabledButton=-10455918
++picker_enabledButton=-8455717
++player_actionBarItems=-1641985
++player_actionBarSelector=-14668217
++player_actionBarSubtitle=2028401151
++player_actionBarTitle=-1641985
++player_background=-15788248
++player_button=-1641985
++player_buttonActive=-9635882
++player_progress=-12651832
++player_progressBackground=-14339251
++player_time=-7231807
++premiumGradientBackground1=-15787991
++premiumGradientBackground2=-16315112
++premiumGradientBackground3=-16315369
++premiumGradientBackground4=-16249575
++premiumStarGradient1=-12784702
++premiumStarGradient2=-4167942
++premiumStartSmallStarsColor=1904435967
++profile_actionBackground=-10488110
++profile_actionIcon=-1641985
++profile_actionPressedBackground=-12258358
++profile_creatorIcon=-9635882
++profile_status=-12651832
++profile_tabSelector=350679551
++profile_tabText=2028401151
++profile_title=-1641985
++profile_verifiedBackground=-8849191
++profile_verifiedCheck=-1641985
++progressCircle=-8849191
++radioBackground=-1634621759
++radioBackgroundChecked=-12651832
++returnToCallBackground=-10357038
++share_icon=-1641985
++share_linkBackground=350679551
++share_linkText=-1209601537
++sharedMedia_linkPlaceholder=-15261384
++sharedMedia_startStopLoadIcon=-9635882
++statisticChartActiveLine=853996031
++statisticChartActivePickerChart=-665886338
++statisticChartBackZoomColor=-11209522
++statisticChartChevronColor=-8482129
++statisticChartHintLine=451342847
++statisticChartInactivePickerChart=-937612734
++statisticChartLine_blue=-9701419
++statisticChartLine_golden=-871618
++statisticChartLine_green=-12729793
++statisticChartLine_indigo=-7906078
++statisticChartLine_lightblue=-11865140
++statisticChartLine_lightgreen=-7352519
++statisticChartLine_orange=-881607
++statisticChartLine_red=-38037
++statisticChartRipple=747174622
++statisticChartSignature=-1213218344
++statisticChartSignatureAlpha=-1947799041
++stickers_menu=-10258539
++stories_circle1=-12984516
++stories_circle2=-9963564
++stories_circle_closeFriends1=-3544264
++stories_circle_closeFriends2=-16137881
++stories_circle_dialog1=-11866795
++stories_circle_dialog2=-9963564
++switch2TrackChecked=-12651832
++switchTrack=-9929574
++switchTrackBlue=-12035466
++switchTrackBlueChecked=-1942031672
++switchTrackBlueSelector=431750636
++switchTrackBlueSelectorChecked=849018083
++switchTrackBlueThumb=-15920093
++switchTrackBlueThumbChecked=-12651832
++switchTrackChecked=-1942031672
++table_background=178257124
++table_border=434565631
++text_RedBold=-38037
++text_RedRegular=-38037
++undo_background=-233101504
++voipgroup_topPanelGray=-9995367
++wallet_out_commentBorder=-13746856
++wallpaperFileOffset=-1641985
++windowBackgroundCheckText=-1641985
++windowBackgroundChecked=-13514587
++windowBackgroundGray=-16315369
++windowBackgroundUnchecked=-16051680
++windowBackgroundWhite=-16051680
++windowBackgroundWhiteBlackText=-1641985
++windowBackgroundWhiteBlueButton=-12651832
++windowBackgroundWhiteBlueHeader=-12651832
++windowBackgroundWhiteBlueIcon=-12651832
++windowBackgroundWhiteBlueText=-12651832
++windowBackgroundWhiteBlueText2=-12651832
++windowBackgroundWhiteBlueText3=-12651832
++windowBackgroundWhiteBlueText4=-12651832
++windowBackgroundWhiteBlueText5=-12651832
++windowBackgroundWhiteBlueText6=-12651832
++windowBackgroundWhiteBlueText7=-12651832
++windowBackgroundWhiteGrayIcon=-7231807
++windowBackgroundWhiteGrayText=-7429185
++windowBackgroundWhiteGrayText2=-7429185
++windowBackgroundWhiteGrayText3=-10521711
++windowBackgroundWhiteGrayText4=-7429185
++windowBackgroundWhiteGrayText5=-10521711
++windowBackgroundWhiteGrayText6=-7429185
++windowBackgroundWhiteGrayText7=-10521711
++windowBackgroundWhiteGrayText8=-7429185
++windowBackgroundWhiteGreenText=-10371737
++windowBackgroundWhiteGreenText2=-10366101
++windowBackgroundWhiteHintText=-10521711
++windowBackgroundWhiteInputField=-14536630
++windowBackgroundWhiteInputFieldActivated=-12651832
++windowBackgroundWhiteLinkSelection=863566041
++windowBackgroundWhiteLinkText=-12651832
++windowBackgroundWhiteValueText=-527959330
 diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/AndroidUtilities.java b/TMessagesProj/src/main/java/org/telegram/messenger/AndroidUtilities.java
 index d59b29a66..55c729b67 100644
 --- a/TMessagesProj/src/main/java/org/telegram/messenger/AndroidUtilities.java
@@ -923,6 +1499,151 @@ index ab54ee378..0d11528b6 100644
          }
  
          for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ActionBar/Theme.java b/TMessagesProj/src/main/java/org/telegram/ui/ActionBar/Theme.java
+index 7fc7292d1..977d42ebe 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ActionBar/Theme.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ActionBar/Theme.java
+@@ -150,6 +150,8 @@ import java.util.concurrent.CountDownLatch;
+ public class Theme {
+ 
+     public static final String DEFAULT_BACKGROUND_SLUG = "d";
++    /** Xraygram (FEAT-20): key of the built-in «Рентген» theme. */
++    public static final String XRAYGRAM_THEME = "Rentgen";
+     public static final String THEME_BACKGROUND_SLUG = "t";
+     public static final String COLOR_BACKGROUND_SLUG = "c";
+ 
+@@ -1560,6 +1562,8 @@ public class Theme {
+                 return getString(R.string.ThemeDay);
+             } else if ("Night".equals(name)) {
+                 return getString(R.string.ThemeNight);
++            } else if (XRAYGRAM_THEME.equals(name)) {
++                return org.telegram.utils.proxy.XrayTransport.str("Рентген", "X-ray"); // Xraygram (FEAT-20)
+             }
+             return info != null ? info.title : name;
+         }
+@@ -1676,7 +1680,7 @@ public class Theme {
+             if (isDark != UNKNOWN) {
+                 return isDark == DARK;
+             }
+-            if ("Dark Blue".equals(name) || "Night".equals(name)) {
++            if ("Dark Blue".equals(name) || "Night".equals(name) || XRAYGRAM_THEME.equals(name)) {
+                 isDark = DARK;
+             } else if ("Blue".equals(name) || "Arctic Blue".equals(name) || "Day".equals(name)) {
+                 isDark = LIGHT;
+@@ -4098,6 +4102,18 @@ public class Theme {
+         themes.add(themeInfo);
+         themesDict.put("Night", themeInfo);
+ 
++        // Xraygram (FEAT-20, PAR-22): built-in dark theme «Рентген», the default (assets/rentgen.attheme is generated by
++        // android/scripts/make-rentgen-theme.py from darkblue.attheme and branding/theme-rentgen.md tokens)
++        themeInfo = new ThemeInfo();
++        themeInfo.name = XRAYGRAM_THEME;
++        themeInfo.assetName = "rentgen.attheme";
++        themeInfo.previewBackgroundColor = 0xff0B1220;
++        themeInfo.previewInColor = 0xff18233A;
++        themeInfo.previewOutColor = 0xff10403A;
++        themeInfo.sortIndex = 0;
++        themes.add(themeInfo);
++        themesDict.put(XRAYGRAM_THEME, themeInfo);
++
+         String themesString = themeConfig.getString("themes2", null);
+ 
+         int remoteVersion = themeConfig.getInt("remote_version", 0);
+@@ -4367,6 +4383,30 @@ public class Theme {
+         } else {
+             currentDayTheme = applyingTheme;
+         }
++        // Xraygram (FEAT-20 п. 2–3): «Рентген» once — on a clean install and on an update where the upstream default theme
++        // is set (the user never chose one); a chosen theme is kept. Dark regardless of the system: auto-night off.
++        try {
++            final ThemeInfo rentgen = themesDict.get(XRAYGRAM_THEME);
++            if (rentgen != null && !preferences.getBoolean("xraygram_theme_default_done", false)) {
++                final String chosen = preferences.getString("theme", null);
++                final String chosenNight = preferences.getString("nighttheme", null);
++                final boolean upstreamDefault = (chosen == null || "Blue".equals(chosen) || "Default".equals(chosen))
++                        && (chosenNight == null || "Dark Blue".equals(chosenNight) || "Dark".equals(chosenNight));
++                SharedPreferences.Editor editor = preferences.edit().putBoolean("xraygram_theme_default_done", true);
++                if (upstreamDefault) {
++                    applyingTheme = rentgen;
++                    currentDayTheme = rentgen;
++                    currentNightTheme = rentgen;
++                    selectedAutoNightType = AUTO_NIGHT_TYPE_NONE;
++                    editor.putString("theme", XRAYGRAM_THEME).putString("nighttheme", XRAYGRAM_THEME)
++                            .putInt("selectedAutoNightType", AUTO_NIGHT_TYPE_NONE);
++                    themeConfig.edit().putString("lastDayTheme", XRAYGRAM_THEME).putString("lastDarkTheme", XRAYGRAM_THEME).commit();
++                }
++                editor.commit();
++            }
++        } catch (Exception e) {
++            FileLog.e(e);
++        }
+ 
+         if (preferences.contains("overrideThemeWallpaper") || preferences.contains("selectedBackground2")) {
+             boolean override = preferences.getBoolean("overrideThemeWallpaper", false);
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/DialogsActivityTopPanelLayout.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/DialogsActivityTopPanelLayout.java
+index 50f4d9afe..615c5e52b 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/DialogsActivityTopPanelLayout.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/DialogsActivityTopPanelLayout.java
+@@ -28,6 +28,31 @@ public class DialogsActivityTopPanelLayout extends AnimatedLinearLayout implemen
+ 
+     BlurredBackgroundDrawable backgroundDrawable;
+ 
++    // Xraygram (FEAT-20): a row drawn without the glass card and divider while it is the only visible one (status pill)
++    private View bareView;
++
++    public void setBareView(View view) {
++        bareView = view;
++    }
++
++    private boolean onlyBareVisible() {
++        if (bareView == null) {
++            return false;
++        }
++        boolean any = false;
++        for (int a = 0, N = getEntriesCount(); a < N; a++) {
++            final ListAnimator.Entry<AnimatedLinearLayout.Holder> entry = getEntry(a);
++            if (entry.getVisibility() <= 0) {
++                continue;
++            }
++            if (entry.item.view != bareView) {
++                return false;
++            }
++            any = true;
++        }
++        return any;
++    }
++
+     public void setBlurredBackground(BlurredBackgroundDrawable background) {
+         backgroundDrawable = background;
+     }
+@@ -48,7 +73,7 @@ public class DialogsActivityTopPanelLayout extends AnimatedLinearLayout implemen
+     @Override
+     public boolean dispatchTouchEvent(MotionEvent ev) {
+         return super.dispatchTouchEvent(ev)
+-            || ev.getAction() == MotionEvent.ACTION_DOWN && backgroundDrawable != null && backgroundDrawable.getBounds().contains((int) ev.getX(), (int) ev.getY());
++            || ev.getAction() == MotionEvent.ACTION_DOWN && backgroundDrawable != null && !onlyBareVisible() && backgroundDrawable.getBounds().contains((int) ev.getX(), (int) ev.getY());
+     }
+ 
+     private final Path clipPath = new Path();
+@@ -102,7 +127,8 @@ public class DialogsActivityTopPanelLayout extends AnimatedLinearLayout implemen
+     protected void dispatchDraw(@NonNull Canvas canvas) {
+         if (getMetadata().getTotalVisibility() == 0) return;
+ 
+-        if (backgroundDrawable != null) {
++        final boolean bare = onlyBareVisible();
++        if (backgroundDrawable != null && !bare) {
+             backgroundDrawable.draw(canvas);
+         }
+ 
+@@ -148,7 +174,7 @@ public class DialogsActivityTopPanelLayout extends AnimatedLinearLayout implemen
+                 continue;
+             }
+ 
+-            if (callDrawnView == view) {
++            if (callDrawnView == view || bare || view == bareView) {
+                 continue;
+             }
+ 
 diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/InstantCameraVideoEncoderOverlayHelper.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/InstantCameraVideoEncoderOverlayHelper.java
 index 07de161c9..f324c53cf 100644
 --- a/TMessagesProj/src/main/java/org/telegram/ui/Components/InstantCameraVideoEncoderOverlayHelper.java
@@ -984,6 +1705,279 @@ index 1fd3b36c1..868d8be66 100644
  
          titleTextView = new TextView(context);
          ThemeBind.textColor(titleTextView, Theme.key_windowBackgroundWhiteBlackText);
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/XrayStatusPill.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/XrayStatusPill.java
+new file mode 100644
+index 000000000..76dc0e433
+--- /dev/null
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/XrayStatusPill.java
+@@ -0,0 +1,267 @@
++package org.telegram.ui.Components;
++
++import android.content.Context;
++import android.graphics.Canvas;
++import android.graphics.Paint;
++import android.graphics.RectF;
++import android.os.SystemClock;
++import android.text.TextPaint;
++import android.text.TextUtils;
++import android.view.View;
++import android.view.accessibility.AccessibilityNodeInfo;
++
++import androidx.annotation.NonNull;
++
++import org.telegram.messenger.AndroidUtilities;
++import org.telegram.messenger.NotificationCenter;
++import org.telegram.messenger.SharedConfig;
++import org.telegram.tgnet.ConnectionsManager;
++import org.telegram.utils.proxy.ProxySettings;
++import org.telegram.utils.proxy.XrayGate;
++import org.telegram.utils.proxy.XrayTransport;
++
++import static org.telegram.messenger.AndroidUtilities.dp;
++import static org.telegram.utils.proxy.XrayTransport.str;
++
++/**
++ * Xraygram (FEAT-20 §8–12, PAR-23): status of the connection under the chat list title — a pill "● XRAY · name · 85 ms".
++ * Six states, first match wins: no network → direct → other proxy → no connection (core error or connecting > 20 s with
++ * the network up) → connecting → connected. Hidden while the XRAY gate is closed (the list is not visible then) and
++ * while the search is open (the host decides). Tap → proxy list (the host's click listener). The ping of the active
++ * entry is refreshed at most once a minute while the pill is on screen.
++ */
++public class XrayStatusPill extends View implements NotificationCenter.NotificationCenterDelegate {
++
++    public static final int ACCENT = 0xFF3EF2C8;
++    public static final int WARN = 0xFFF2B33E;
++    public static final int ERROR = 0xFFFF6B6B;
++    public static final int TEXT_2 = 0xFF8EA3BF;
++
++    private static final long CONNECTING_TIMEOUT_MS = 20_000;
++    private static final long PING_INTERVAL_MS = 60_000;
++    private static final int NAME_MAX = 16;
++
++    private final int account;
++    private final TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
++    private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
++    private final Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
++    private final Paint dotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
++    private final RectF pill = new RectF();
++
++    private String text = "";
++    private CharSequence drawnText = "";
++    private int color = ACCENT;
++    private boolean shown;
++    private long connectingSince;
++    private long lastPingRequest;
++    private boolean attached;
++    private Runnable onVisibilityChanged;
++
++    private final Runnable tick = new Runnable() {
++        @Override
++        public void run() {
++            update();
++            if (attached) {
++                AndroidUtilities.runOnUIThread(this, 1000);
++            }
++        }
++    };
++
++    public XrayStatusPill(Context context, int account) {
++        super(context);
++        this.account = account;
++        textPaint.setTypeface(AndroidUtilities.getTypeface(AndroidUtilities.TYPEFACE_ROBOTO_MONO));
++        textPaint.setTextSize(dp(12));
++        strokePaint.setStyle(Paint.Style.STROKE);
++        strokePaint.setStrokeWidth(Math.max(1, dp(1)));
++        setFocusable(true);
++        setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
++    }
++
++    /** Called when the pill appears or disappears (the host shows/hides its row). */
++    public void setOnVisibilityChanged(Runnable r) {
++        onVisibilityChanged = r;
++    }
++
++    public boolean isShown2() {
++        return shown;
++    }
++
++    // ------------------------------------------------------------------ state
++
++    private static String trimName(String name) {
++        if (name == null) {
++            return "";
++        }
++        return name.length() > NAME_MAX ? name.substring(0, NAME_MAX - 1) + "…" : name;
++    }
++
++    public void update() {
++        String newText;
++        int newColor;
++        boolean newShown = true;
++        final int state = ConnectionsManager.getInstance(account).getConnectionState();
++        final SharedConfig.ProxyInfo proxy = SharedConfig.currentProxy;
++        final boolean proxyOn = SharedConfig.isProxyEnabled() && proxy != null;
++        final boolean xray = proxyOn && proxy.settings.getType() == ProxySettings.Type.XRAY;
++        final boolean connecting = state == ConnectionsManager.ConnectionStateConnecting
++                || state == ConnectionsManager.ConnectionStateConnectingToProxy
++                || state == ConnectionsManager.ConnectionStateUpdating;
++        if (connecting) {
++            if (connectingSince == 0) {
++                connectingSince = SystemClock.elapsedRealtime();
++            }
++        } else {
++            connectingSince = 0;
++        }
++
++        if (XrayGate.isBlocked()) {
++            newShown = false;
++            newText = "";
++            newColor = TEXT_2;
++        } else if (state == ConnectionsManager.ConnectionStateWaitingForNetwork) {
++            newText = str("Нет сети", "No network");
++            newColor = TEXT_2;
++        } else if (!proxyOn) {
++            newText = str("Напрямую, без XRAY", "Direct, without XRAY");
++            newColor = WARN;
++        } else if (!xray) {
++            newText = str("Прокси без XRAY", "Proxy without XRAY");
++            newColor = WARN;
++        } else {
++            final String link = proxy.settings.getLink();
++            final String name = trimName(XrayTransport.parse(link).displayName());
++            final String coreError = XrayTransport.statusError(link);
++            final boolean stuck = connecting && connectingSince != 0
++                    && SystemClock.elapsedRealtime() - connectingSince > CONNECTING_TIMEOUT_MS;
++            if (coreError != null || stuck) {
++                newText = "XRAY · " + name + " · " + str("нет связи", "no connection");
++                newColor = ERROR;
++            } else if (connecting) {
++                newText = "XRAY · " + name + " · " + str("подключение…", "connecting…");
++                newColor = WARN;
++            } else {
++                newText = proxy.available && proxy.ping > 0
++                        ? "XRAY · " + name + " · " + proxy.ping + str(" мс", " ms")
++                        : "XRAY · " + name;
++                newColor = ACCENT;
++                maybePing(proxy);
++            }
++        }
++        boolean changed = !TextUtils.equals(newText, text) || newColor != color;
++        text = newText;
++        color = newColor;
++        if (changed) {
++            setContentDescription(text + ". " + str("Открыть настройки прокси", "Open proxy settings"));
++            requestLayout();
++            invalidate();
++        }
++        if (newShown != shown) {
++            shown = newShown;
++            if (onVisibilityChanged != null) {
++                onVisibilityChanged.run();
++            }
++        }
++    }
++
++    /** The same check as the proxy list, at most once a minute (FEAT-20 п. 10). */
++    private void maybePing(SharedConfig.ProxyInfo proxy) {
++        final long now = SystemClock.elapsedRealtime();
++        if (proxy.checking || now - lastPingRequest < PING_INTERVAL_MS
++                || proxy.availableCheckTime != 0 && now - proxy.availableCheckTime < PING_INTERVAL_MS) {
++            return;
++        }
++        lastPingRequest = now;
++        proxy.checking = true;
++        ConnectionsManager.getInstance(account).checkProxy(proxy.settings, time -> AndroidUtilities.runOnUIThread(() -> {
++            proxy.availableCheckTime = SystemClock.elapsedRealtime();
++            proxy.checking = false;
++            if (time == -1) {
++                proxy.available = false;
++                proxy.ping = 0;
++            } else {
++                proxy.ping = time;
++                proxy.available = true;
++            }
++            NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxyCheckDone, proxy);
++        }));
++    }
++
++    @Override
++    public void didReceivedNotification(int id, int account, Object... args) {
++        update();
++    }
++
++    @Override
++    protected void onAttachedToWindow() {
++        super.onAttachedToWindow();
++        attached = true;
++        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.proxySettingsChanged);
++        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.proxyCheckDone);
++        NotificationCenter.getInstance(account).addObserver(this, NotificationCenter.didUpdateConnectionState);
++        AndroidUtilities.cancelRunOnUIThread(tick);
++        tick.run();
++    }
++
++    @Override
++    protected void onDetachedFromWindow() {
++        super.onDetachedFromWindow();
++        attached = false;
++        AndroidUtilities.cancelRunOnUIThread(tick);
++        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.proxySettingsChanged);
++        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.proxyCheckDone);
++        NotificationCenter.getInstance(account).removeObserver(this, NotificationCenter.didUpdateConnectionState);
++    }
++
++    // ------------------------------------------------------------------ drawing
++
++    @Override
++    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
++        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), dp(40));
++    }
++
++    @Override
++    protected void onDraw(@NonNull Canvas canvas) {
++        if (TextUtils.isEmpty(text)) {
++            return;
++        }
++        final float padH = dp(12), dotR = dp(3.5f), gap = dp(8), h = dp(26);
++        final float maxText = getWidth() - dp(32) - padH * 2 - dotR * 2 - gap;
++        drawnText = TextUtils.ellipsize(text, textPaint, Math.max(0, maxText), TextUtils.TruncateAt.END);
++        final float textW = textPaint.measureText(drawnText, 0, drawnText.length());
++        final float w = padH * 2 + dotR * 2 + gap + textW;
++        final float left = (getWidth() - w) / 2f, top = (getHeight() - h) / 2f;
++        pill.set(left, top, left + w, top + h);
++
++        fillPaint.setColor(color);
++        fillPaint.setAlpha((int) (255 * 0.10f));
++        strokePaint.setColor(color);
++        strokePaint.setAlpha((int) (255 * 0.35f));
++        canvas.drawRoundRect(pill, h / 2f, h / 2f, fillPaint);
++        canvas.drawRoundRect(pill, h / 2f, h / 2f, strokePaint);
++
++        dotPaint.setColor(color);
++        canvas.drawCircle(left + padH + dotR, top + h / 2f, dotR, dotPaint);
++
++        textPaint.setColor(color);
++        final Paint.FontMetrics fm = textPaint.getFontMetrics();
++        final float baseline = top + h / 2f - (fm.ascent + fm.descent) / 2f;
++        canvas.drawText(drawnText, 0, drawnText.length(), left + padH + dotR * 2 + gap, baseline, textPaint);
++    }
++
++    @Override
++    public boolean onTouchEvent(android.view.MotionEvent event) {
++        // only the pill itself is tappable, not the whole row
++        if (event.getAction() == android.view.MotionEvent.ACTION_DOWN && !pill.contains(event.getX(), event.getY())) {
++            return false;
++        }
++        return super.onTouchEvent(event);
++    }
++
++    @Override
++    public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
++        super.onInitializeAccessibilityNodeInfo(info);
++        info.setClassName("android.widget.Button");
++        info.setClickable(true);
++    }
++}
 diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/XraygramWordmarkDrawable.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/XraygramWordmarkDrawable.java
 new file mode 100644
 index 000000000..9169c5f81
@@ -1099,10 +2093,18 @@ index cb6f2e2a7..eecadaf3c 100644
  		if (VoIPService.getSharedInstance() != null) {
  			VoIPService.getSharedInstance().hangUp(() -> {
 diff --git a/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java
-index e6478ee82..79b4cbebb 100644
+index e6478ee82..a818d5c18 100644
 --- a/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java
 +++ b/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java
-@@ -3436,7 +3436,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
+@@ -617,6 +617,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
+     private FragmentContextView fragmentContextView;
+     private FrameLayout fragmentContextViewWrapper;
+     private DialogsActivityTopPanelLayout topPanelLayout;
++    private org.telegram.ui.Components.XrayStatusPill xrayStatusPill; // Xraygram (FEAT-20, PAR-23)
+     private DialogsActivityTopBubblesFadeView topBubblesFadeView;
+     private ActiveGiftAuctionsHintCell activeGiftAuctionsHintCell;
+     private DialogsHintCell dialogsHintCell;
+@@ -3436,7 +3437,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
              } else {
                  statusDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(null, dp(26));
                  statusDrawable.center = true;
@@ -1111,6 +2113,69 @@ index e6478ee82..79b4cbebb 100644
                  logoDrawable.setBounds(0, dp(2), logoDrawable.getIntrinsicWidth(), dp(2) + logoDrawable.getIntrinsicHeight());
                  // a new drawable (also when the view is recreated after a theme switch made elsewhere): remember its tint, the
                  // theme hook only recolors when the color differs from the last one applied
+@@ -4726,6 +4727,18 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
+             topPanelLayout.setBlurredBackground(topPanelLayoutBackground);
+             topPanelLayout.setDefaultRadiusDp(communityId != 0 ? 18 : 24);
+ 
++            // Xraygram (FEAT-20, PAR-23): XRAY status pill, the first row under the title; no glass card while it is alone
++            if (folderId == 0) {
++                xrayStatusPill = new org.telegram.ui.Components.XrayStatusPill(context, currentAccount);
++                xrayStatusPill.setOnClickListener(v -> presentFragment(new ProxyListActivity()));
++                topPanelLayout.addView(xrayStatusPill);
++                topPanelLayout.setPriority(xrayStatusPill, -10);
++                topPanelLayout.setDebugName(xrayStatusPill, "xraygram status");
++                topPanelLayout.setBareView(xrayStatusPill);
++                topPanelLayout.setViewVisible(xrayStatusPill, false, false);
++                xrayStatusPill.setOnVisibilityChanged(() -> updateXrayStatusPill(true));
++            }
++
+             fragmentLocationContextViewWrapper = new FrameLayout(context);
+             topPanelLayout.addView(fragmentLocationContextViewWrapper);
+             topPanelLayout.setPriority(fragmentLocationContextViewWrapper, 5);
+@@ -6693,6 +6706,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
+         if (actionBar != null && actionBar.isSearchFieldVisible()) {
+             actionBar.closeSearchField();
+             searchIsShowed = false;
++            updateXrayStatusPill(true);
+             updateFilterTabs(true, true);
+         }
+     }
+@@ -7408,6 +7422,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
+             searchAnimator = null;
+         }
+         searchIsShowed = show;
++        updateXrayStatusPill(animated); // Xraygram (FEAT-20 п. 8): hidden while searching
+         glassEngine.invalidate();
+         if (!show) {
+             updateFilterTabs(false, animated);
+@@ -10155,6 +10170,18 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
+         return undoView[0];
+     }
+ 
++    /** Xraygram (FEAT-20 п. 8): the pill is shown when it has a state and the search is closed. */
++    private void updateXrayStatusPill(boolean animated) {
++        if (xrayStatusPill == null || topPanelLayout == null) {
++            return;
++        }
++        topPanelLayout.setViewVisible(xrayStatusPill, xrayStatusPill.isShown2() && !searchIsShowed, animated);
++    }
++
++    private boolean xrayStatusPillVisible() {
++        return xrayStatusPill != null && xrayStatusPill.isShown2();
++    }
++
+     private void updateProxyButton(boolean animated, boolean force) {
+         if (proxyDrawable == null || doneItem != null && doneItem.getVisibility() == View.VISIBLE) {
+             return;
+@@ -13448,7 +13475,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
+             final boolean proxyVisible = proxyEnabled && !TextUtils.isEmpty(proxyAddress)
+                     || getMessagesController().blockedCountry && !SharedConfig.proxyList.isEmpty();
+ 
+-            if (proxyVisible) {
++            if (proxyVisible && !xrayStatusPillVisible()) { // Xraygram (FEAT-20 п. 11, F20-17): one way in, the pill
+                 io.addGap();
+                 io.add(proxyMenuSubItem);
+             }
 diff --git a/TMessagesProj/src/main/java/org/telegram/ui/IntroActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/IntroActivity.java
 index 9f8f0977b..6ec013a6e 100644
 --- a/TMessagesProj/src/main/java/org/telegram/ui/IntroActivity.java
@@ -1446,7 +2511,7 @@ index 271182cc7..28b64dd98 100644
                          Intent shareIntent = new Intent(Intent.ACTION_SEND);
                          shareIntent.setType("text/plain");
 diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ProxySettingsActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ProxySettingsActivity.java
-index 84ffe29b2..78d8cd759 100644
+index 84ffe29b2..d9285cdd1 100644
 --- a/TMessagesProj/src/main/java/org/telegram/ui/ProxySettingsActivity.java
 +++ b/TMessagesProj/src/main/java/org/telegram/ui/ProxySettingsActivity.java
 @@ -56,6 +56,7 @@ import org.telegram.messenger.SharedConfig;
@@ -1534,12 +2599,13 @@ index 84ffe29b2..78d8cd759 100644
              FrameLayout container = new FrameLayout(context);
              inputFieldsContainer.addView(container, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 64));
  
-@@ -412,6 +435,24 @@ public class ProxySettingsActivity extends BaseFragment {
+@@ -412,6 +435,25 @@ public class ProxySettingsActivity extends BaseFragment {
              } else {
                  inputFields[a].setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
              }
 +            if (a == FIELD_LINK) {
 +                inputFields[a].setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_VARIATION_URI);
++                inputFields[a].setTypeface(AndroidUtilities.getTypeface(AndroidUtilities.TYPEFACE_ROBOTO_MONO)); // FEAT-20 п. 7
 +                inputFields[a].addTextChangedListener(new TextWatcher() {
 +                    @Override
 +                    public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -1559,7 +2625,7 @@ index 84ffe29b2..78d8cd759 100644
              if (a == FIELD_SECRET) {
                  inputFields[a].addTextChangedListener(new TextWatcher() {
                      @Override
-@@ -448,7 +489,11 @@ public class ProxySettingsActivity extends BaseFragment {
+@@ -448,7 +490,11 @@ public class ProxySettingsActivity extends BaseFragment {
                      break;
                  case FIELD_SECRET:
                      inputFields[a].setHintText(LocaleController.getString(R.string.UseProxySecret));
@@ -1572,7 +2638,7 @@ index 84ffe29b2..78d8cd759 100644
                      break;
              }
              inputFields[a].setSelection(inputFields[a].length());
-@@ -488,6 +533,12 @@ public class ProxySettingsActivity extends BaseFragment {
+@@ -488,6 +534,12 @@ public class ProxySettingsActivity extends BaseFragment {
          pasteCell.setText(LocaleController.getString(R.string.PasteFromClipboard), false);
          ThemeBind.textColor(pasteCell.getTextView(), Theme.key_windowBackgroundWhiteBlueText4);
          pasteCell.setOnClickListener(v -> {
@@ -1585,7 +2651,7 @@ index 84ffe29b2..78d8cd759 100644
              if (pasteProxySettings != null) {
                  final ProxySettings.Type pasteType = pasteProxySettings.getType();
  
-@@ -570,6 +621,11 @@ public class ProxySettingsActivity extends BaseFragment {
+@@ -570,6 +622,11 @@ public class ProxySettingsActivity extends BaseFragment {
              String secret = inputFields[FIELD_SECRET].getText().toString();
              String url;
              try {
@@ -1597,7 +2663,7 @@ index 84ffe29b2..78d8cd759 100644
                  if (currentType == ProxySettings.Type.WEB) {
                      showShareQrCode(context, ProxySettings.builder()
                          .setType(currentType)
-@@ -628,12 +684,19 @@ public class ProxySettingsActivity extends BaseFragment {
+@@ -628,12 +685,19 @@ public class ProxySettingsActivity extends BaseFragment {
          checkShareDone(false);
  
          currentType = null;
@@ -1618,7 +2684,7 @@ index 84ffe29b2..78d8cd759 100644
          return fragmentView;
      }
  
-@@ -720,6 +783,11 @@ public class ProxySettingsActivity extends BaseFragment {
+@@ -720,6 +784,11 @@ public class ProxySettingsActivity extends BaseFragment {
          if (shareCell == null || doneItem == null || inputFields[FIELD_IP] == null || inputFields[FIELD_PORT] == null) {
              return;
          }
@@ -1630,7 +2696,7 @@ index 84ffe29b2..78d8cd759 100644
          boolean enabled = currentType == ProxySettings.Type.WEB
                  ? !TextUtils.isEmpty(WebProxyTransport.normalizeHost(inputFields[FIELD_IP].getText().toString()))
                      && WebProxyTransport.isValidSecret(inputFields[FIELD_SECRET].getText().toString())
-@@ -732,6 +800,44 @@ public class ProxySettingsActivity extends BaseFragment {
+@@ -732,6 +801,45 @@ public class ProxySettingsActivity extends BaseFragment {
          setProxyType(type, animated, null);
      }
  
@@ -1651,8 +2717,9 @@ index 84ffe29b2..78d8cd759 100644
 +            bottomCells[1].setText(hint);
 +            return;
 +        }
-+        bottomCells[1].setText(instant + "\n\n" + hint);
-+        if (!org.telegram.utils.proxy.XrayLinkPreview.instantValid(link)) {
++        final boolean instantOk = org.telegram.utils.proxy.XrayLinkPreview.instantValid(link);
++        bottomCells[1].setText(org.telegram.utils.proxy.XrayLinkPreview.styled(instant, instantOk, hint)); // FEAT-20 п. 13
++        if (!instantOk) {
 +            return;
 +        }
 +        xrayPreviewRunnable = () -> {
@@ -1665,7 +2732,7 @@ index 84ffe29b2..78d8cd759 100644
 +                    }
 +                    xrayRejectedLink = link; // FEAT-01 п. 6: xray rejected it — Save stays off
 +                    setShareDoneEnabled(false, true);
-+                    bottomCells[1].setText(verdict + "\n\n" + hint);
++                    bottomCells[1].setText(org.telegram.utils.proxy.XrayLinkPreview.styled(verdict, false, hint));
 +                });
 +            });
 +        };
@@ -1675,7 +2742,7 @@ index 84ffe29b2..78d8cd759 100644
      private void setProxyType(ProxySettings.Type type, boolean animated, Runnable onTransitionEnd) {
          if (currentType != type) {
              currentType = type;
-@@ -773,7 +879,18 @@ public class ProxySettingsActivity extends BaseFragment {
+@@ -773,7 +881,18 @@ public class ProxySettingsActivity extends BaseFragment {
  
                  TransitionManager.beginDelayedTransition(linearLayout2, transitionSet);
              }
@@ -1695,7 +2762,7 @@ index 84ffe29b2..78d8cd759 100644
                  bottomCells[0].setVisibility(View.VISIBLE);
                  bottomCells[1].setVisibility(View.GONE);
                  ((View) inputFields[FIELD_SECRET].getParent()).setVisibility(View.GONE);
-@@ -798,9 +915,10 @@ public class ProxySettingsActivity extends BaseFragment {
+@@ -798,9 +917,10 @@ public class ProxySettingsActivity extends BaseFragment {
                  ((View) inputFields[FIELD_PORT].getParent()).setVisibility(View.GONE);
                  inputFields[FIELD_PORT].setText("443");
              }
@@ -1709,7 +2776,7 @@ index 84ffe29b2..78d8cd759 100644
              checkShareDone(animated);
          }
      }
-@@ -808,8 +926,12 @@ public class ProxySettingsActivity extends BaseFragment {
+@@ -808,8 +928,12 @@ public class ProxySettingsActivity extends BaseFragment {
      @Override
      public void onTransitionAnimationEnd(boolean isOpen, boolean backward) {
          if (isOpen && !backward && addingNewProxy) {
@@ -1840,10 +2907,10 @@ index 496f76966..62c4c9261 100644
              addPeopleSheet.show();
 diff --git a/TMessagesProj/src/main/java/org/telegram/ui/XrayGateActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/XrayGateActivity.java
 new file mode 100644
-index 000000000..a83ff5e9b
+index 000000000..a77e2e9c4
 --- /dev/null
 +++ b/TMessagesProj/src/main/java/org/telegram/ui/XrayGateActivity.java
-@@ -0,0 +1,320 @@
+@@ -0,0 +1,347 @@
 +package org.telegram.ui;
 +
 +import android.content.ClipData;
@@ -1963,12 +3030,21 @@ index 000000000..a83ff5e9b
 +        layout.setOrientation(LinearLayout.VERTICAL);
 +        scrollView.addView(layout, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 +
++        // Xraygram (FEAT-20 п. 13, PAR-24): overline in monospace and the accent
++        TextView overline = new TextView(context);
++        overline.setText("XRAY · VLESS");
++        overline.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
++        overline.setTypeface(AndroidUtilities.getTypeface(AndroidUtilities.TYPEFACE_ROBOTO_MONO));
++        overline.setLetterSpacing(2f / 12f);
++        ThemeBind.textColor(overline, Theme.key_windowBackgroundWhiteBlueText);
++        layout.addView(overline, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 21, 20, 21, 0));
++
 +        TextView title = new TextView(context);
 +        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 22);
 +        title.setTypeface(AndroidUtilities.bold());
 +        ThemeBind.textColor(title, Theme.key_windowBackgroundWhiteBlackText);
 +        title.setText(str("Подключение через XRAY", "Connect through XRAY"));
-+        layout.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 21, 20, 21, 0));
++        layout.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 21, 6, 21, 0));
 +
 +        TextView subtitle = new TextView(context);
 +        subtitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
@@ -2003,9 +3079,14 @@ index 000000000..a83ff5e9b
 +        }
 +
 +        linkContainer = new FrameLayout(context);
-+        layout.addView(linkContainer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 64));
++        // Xraygram (FEAT-20 п. 13): the field on the surface with an accent outline (error colour on a bad link)
++        linkBox = new android.graphics.drawable.GradientDrawable();
++        linkBox.setCornerRadius(AndroidUtilities.dp(12));
++        linkContainer.setBackground(linkBox);
++        layout.addView(linkContainer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 64, 16, 8, 16, 0));
 +        linkField = new EditTextBoldCursor(context);
-+        linkField.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
++        linkField.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
++        linkField.setTypeface(AndroidUtilities.getTypeface(AndroidUtilities.TYPEFACE_ROBOTO_MONO));
 +        ThemeBind.editHintColor(linkField, Theme.key_windowBackgroundWhiteHintText);
 +        ThemeBind.textColor(linkField, Theme.key_windowBackgroundWhiteBlackText);
 +        linkField.setBackground(null);
@@ -2016,7 +3097,7 @@ index 000000000..a83ff5e9b
 +        linkField.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.CENTER_VERTICAL);
 +        ThemeBind.editHeaderHintColor(linkField, Theme.key_windowBackgroundWhiteBlueHeader);
 +        linkField.setTransformHintToHeader(true);
-+        ThemeBind.lineColors(linkField, Theme.key_windowBackgroundWhiteInputField, Theme.key_windowBackgroundWhiteInputFieldActivated, Theme.key_text_RedRegular);
++        linkField.setLineColors(0, 0, 0); // the box replaces the underline
 +        linkField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_VARIATION_URI);
 +        linkField.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
 +        linkField.setHintText(org.telegram.utils.proxy.XrayLinkPreview.fieldTitle());
@@ -2038,7 +3119,7 @@ index 000000000..a83ff5e9b
 +                update();
 +            }
 +        });
-+        linkContainer.addView(linkField, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.LEFT | Gravity.TOP, 21, 12, 21, 0));
++        linkContainer.addView(linkField, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.LEFT | Gravity.TOP, 14, 10, 14, 2));
 +
 +        previewCell = new TextInfoPrivacyCell(context);
 +        layout.addView(previewCell, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
@@ -2062,6 +3143,17 @@ index 000000000..a83ff5e9b
 +
 +        update();
 +        return fragmentView;
++    }
++
++    private android.graphics.drawable.GradientDrawable linkBox;
++
++    private void updateLinkBox(boolean error) {
++        if (linkBox == null) {
++            return;
++        }
++        linkBox.setColor(Theme.getColor(Theme.key_dialogBackground));
++        linkBox.setStroke(Math.max(1, AndroidUtilities.dp(1)),
++                Theme.getColor(error ? Theme.key_text_RedRegular : Theme.key_windowBackgroundWhiteInputFieldActivated));
 +    }
 +
 +    private void select(int index) {
@@ -2103,11 +3195,12 @@ index 000000000..a83ff5e9b
 +        }
 +        final String hint = org.telegram.utils.proxy.XrayLinkPreview.hint();
 +        final String instant = org.telegram.utils.proxy.XrayLinkPreview.instant(link);
++        updateLinkBox(instant != null && !valid);
 +        if (instant == null) {
 +            previewCell.setText(hint);
 +            return;
 +        }
-+        previewCell.setText(selected == -1 ? instant + "\n\n" + hint : instant);
++        previewCell.setText(org.telegram.utils.proxy.XrayLinkPreview.styled(instant, valid, selected == -1 ? hint : null));
 +        if (!valid) {
 +            return;
 +        }
@@ -2122,7 +3215,8 @@ index 000000000..a83ff5e9b
 +                    rejectedLink = link; // FEAT-01 п. 6: xray rejected it — no entry from this link
 +                    connectButton.setEnabled(false);
 +                    connectButton.setAlpha(0.5f);
-+                    previewCell.setText(selected == -1 ? verdict + "\n\n" + hint : verdict);
++                    updateLinkBox(true);
++                    previewCell.setText(org.telegram.utils.proxy.XrayLinkPreview.styled(verdict, false, selected == -1 ? hint : null));
 +                });
 +            });
 +        };
@@ -3411,10 +4505,10 @@ index 000000000..6c12e9e4c
 +}
 diff --git a/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayLinkPreview.java b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayLinkPreview.java
 new file mode 100644
-index 000000000..a69ba611f
+index 000000000..6bf5a04e2
 --- /dev/null
 +++ b/TMessagesProj/src/main/java/org/telegram/utils/proxy/XrayLinkPreview.java
-@@ -0,0 +1,91 @@
+@@ -0,0 +1,113 @@
 +package org.telegram.utils.proxy;
 +
 +import android.text.TextUtils;
@@ -3440,6 +4534,28 @@ index 000000000..a69ba611f
 +
 +    public static String fieldTitle() {
 +        return str("Ссылка", "Link");
++    }
++
++    /**
++     * Xraygram (FEAT-20 п. 13, PAR-24): the preview line in the theme — success "✓ …" in the accent, an error in the
++     * error colour; the hint below stays in the cell's colour.
++     */
++    public static CharSequence styled(String preview, boolean ok, String hint) {
++        android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
++        if (preview != null) {
++            final String p = ok ? "✓ " + preview : preview;
++            sb.append(p);
++            sb.setSpan(new android.text.style.ForegroundColorSpan(org.telegram.ui.ActionBar.Theme.getColor(ok
++                            ? org.telegram.ui.ActionBar.Theme.key_windowBackgroundWhiteBlueText : org.telegram.ui.ActionBar.Theme.key_text_RedRegular)),
++                    0, p.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
++            if (hint != null) {
++                sb.append("\n\n");
++            }
++        }
++        if (hint != null) {
++            sb.append(hint);
++        }
++        return sb;
 +    }
 +
 +    /** Instant check in Java. null = empty field. */
@@ -4604,7 +5720,7 @@ index 9e9962e68..2763a8614 100644
 +    android:accountType="io.github.xraygram.account"/>
 \ No newline at end of file
 diff --git a/TMessagesProj_AppStandalone/build.gradle b/TMessagesProj_AppStandalone/build.gradle
-index 155126924..c3c2e3f7e 100644
+index 155126924..3e5ab26d9 100644
 --- a/TMessagesProj_AppStandalone/build.gradle
 +++ b/TMessagesProj_AppStandalone/build.gradle
 @@ -21,6 +21,7 @@ dependencies {
@@ -4660,6 +5776,18 @@ index 155126924..c3c2e3f7e 100644
              }
              ext {
                  abiVersionCode = 9
+@@ -123,7 +133,10 @@ android {
+     applicationVariants.all { variant ->
+         variant.outputs.all { output ->
+             outputFileName = "app.apk"
+-            output.versionCodeOverride = defaultConfig.versionCode * 10 + variant.productFlavors.get(0).abiVersionCode
++            // Xraygram: versionCode grows with every build (android/scripts/build-local.sh: YYMMDD*100+N from the build ID),
++            // so an update installs over any earlier build; the last digit stays the upstream ABI code
++            def xgCode = project.findProperty("XRAYGRAM_VERSION_CODE")
++            output.versionCodeOverride = (xgCode ? Integer.parseInt(xgCode.toString()) : defaultConfig.versionCode) * 10 + variant.productFlavors.get(0).abiVersionCode
+         }
+     }
+ 
 diff --git a/TMessagesProj_AppStandalone/google-services.json b/TMessagesProj_AppStandalone/google-services.json
 index 640e841b2..61af7f86b 100644
 --- a/TMessagesProj_AppStandalone/google-services.json

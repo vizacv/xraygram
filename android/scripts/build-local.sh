@@ -189,6 +189,9 @@ gradle_env() {
 	local build_id; build_id="$(next_build_id)"
 	echo "$build_id" > "$XG_WORK/build-id"
 	export ORG_GRADLE_PROJECT_XRAYGRAM_BUILD="$build_id"
+	# versionCode растёт с каждой сборкой: android-20261119-4 → 26111904 (×10 + ABI в gradle → 261119049)
+	local ymd="${build_id#android-20}" ; ymd="${ymd%-*}"
+	export ORG_GRADLE_PROJECT_XRAYGRAM_VERSION_CODE="$(( 10#$ymd * 100 + ${build_id##*-} ))"
 	export ORG_GRADLE_PROJECT_XRAYGRAM_KEYSTORE="$XG_KEYSTORE"
 	export ORG_GRADLE_PROJECT_XRAYGRAM_KEYSTORE_PASSWORD="$XRAYGRAM_KEYSTORE_PASSWORD"
 	export ORG_GRADLE_PROJECT_XRAYGRAM_KEY_ALIAS="$XRAYGRAM_KEY_ALIAS"

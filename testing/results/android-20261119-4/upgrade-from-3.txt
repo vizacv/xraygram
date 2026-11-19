@@ -1,0 +1,12 @@
+# Обновление android-20261119-3 → -4 поверх (эмулятор)
+heavy-build: [qa] дождался очереди через 380 с
+1) ставлю -3: Success
+   -3 подключён: 12 accepted в access.log
+   аккаунты до: 
+2) обновляю до -4: Success
+   версия: versionCode=261119049 lastUpdateTime=2026-11-19 10:57:20
+PASS U1 после обновления XRAY-запись на месте: DC через тестовый сервер за 3 с
+PASS U2 прямых соединений к Telegram нет
+   аккаунты после: 
+   аутентификаторы: type=io.github.xraygram.account 
+PASS U3 крэшей нет
