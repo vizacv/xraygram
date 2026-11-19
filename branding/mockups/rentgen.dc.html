@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Рентген</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#3EF2C8}a:hover{color:#8FFBE0}
+</style>
+</helmet>
+<div style="width: 1800px; height: 1070px; box-sizing: border-box; padding: 48px; background: #05080F; font-family: Inter, system-ui, sans-serif; color: #E6F1FF; display: flex; flex-direction: column; gap: 24px">
+
+  <div style="display: flex; align-items: flex-end; justify-content: space-between; height: 70px">
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <div style="font-size: 32px; font-weight: 700; letter-spacing: -0.5px">А · Рентген</div>
+      <div style="font-size: 16px; color: #8EA3BF">Тёмная по умолчанию, светящийся бирюзовый акцент, как снимок на негатоскопе. Сервер и пинг — моноширинным.</div>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8EA3BF">
+      <div style="width: 28px; height: 28px; border-radius: 8px; background: #0B1220; border: 1px solid #22304A"></div>#0B1220
+      <div style="width: 28px; height: 28px; border-radius: 8px; background: #121B2E; border: 1px solid #22304A"></div>#121B2E
+      <div style="width: 28px; height: 28px; border-radius: 8px; background: #3EF2C8"></div>#3EF2C8
+      <div style="width: 28px; height: 28px; border-radius: 8px; background: #E6F1FF"></div>#E6F1FF
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 48px">
+
+    <!-- 1. Заставка -->
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div style="font-size: 14px; color: #8EA3BF; height: 20px">Заставка и вступление</div>
+      <div style="width: 390px; height: 844px; border-radius: 40px; overflow: hidden; background: #0B1220; border: 1px solid #1C2840; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; padding: 0 32px 40px">
+        <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px">
+          <div style="position: relative; width: 176px; height: 176px; border-radius: 40px; overflow: hidden; box-shadow: 0 0 60px rgba(62,242,200,0.25)">
+            <img src="/_blob/8933981c1f92efeb3ab885568552fa93" alt="Иконка Xraygram" style="width: 176px; height: 176px; display: block">
+            <div style="position: absolute; left: 0; right: 0; top: 70px; height: 34px; background: linear-gradient(180deg, rgba(62,242,200,0) 0%, rgba(62,242,200,0.55) 50%, rgba(62,242,200,0) 100%)"></div>
+            <div style="position: absolute; left: 0; right: 0; top: 86px; height: 2px; background: #8FFBE0"></div>
+          </div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 600; letter-spacing: 6px">XRAYGRAM</div>
+          <div style="font-size: 15px; line-height: 22px; color: #8EA3BF; text-align: center">Неофициальный клиент Telegram,<br>который ходит через ваш XRAY-сервер</div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #5F7391">луч сканирует иконку сверху вниз · 1,2 с</div>
+        </div>
+        <a href="#" style="width: 100%; height: 52px; border-radius: 14px; background: #3EF2C8; color: #04211B; font-weight: 600; font-size: 16px; display: flex; align-items: center; justify-content: center; text-decoration: none">Начать</a>
+        <div style="margin-top: 14px; font-size: 13px; color: #8EA3BF">Русский · English</div>
+      </div>
+    </div>
+
+    <!-- 2. Список чатов -->
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div style="font-size: 14px; color: #8EA3BF; height: 20px">Список чатов + статус XRAY</div>
+      <div style="width: 390px; height: 844px; border-radius: 40px; overflow: hidden; background: #0B1220; border: 1px solid #1C2840; box-sizing: border-box; display: flex; flex-direction: column">
+        <div style="padding: 28px 20px 12px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; align-items: center; justify-content: space-between">
+            <button aria-label="Меню" style="width: 44px; height: 44px; border: 0; background: transparent; color: #E6F1FF; padding: 0; display: flex; align-items: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+            <div style="font-size: 20px; font-weight: 700">Xraygram</div>
+            <button aria-label="Поиск" style="width: 44px; height: 44px; border: 0; background: transparent; color: #E6F1FF; padding: 0; display: flex; align-items: center; justify-content: flex-end"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
+          </div>
+          <div style="align-self: center; display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; background: rgba(62,242,200,0.10); border: 1px solid rgba(62,242,200,0.35); font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #3EF2C8">
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: #3EF2C8; box-shadow: 0 0 8px #3EF2C8"></div>XRAY · nl-1 · 85 мс
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column">
+          <sc-for list="{{chats}}" as="c" hint-placeholder-count="6">
+            <div style="display: flex; gap: 12px; padding: 10px 20px; align-items: center">
+              <div style="width: 52px; height: 52px; border-radius: 50%; background: {{c.bg}}; color: #0B1220; font-weight: 700; font-size: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0">{{c.ini}}</div>
+              <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid #16213A; padding-bottom: 12px">
+                <div style="display: flex; justify-content: space-between">
+                  <div style="font-weight: 600; font-size: 16px">{{c.name}}</div>
+                  <div style="font-size: 13px; color: #8EA3BF">{{c.time}}</div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px">
+                  <div style="font-size: 14px; color: #8EA3BF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{c.msg}}</div>
+                  <sc-if value="{{c.unread}}" hint-placeholder-val="{{true}}">
+                    <div style="min-width: 22px; height: 22px; border-radius: 11px; background: #3EF2C8; color: #04211B; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 6px; box-sizing: border-box">{{c.unread}}</div>
+                  </sc-if>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="flex-grow: 1"></div>
+        <div style="display: flex; justify-content: flex-end; padding: 0 20px 28px">
+          <button aria-label="Новое сообщение" style="width: 58px; height: 58px; border-radius: 18px; border: 0; background: #3EF2C8; color: #04211B; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 24px rgba(62,242,200,0.35)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Чат -->
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div style="font-size: 14px; color: #8EA3BF; height: 20px">Чат</div>
+      <div style="width: 390px; height: 844px; border-radius: 40px; overflow: hidden; background: #0B1220; border: 1px solid #1C2840; box-sizing: border-box; display: flex; flex-direction: column">
+        <div style="padding: 24px 12px 12px; display: flex; align-items: center; gap: 8px; background: #121B2E; border-bottom: 1px solid #1C2840">
+          <button aria-label="Назад" style="width: 44px; height: 44px; border: 0; background: transparent; color: #3EF2C8; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+          <div style="width: 40px; height: 40px; border-radius: 50%; background: #F2B33E; color: #0B1220; font-weight: 700; display: flex; align-items: center; justify-content: center">А</div>
+          <div style="display: flex; flex-direction: column; gap: 2px">
+            <div style="font-weight: 600; font-size: 16px">Андрей</div>
+            <div style="font-size: 12px; color: #3EF2C8">в сети</div>
+          </div>
+        </div>
+        <div style="flex-grow: 1; padding: 16px 14px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; background: radial-gradient(circle at 50% 30%, #0F1A2E 0%, #0B1220 70%)">
+          <sc-for list="{{msgs}}" as="m" hint-placeholder-count="5">
+            <sc-if value="{{m.out}}" hint-placeholder-val="{{false}}">
+              <div style="align-self: flex-end; max-width: 78%; background: #10403A; border: 1px solid rgba(62,242,200,0.3); border-radius: 18px 18px 6px 18px; padding: 9px 12px; font-size: 15px; line-height: 21px">{{m.t}}<span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #7FD9C2; margin-left: 8px">{{m.time}}</span></div>
+            </sc-if>
+            <sc-if value="{{m.inc}}" hint-placeholder-val="{{true}}">
+              <div style="align-self: flex-start; max-width: 78%; background: #18233A; border-radius: 18px 18px 18px 6px; padding: 9px 12px; font-size: 15px; line-height: 21px">{{m.t}}<span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8EA3BF; margin-left: 8px">{{m.time}}</span></div>
+            </sc-if>
+          </sc-for>
+          <div style="align-self: flex-end; width: 240px; background: #121B2E; border: 1px solid rgba(62,242,200,0.4); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 6px">
+            <div style="font-size: 12px; color: #8EA3BF">Сервер XRAY</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #3EF2C8">nl-1 · vless · Reality</div>
+            <div style="font-size: 12px; color: #F2B33E">Кто получит ссылку — пользуется вашим сервером</div>
+          </div>
+        </div>
+        <div style="padding: 10px 12px 24px; display: flex; align-items: center; gap: 8px; background: #121B2E">
+          <button aria-label="Прикрепить" style="width: 44px; height: 44px; border: 0; background: transparent; color: #8EA3BF; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11l-8.5 8.5a5 5 0 01-7-7L13 4a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L14 7"/></svg></button>
+          <label style="flex-grow: 1; height: 44px; border-radius: 22px; background: #0B1220; border: 1px solid #22304A; display: flex; align-items: center; padding: 0 16px; font-size: 15px; color: #8EA3BF">Сообщение<input aria-label="Сообщение" style="position: absolute; opacity: 0; width: 1px"></label>
+          <button aria-label="Отправить" style="width: 44px; height: 44px; border-radius: 50%; border: 0; background: #3EF2C8; color: #04211B; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Экран XRAY -->
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div style="font-size: 14px; color: #8EA3BF; height: 20px">Подключение через XRAY</div>
+      <div style="width: 390px; height: 844px; border-radius: 40px; overflow: hidden; background: #0B1220; border: 1px solid #1C2840; box-sizing: border-box; display: flex; flex-direction: column; padding: 40px 24px 32px; gap: 20px">
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #3EF2C8; letter-spacing: 2px">XRAY · VLESS</div>
+          <div style="font-size: 26px; font-weight: 700; line-height: 32px">Подключение<br>через XRAY</div>
+          <div style="font-size: 15px; line-height: 22px; color: #8EA3BF">Пока сервер не добавлен, Xraygram никуда не подключается.</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <label style="font-size: 13px; color: #8EA3BF">Ссылка на сервер</label>
+          <div style="border-radius: 14px; background: #121B2E; border: 1px solid #3EF2C8; padding: 14px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 18px; color: #C9D6EA; word-break: break-all">vless://3f1c…@nl-1.example.net:443?security=reality&amp;sni=…</div>
+          <div style="display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #3EF2C8">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>nl-1 · vless · Reality · 443
+          </div>
+        </div>
+        <a href="#" style="height: 52px; border-radius: 14px; background: #3EF2C8; color: #04211B; font-weight: 600; font-size: 16px; display: flex; align-items: center; justify-content: center; text-decoration: none">Подключить</a>
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <div style="font-size: 13px; color: #8EA3BF; margin-bottom: 6px">Сохранённые серверы</div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-radius: 12px; background: #121B2E">
+            <div style="font-size: 15px">nl-1</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #3EF2C8">85 мс</div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-radius: 12px; background: #121B2E">
+            <div style="font-size: 15px">de-2</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #F2B33E">240 мс</div>
+          </div>
+        </div>
+        <div style="flex-grow: 1"></div>
+        <a href="#" style="align-self: center; font-size: 13px; color: #8EA3BF; text-decoration: none; padding: 12px">Подключиться без XRAY (напрямую)</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1800,"height":1070}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var chats = [
+      { ini: 'М', name: 'Мама', msg: 'Ты поел?', time: '08:12', unread: 2, bg: '#F28CB1' },
+      { ini: 'Р', name: 'Работа · дизайн', msg: 'Сергей: макеты к обеду', time: '08:05', unread: 5, bg: '#7FB2FF' },
+      { ini: 'И', name: 'Избранное', msg: 'nl-1 · vless · Reality', time: '07:40', unread: 0, bg: '#3EF2C8' },
+      { ini: 'Д', name: 'Друзья', msg: 'Аня: в субботу на каток?', time: 'вчера', unread: 0, bg: '#B49CFF' },
+      { ini: 'А', name: 'Андрей', msg: 'Спасибо, подключился!', time: 'вчера', unread: 0, bg: '#F2B33E' },
+      { ini: 'К', name: 'Книжный клуб', msg: 'Седьмую главу обсуждаем в четверг', time: 'пн', unread: 0, bg: '#8EE07A' }
+    ];
+    var msgs = [
+      { t: 'Привет! Твой сервер завёлся?', time: '21:02', out: false },
+      { t: 'Да, всё через свой XRAY, звонки тоже', time: '21:03', out: true },
+      { t: 'Скинешь? У меня прокси опять отвалился', time: '21:04', out: false },
+      { t: 'Держи, только никому дальше', time: '21:05', out: true }
+    ].map(function (m) { return Object.assign({}, m, { inc: !m.out }); });
+    return { chats: chats, msgs: msgs };
+  }
+}
+</script>
+</body>
+</html>
