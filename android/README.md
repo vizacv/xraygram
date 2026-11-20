@@ -136,6 +136,10 @@ tools/heavy-build.sh android android/scripts/smoke-emulator.sh reality
 Тяжёлые шаги (`libxray`, `apk`) идут через очередь `tools/heavy-build.sh android ...` (на Маке параллельно собирает
 iOS-тема). `quick` идёт без очереди.
 
+**Место на диске** (`docs/orchestration.md`): `upstream/` ≤ 30 ГБ (`tools/cleanup.sh size`). В
+`upstream/android-work/dist/` держим только последнюю сборку; прежние APK удаляем после вердикта QA по новой.
+После чистки кэшей следующая сборка идёт с нуля (~20 мин).
+
 **Не правьте `android/scripts/*.sh`, пока идёт сборка:** bash дочитывает скрипт на ходу и после правки продолжает
 не с того места (так один раз обёртка «ушла» в `step_emulator` и повисла на `adb wait-for-device`).
 

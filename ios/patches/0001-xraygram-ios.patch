@@ -758,10 +758,28 @@ index d7354475..0fe121ac 100644
      return None
  
 diff --git a/build-system/Make/Make.py b/build-system/Make/Make.py
-index 08b05aef..55979a36 100644
+index 08b05aef..f9d3355d 100644
 --- a/build-system/Make/Make.py
 +++ b/build-system/Make/Make.py
-@@ -48,6 +48,7 @@ class BazelCommandLine:
+@@ -26,6 +26,17 @@ class ResolvedCodesigningData:
+         self.use_xcode_managed_codesigning = use_xcode_managed_codesigning
+ 
+ 
++def disk_cache_gc_arguments():
++    # Xraygram: лимит дискового кэша Bazel (бюджет upstream/ — 30 ГБ). XRAYGRAM_DISK_CACHE_MAX=0 — без лимита.
++    max_size = os.environ.get('XRAYGRAM_DISK_CACHE_MAX', '8G')
++    if max_size in ('', '0'):
++        return []
++    return [
++        '--experimental_disk_cache_gc_max_size={}'.format(max_size),
++        '--experimental_disk_cache_gc_idle_delay=1m',
++    ]
++
++
+ class BazelCommandLine:
+     def __init__(self, bazel, override_bazel_version, override_xcode_version, bazel_user_root):
+         self.build_environment = BuildEnvironment(
+@@ -48,6 +59,7 @@ class BazelCommandLine:
          self.show_actions = False
          self.enable_sandbox = False
          self.disable_provisioning_profiles = False
@@ -769,7 +787,7 @@ index 08b05aef..55979a36 100644
          self.profile_swift = False
          self.embed_watch_app = False
          self.watch_api_id = None
-@@ -143,6 +144,10 @@ class BazelCommandLine:
+@@ -143,6 +155,10 @@ class BazelCommandLine:
      def set_disable_provisioning_profiles(self):
          self.disable_provisioning_profiles = True
  
@@ -780,7 +798,16 @@ index 08b05aef..55979a36 100644
      def set_profile_swift(self, value):
          self.profile_swift = value
  
-@@ -303,6 +308,8 @@ class BazelCommandLine:
+@@ -256,7 +272,7 @@ class BazelCommandLine:
+         elif self.cache_dir is not None:
+             combined_arguments += [
+                 '--disk_cache={path}'.format(path=self.cache_dir)
+-            ]
++            ] + disk_cache_gc_arguments()
+ 
+         if self.continue_on_error:
+             combined_arguments += ['--keep_going']
+@@ -303,6 +319,8 @@ class BazelCommandLine:
  
          if self.disable_provisioning_profiles:
              combined_arguments += ['--//Telegram:disableProvisioningProfiles']
@@ -789,7 +816,34 @@ index 08b05aef..55979a36 100644
  
          combined_arguments += self.common_args
          combined_arguments += self.common_build_args
-@@ -653,6 +660,10 @@ def build(bazel, arguments):
+@@ -317,7 +335,7 @@ class BazelCommandLine:
+         elif self.cache_dir is not None:
+             combined_arguments += [
+                 '--disk_cache={path}'.format(path=self.cache_dir)
+-            ]
++            ] + disk_cache_gc_arguments()
+ 
+         combined_arguments += self.configuration_args
+         if self.profile_swift:
+@@ -354,7 +372,7 @@ class BazelCommandLine:
+         elif self.cache_dir is not None:
+             combined_arguments += [
+                 '--disk_cache={path}'.format(path=self.cache_dir)
+-            ]
++            ] + disk_cache_gc_arguments()
+ 
+         combined_arguments += self.configuration_args
+ 
+@@ -384,7 +402,7 @@ class BazelCommandLine:
+         elif self.cache_dir is not None:
+             combined_arguments += [
+                 '--disk_cache={path}'.format(path=self.cache_dir)
+-            ]
++            ] + disk_cache_gc_arguments()
+ 
+         # Add user-provided query arguments
+         combined_arguments += query_args
+@@ -653,6 +671,10 @@ def build(bazel, arguments):
      bazel_command_line.set_show_actions(arguments.showActions)
      bazel_command_line.set_enable_sandbox(arguments.sandbox)
      bazel_command_line.set_profile_swift(arguments.profileSwift)
@@ -800,7 +854,7 @@ index 08b05aef..55979a36 100644
  
      bazel_command_line.set_split_swiftmodules(arguments.enableParallelSwiftmoduleGeneration)
  
-@@ -1088,6 +1099,18 @@ if __name__ == '__main__':
+@@ -1088,6 +1110,18 @@ if __name__ == '__main__':
          default=False,
          help='Enable sandbox.',
      )

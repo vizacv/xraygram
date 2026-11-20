@@ -55,6 +55,13 @@ iPhone со встроенным xray (VLESS+Reality и др.), которую �
 Xcode берётся из `/Applications/Xcode.app` через `DEVELOPER_DIR`, `xcode-select` и sudo не нужны.
 Ключи API — `.secrets/api.env` (те же, что для macOS).
 
+**Место на диске** (бюджет `upstream/` — 30 ГБ, `docs/orchestration.md`):
+- кэш Bazel ограничен в `Make.py` флагом `--experimental_disk_cache_gc_max_size=8G` (переменная
+  `XRAYGRAM_DISK_CACHE_MAX`, `0` — без лимита); чистится, пока сервер Bazel простаивает (1 мин);
+- `build.sh snapshot` делает APFS-клон и оставляет в `dist/` новую и предыдущую сборки;
+  после вердикта QA — `build.sh prune-dist` (только последняя); `build.sh disk` — размеры;
+- первая сборка после чистки кэшей — около часа.
+
 ```bash
 ios/scripts/build.sh src        # клон Telegram-iOS + сабмодули + патч (один раз, ~1 ГБ)
 ```

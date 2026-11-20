@@ -14,7 +14,9 @@
 #   device-check  собрать фреймворки для iPhone без профиля (проверка компиляции/линковки arm64)
 #   install    поставить dist/Xraygram.ipa на подключённый iPhone (devicectl)
 #   snapshot   снять последнюю сборку под ID ios-ГГГГММДД-N (docs/process.md): dist/Xraygram-<ID>-sim.app
-#              и/или dist/Xraygram-<ID>.ipa; дальше — строка в docs/builds.md и сообщение QA
+#              и/или dist/Xraygram-<ID>.ipa (APFS-клон); в dist/ остаются новая и предыдущая сборки
+#   prune-dist после вердикта QA: оставить в dist/ только последнюю сборку
+#   disk       размеры кэша Bazel, output base, dist/ (бюджет upstream/ — 30 ГБ; кэш Bazel ≤ 8 ГБ через Make.py)
 #   status     что готово
 #
 # По умолчанию Debug (debug_sim_arm64 / debug_arm64); --release — release_*.
@@ -329,10 +331,45 @@ next_build_id() {
 	echo "ios-$today-$n"
 }
 
+# Снимки в dist/ по порядку ID (ГГГГММДД*1000+N), от старых к новым: «ключ путь».
+dist_snapshots() {
+	local file base id date n
+	for file in "$XG_DIST"/Xraygram-ios-*; do
+		[[ -e "$file" ]] || continue
+		base="$(basename "$file")"
+		id="${base#Xraygram-}"; id="${id%-sim.app}"; id="${id%.ipa}"
+		date="${id#ios-}"; date="${date%%-*}"; n="${id##*-}"
+		[[ "$date" =~ ^[0-9]{8}$ && "$n" =~ ^[0-9]+$ ]] || continue
+		echo "$((10#$date * 1000 + 10#$n)) $file"
+	done | sort -n
+}
+
+# Оставить в dist/ только $1 последних сборок (по ID; .app и .ipa одной сборки — вместе) — бюджет upstream/ 30 ГБ.
+prune_dist() {
+	local keep="$1" keys key file
+	keys="$(dist_snapshots | awk '{print $1}' | uniq | tail -n "$keep" | tr '\n' ' ')"
+	while read -r key file; do
+		[[ -n "$key" ]] || continue
+		[[ " $keys " == *" $key "* ]] && continue
+		xg_log "dist: удаляю старую сборку $(basename "$file")"
+		rm -rf "$file"
+	done < <(dist_snapshots)
+}
+
+# Размеры рабочих каталогов (бюджет upstream/ — 30 ГБ; кэш Bazel ограничен в Make.py, XRAYGRAM_DISK_CACHE_MAX=8G).
+cmd_disk() {
+	local dir
+	for dir in "$XG_BAZEL_CACHE" "$XG_BAZEL_ROOT" "$XG_DIST" "$XG_WORK"; do
+		[[ -e "$dir" ]] && du -sh "$dir" 2>/dev/null
+	done
+	return 0
+}
+
 cmd_snapshot() {
 	local id="${XRAYGRAM_BUILD_ID:-$(next_build_id)}" made=0
 	if [[ -d "$XG_DIST/Xraygram-sim.app" ]]; then
-		ditto "$XG_DIST/Xraygram-sim.app" "$XG_DIST/Xraygram-$id-sim.app"
+		# APFS-клон: место не занимает, пока файлы не меняются.
+		cp -cR "$XG_DIST/Xraygram-sim.app" "$XG_DIST/Xraygram-$id-sim.app"
 		xg_log "$id: $XG_DIST/Xraygram-$id-sim.app"
 		made=1
 	fi
@@ -342,7 +379,16 @@ cmd_snapshot() {
 		made=1
 	fi
 	(( made )) || xg_die "нечего снимать: нет dist/Xraygram-sim.app и dist/Xraygram.ipa"
-	xg_log "дальше: строка $id в docs/builds.md и сообщение QA (xraygram-tester)"
+	# Новая сборка + предыдущая (на ней QA-вердикт до проверки новой); более старые не храним.
+	prune_dist 2
+	cmd_disk
+	xg_log "дальше: строка $id в docs/builds.md и сообщение QA (xraygram-tester); после вердикта QA — $0 prune-dist"
+}
+
+# После вердикта QA по новой сборке: оставить в dist/ только её.
+cmd_prune_dist() {
+	prune_dist 1
+	cmd_disk
 }
 
 cmd_status() {
@@ -368,6 +414,8 @@ case "$COMMAND" in
 	device-check) cmd_device_check ;;
 	install) cmd_install ;;
 	snapshot) cmd_snapshot ;;
+	prune-dist) cmd_prune_dist ;;
+	disk) cmd_disk ;;
 	status) cmd_status ;;
 	*) xg_die "неизвестная команда: $COMMAND (см. --help)" ;;
 esac
