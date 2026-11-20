@@ -27,5 +27,6 @@
 ## Общее
 
 - `upstream/` — локальные клоны исходников для чтения кода (в git не коммитятся).
+- **Место на диске:** `upstream/` не больше 30 ГБ — только исходники, инструменты и последняя сборка каждой платформы. Кэши и старые сборки чистит `tools/cleanup.sh` после выдачи сборок (`tools/cleanup.sh size` — текущий размер). Правило — `docs/orchestration.md`.
 - Ядро: [XTLS/libXray](https://github.com/XTLS/libXray) (`Invoke` API, см. [android/research.md](android/research.md#api-libxray-invoke)).
 - Сборки — локально на Маке по очереди (`tools/heavy-build.sh`); CI — эталонные сборки по кнопке.

@@ -53,4 +53,7 @@ trap 'kill -TERM "$child" 2>/dev/null; wait "$child" 2>/dev/null; rm -rf "$LOCK"
 wait "$child"
 rc=$?
 rm -rf "$LOCK"
+# Бюджет места (docs/orchestration.md «Место на диске»): после каждой тяжёлой сборки — предупреждение.
+"$(dirname "$0")/cleanup.sh" size 2>/dev/null | grep -q "ПРЕВЫШЕН" && \
+	echo "heavy-build: upstream/ больше бюджета — сообщи оркестратору (tools/cleanup.sh)" >&2
 exit $rc
