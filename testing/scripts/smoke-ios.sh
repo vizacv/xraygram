@@ -186,7 +186,12 @@ P="$(app_pid2)"
 xcrun simctl terminate "$UDID" "$BID" 2>/dev/null
 sleep 2
 check E1 "процесс приложения завершён" bash -c "! kill -0 ${P:-0} 2>/dev/null"
-if (( KEEP )); then log "# устройство Xraygram QA оставлено включённым ($UDID)"; else xcrun simctl shutdown "$UDID" 2>/dev/null; fi
+for f in "$OUT"/*.png; do [[ -f "$f" ]] && sips -Z 1000 "$f" > /dev/null 2>&1; done   # скриншоты в репозитории — не больше 1000 px
+if (( KEEP )); then log "# устройство Xraygram QA оставлено включённым ($UDID)"
+else
+	xcrun simctl shutdown "$UDID" 2>/dev/null
+	xcrun simctl erase "$UDID" 2>/dev/null   # место на диске: данные приложения в симуляторе — до 4 ГБ
+fi
 log ""
 log "# Итог: $(grep -c '^PASS' "$REPORT") PASS, $(grep -c '^FAIL' "$REPORT") FAIL, $(grep -c '^WARN' "$REPORT") WARN, $(grep -c '^SKIP' "$REPORT") SKIP"
 (( FAILS == 0 ))
